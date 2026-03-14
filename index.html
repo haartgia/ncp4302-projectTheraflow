@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Theraflow Dashboard</title>
+<link rel="stylesheet" href="style.css">
+
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+
+        <div class="logo">
+              <img src="assets/theraflowlogo.png" alt="Theraflow Logo"
+              style="height: 60px; vertical-align: middle;">
+        </div>
+
+        <ul class="menu">
+
+            <li class="active">
+                <i class="fa-solid fa-house"></i>
+                <span>Home</span>
+            </li>
+
+            <li>
+                <i class="fa-regular fa-file"></i>
+                <span>Reports</span>
+            </li>
+
+            <li>
+                <i class="fa-solid fa-plus"></i>
+                <span>Exercises</span>
+            </li>
+
+            <li>
+                <i class="fa-solid fa-table-cells"></i>
+                <span>Dashboard</span>
+            </li>
+
+            <li>
+                <i class="fa-regular fa-user"></i>
+                <span>Profile</span>
+            </li>
+
+            <li>
+                <i class="fa-solid fa-gear"></i>
+                <span>Account</span>
+            </li>
+
+        </ul>
+
+    </aside>
+
+    <!-- Main Content -->
+    <main class="content">
+
+        <div class="header">
+                <div class="header-row">
+                    <div class="header-left">
+                        <h1>Hello, Patient!</h1>
+                        <p class="subheader">Day 0 of Therapy</p>
+                    </div>
+                    <div class="header-right">
+                        <div class="widget widget-blue widget-header">
+                            <div class="widget-title">Completion progress</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                        <div class="dashboard-row dashboard-row-top">
+                            <div class="widget widget-blue widget-calendar">
+                                <div class="widget-title">Calendar</div>
+                            </div>
+                            <div class="widget widget-blue widget-streak">
+                                <div class="widget-title">Streak Information</div>
+                            </div>
+                        </div>
+                        <div class="dashboard-row dashboard-row-main">
+                            <div class="dashboard-col dashboard-col-left">
+                                <div class="dashboard-row dashboard-row-sub">
+                                    <div class="widget widget-blue">
+                                        <div class="widget-title">Grip Strength</div>
+                                        <div class="widget-icon"><i class="fa-solid fa-hand-fist"></i></div>
+                                        <div class="widget-value">0 N</div>
+                                        <div class="widget-label">Latest</div>
+                                    </div>
+                                    <div class="widget widget-blue">
+                                        <div class="widget-title">Finger Movement</div>
+                                        <div class="widget-icon"><i class="fa-solid fa-hand-point-up"></i></div>
+                                        <div class="widget-value">Flex: 0<br>Ext: 0</div>
+                                    </div>
+                                </div>
+                                <div class="dashboard-row dashboard-row-sub">
+                                    <div class="widget widget-blue">
+                                        <div class="widget-title">Repetitions</div>
+                                        <div class="widget-icon"><i class="fa-solid fa-repeat"></i></div>
+                                        <div class="widget-value">0</div>
+                                        <div class="widget-label">Today</div>
+                                    </div>
+                                    <div class="widget widget-blue">
+                                        <div class="widget-title">Session Duration</div>
+                                        <div class="widget-icon"><i class="fa-regular fa-clock"></i></div>
+                                        <div class="widget-value">0 mins</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="dashboard-col dashboard-col-right">
+                                <div class="widget widget-green">
+                                    <div class="widget-title">Grip Strength Progress</div>
+                                    <div class="widget-placeholder">Line Graph</div>
+                                </div>
+                                <div class="widget widget-green">
+                                    <div class="widget-title">Finger Flexion / Extension</div>
+                                    <div class="widget-placeholder">Bar Graph</div>
+                                </div>
+                                <div class="widget widget-green widget-tall">
+                                    <div class="widget-title">Next Exercise</div>
+                                    <button class="exercise-btn">Start Exercise</button>
+                                </div>
+                            </div>
+                        </div>
+            </div>
+
+    </main>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
