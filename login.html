@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Theraflow Login</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body class="login-page">
+
+<div class="container">
+
+    <aside class="sidebar is-collapsed" id="sidebar">
+
+        <div class="sidebar-top">
+</div>
+
+        <div class="logo">
+            <div class="logo-icon" aria-hidden="true"><i class="fa-solid fa-hand-holding-heart"></i></div>
+            <div class="logo-wordmark">Theraflow</div>
+        </div>
+
+        <div class="login-sidebar-cta">
+            <a href="index.html" class="sidebar-login-btn" aria-label="Back to Theraflow home">
+                <i class="fa-solid fa-right-to-bracket"></i>
+                <span class="nav-label">Sign In</span>
+            </a>
+        </div>
+
+        <div class="sidebar-footer">
+</div>
+
+    </aside>
+
+    <main class="content login-content">
+        <section class="login-shell" aria-labelledby="loginHeading">
+            <article class="login-card">
+                <h1 id="loginHeading">Log In</h1>
+
+                <form class="login-form" id="loginForm" action="#" method="post" novalidate>
+                    <label class="sr-only" for="loginEmail">Username or Email</label>
+                    <input id="loginEmail" type="text" name="identifier" placeholder="Username / Email" autocomplete="username" required>
+
+                    <label class="sr-only" for="loginPassword">Password</label>
+                    <div class="password-field">
+                        <input id="loginPassword" type="password" name="password" placeholder="Password" autocomplete="current-password" required>
+                        <button type="button" class="password-toggle" id="passwordToggle" aria-label="Show password" aria-pressed="false">
+                            <i class="fa-regular fa-eye"></i>
+                        </button>
+                    </div>
+
+                    <button type="submit" class="sign-in-btn">Sign In</button>
+                    <div class="wizard-error" id="loginFormError" role="alert" aria-live="polite"></div>
+
+                    <a class="login-link login-link-primary" href="#">Forgot Password?</a>
+
+                    <div class="login-divider" aria-hidden="true">
+                        <span>OR</span>
+                    </div>
+
+                    <div class="doctor-cta">
+                        <p class="doctor-copy">Are you a doctor?</p>
+                        <a class="doctor-btn" href="registration.html">Create Doctor Account</a>
+                    </div>
+                </form>
+            </article>
+        </section>
+    </main>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

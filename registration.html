@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Theraflow Doctor Registration</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body class="registration-page">
+
+<div class="container">
+
+    <aside class="sidebar is-collapsed" id="sidebar">
+
+        <div class="sidebar-top">
+</div>
+
+        <div class="logo">
+            <div class="logo-icon" aria-hidden="true"><i class="fa-solid fa-hand-holding-heart"></i></div>
+            <div class="logo-wordmark">Theraflow</div>
+        </div>
+
+        <div class="login-sidebar-cta">
+            <a href="login.html" class="sidebar-login-btn" aria-current="page" aria-label="Go to sign in">
+                <i class="fa-solid fa-right-to-bracket"></i>
+                <span class="nav-label">Sign In</span>
+            </a>
+        </div>
+
+        <div class="sidebar-footer">
+</div>
+
+    </aside>
+
+    <main class="content registration-content">
+        <section class="registration-shell" aria-labelledby="registrationHeading">
+            <article class="registration-card">
+                <div class="registration-progress" aria-label="Registration steps">
+                    <div class="progress-meta">
+                        <span class="progress-kicker">Doctor onboarding</span>
+                        <span class="progress-counter" id="registrationStepCounter">Step 1 of 3</span>
+                    </div>
+                    <div class="progress-track"><span class="progress-fill"></span></div>
+                    <div class="progress-steps progress-dots">
+                        <span class="progress-step is-active" data-progress-step="0">Personal</span>
+                        <span class="progress-step" data-progress-step="1">Professional</span>
+                        <span class="progress-step" data-progress-step="2">Account Setup</span>
+                    </div>
+                </div>
+
+                <h1 id="registrationHeading">Doctor Registration</h1>
+
+                <form class="registration-form registration-wizard" id="registrationWizard" action="#" method="post" enctype="multipart/form-data" novalidate>
+                    <div class="wizard-error" id="registrationWizardError" role="alert" aria-live="polite"></div>
+                    <div class="wizard-stage" id="registrationStage">
+                        <section class="form-step is-active" data-step="0" aria-labelledby="personalInfoHeading">
+                            <div class="form-section">
+                                <div class="section-head">
+                                    <span class="section-badge">01</span>
+                                    <h2 id="personalInfoHeading">Personal Information</h2>
+                                </div>
+                                <div class="field-grid field-grid-two">
+                                    <label class="field-group field-group-span-2 required-field">
+                                        <span>Full Name</span>
+                                        <input type="text" name="fullName" placeholder="Full Name" autocomplete="name" required>
+                                    </label>
+                                    <label class="field-group required-field">
+                                        <span>Email Address</span>
+                                        <input type="email" name="email" placeholder="Email Address" autocomplete="email" required>
+                                    </label>
+                                    <label class="field-group required-field">
+                                        <span>Contact Number</span>
+                                        <input type="tel" name="contactNumber" placeholder="Contact Number" autocomplete="tel" inputmode="numeric" maxlength="11" pattern="09[0-9]{9}" title="Enter an 11-digit contact number starting with 09" required>
+                                        <small class="field-error" data-field-error="contactNumber" aria-live="polite"></small>
+                                    </label>
+                                </div>
+                                <div class="wizard-actions">
+                                    <a class="doctor-btn wizard-login-back" href="login.html">Back</a>
+                                    <button type="button" class="sign-in-btn wizard-next">Next</button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="form-step is-after" data-step="1" aria-labelledby="professionalInfoHeading">
+                            <div class="form-section">
+                                <div class="section-head">
+                                    <span class="section-badge">02</span>
+                                    <h2 id="professionalInfoHeading">Professional Information</h2>
+                                </div>
+                                <div class="field-grid field-grid-two">
+                                    <label class="field-group field-group-span-2 required-field">
+                                        <span>Medical Specialty</span>
+                                        <select name="specialty" required>
+                                            <option value="">Select Specialty</option>
+                                            <option value="neurology">Neurology</option>
+                                            <option value="physical-therapy">Physical Therapy</option>
+                                            <option value="rehabilitation">Rehabilitation</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </label>
+                                    <label class="field-group field-group-span-2 required-field specialty-other-field is-hidden" id="specialtyOtherField">
+                                        <span>Please specify your specialty</span>
+                                        <input type="text" id="specialtyOtherInput" name="specialtyOther" placeholder="Type Specialty" disabled>
+                                    </label>
+                                    <label class="field-group required-field">
+                                        <span>License Number</span>
+                                        <input type="text" name="licenseNumber" placeholder="License Number" required>
+                                    </label>
+                                    <label class="field-group required-field">
+                                        <span>Years of Experience</span>
+                                        <input type="number" name="yearsOfExperience" placeholder="Years Of Experience" min="0" required>
+                                    </label>
+                                    <label class="field-group field-group-span-2 required-field">
+                                        <span>Hospital or Clinic Affiliation</span>
+                                        <input type="text" name="affiliation" placeholder="Hospital / Clinic Affiliation" required>
+                                    </label>
+                                </div>
+                                <div class="wizard-actions">
+                                    <button type="button" class="doctor-btn wizard-back">Back</button>
+                                    <button type="button" class="sign-in-btn wizard-next">Next</button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="form-step is-after" data-step="2" aria-labelledby="accountSetupHeading">
+                            <div class="form-section">
+                                <div class="section-head">
+                                    <span class="section-badge">03</span>
+                                    <h2 id="accountSetupHeading">Account Setup</h2>
+                                </div>
+                                <div class="field-grid field-grid-two">
+                                    <label class="field-group field-group-span-2 required-field">
+                                        <span>Username</span>
+                                        <input type="text" name="username" placeholder="Username" autocomplete="username" required>
+                                    </label>
+                                    <label class="field-group field-group-span-2 required-field">
+                                        <span>Password</span>
+                                        <input type="password" name="password" placeholder="Password" autocomplete="new-password" required>
+                                    </label>
+                                    <label class="field-group field-group-span-2 upload-group optional-field">
+                                        <span>Profile Picture</span>
+                                        <div class="upload-box">
+                                            <i class="fa-regular fa-image" aria-hidden="true"></i>
+                                            <span>Upload a profile picture</span>
+                                            <input type="file" name="profilePicture" accept="image/*">
+                                        </div>
+                                    </label>
+                                    <label class="field-group field-group-span-2 optional-field">
+                                        <span>Short Bio / Notes</span>
+                                        <textarea name="bio" placeholder="Short Bio / Notes" rows="4"></textarea>
+                                    </label>
+                                </div>
+                                <div class="wizard-actions">
+                                    <button type="button" class="doctor-btn wizard-back">Back</button>
+                                    <button type="submit" class="sign-in-btn registration-submit">Complete Registration</button>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </form>
+            </article>
+        </section>
+    </main>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

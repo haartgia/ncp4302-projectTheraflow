@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Theraflow Patients</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body class="patients-page">
+
+<div class="container">
+
+    <aside class="sidebar is-collapsed" id="sidebar">
+
+        <div class="sidebar-top">
+</div>
+
+        <div class="logo">
+            <div class="logo-icon" aria-hidden="true"><i class="fa-solid fa-hand-holding-heart"></i></div>
+            <div class="logo-wordmark">Theraflow</div>
+        </div>
+
+        <div class="active-indicator" aria-hidden="true"></div>
+        <ul class="menu">
+            <li data-page="doctor_dashboard.html">
+                <i class="fa-solid fa-gauge-high"></i>
+                <span class="nav-label">Dashboard</span>
+            </li>
+            <li class="active" aria-current="page" data-page="patients.html">
+                <i class="fa-solid fa-users"></i>
+                <span class="nav-label">Patients</span>
+            </li>
+            <li data-page="therapy_plans.html">
+                <i class="fa-solid fa-notes-medical"></i>
+                <span class="nav-label">Therapy Plans</span>
+            </li>
+            <li data-page="progress.html">
+                <i class="fa-solid fa-chart-line"></i>
+                <span class="nav-label">Progress</span>
+            </li>
+            <li data-page="messages.html" class="has-unread">
+                <i class="fa-regular fa-message"></i>
+                <span class="nav-label">Messages</span>
+                <span class="nav-alert-dot" aria-hidden="true"></span>
+            </li>
+            <li class="settings-nav-item" data-page="settings.html">
+                <i class="fa-solid fa-gear"></i>
+                <span class="nav-label">Settings</span>
+            </li>
+        </ul>
+
+        <div class="sidebar-footer">
+<button class="logout-btn" id="logoutBtn" aria-label="Log out">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span class="nav-label">Logout</span>
+            </button>
+        </div>
+
+    </aside>
+
+    <main class="content patients-content">
+        <section class="patients-shell" id="patientsPageRoot" aria-labelledby="patientsPageTitle">
+
+            <div class="patients-list-view" id="patientListView">
+                <div class="patients-header-row">
+                    <div>
+                        <h1 id="patientsPageTitle">Patient Management</h1>
+                        <p class="subheader">Manage registrations and monitor active recovery progress.</p>
+                    </div>
+                    <button type="button" class="sign-in-btn patients-add-btn" id="openAddPatientModal">+ Add New Patient</button>
+                </div>
+
+                <div class="widget widget-blue patients-list-card">
+                    <div class="patients-list-actions">
+                        <div class="patients-search-wrap">
+                            <label class="sr-only" for="patientSearchInput">Search patient name</label>
+                            <input id="patientSearchInput" type="search" placeholder="Search Patient Name..." autocomplete="off">
+                        </div>
+                        <div class="patients-filter-wrap">
+                            <label class="sr-only" for="patientStatusFilter">Filter patients</label>
+                            <select id="patientStatusFilter" aria-label="Filter patients by status">
+                                <option value="all">All Patients</option>
+                                <option value="Improving">Improving</option>
+                                <option value="Stable">Stable</option>
+                                <option value="Needs Attention">Needs Attention</option>
+                                <option value="Active Today">Active Today</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="patients-table-wrap">
+                        <table class="doctor-table patients-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Name</th>
+                                    <th scope="col">Age</th>
+                                    <th scope="col">Stroke Side</th>
+                                    <th scope="col">Last Session</th>
+                                    <th scope="col">Status</th>
+                                    <th scope="col">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="patientTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="patients-profile-view is-hidden" id="patientProfileView" aria-live="polite">
+                <nav class="patient-profile-breadcrumb" aria-label="Breadcrumb">
+                    <button type="button" class="back-link patient-back-link" id="backToPatientList">
+                        <span class="patient-back-link-icon" aria-hidden="true">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </span>
+                        <span class="patient-back-link-copy">
+                            <span class="patient-back-link-primary">Patients</span>
+                            <span class="patient-back-link-divider" aria-hidden="true">/</span>
+                            <span class="patient-back-link-secondary">Patient Profile: <strong id="patientProfileBreadcrumbName">Patient Name</strong></span>
+                        </span>
+                    </button>
+                </nav>
+
+                <article class="widget widget-blue patient-summary-card">
+                    <div class="patient-summary-photo" aria-hidden="true">
+                        <i class="fa-regular fa-user"></i>
+                    </div>
+                    <div class="patient-summary-info">
+                        <h2 id="profilePatientName">Patient Name</h2>
+                        <div class="patient-summary-meta">
+                            <span>Age: <strong id="profilePatientAge">-</strong></span>
+                            <span>Stroke Type: <strong id="profileStrokeType">-</strong></span>
+                            <span>Affected Hand: <strong id="profileAffectedHand">-</strong></span>
+                        </div>
+                    </div>
+                </article>
+
+                <div class="patients-profile-grid">
+                    <article class="widget widget-green therapy-plan-card">
+                        <h3 class="widget-title">Therapy Plan</h3>
+                        <div class="field-grid field-grid-two">
+                            <label class="field-group required-field">
+                                <span>Duration (min)</span>
+                                <input id="planDuration" type="number" min="1" value="20">
+                            </label>
+                            <label class="field-group required-field">
+                                <span>Target Repetitions</span>
+                                <input id="planRepetitions" type="number" min="1" value="150">
+                            </label>
+                            <label class="field-group required-field field-group-span-2">
+                                <span>Sessions per Day</span>
+                                <input id="planSessions" type="number" min="1" value="3">
+                            </label>
+                        </div>
+                    </article>
+
+                    <article class="widget widget-blue sensor-summary-card">
+                        <h3 class="widget-title">Sensor Data Summary</h3>
+                        <div class="sensor-metrics-grid">
+                            <div class="sensor-metric-tile">
+                                <div class="doctor-stat-label">Avg Grip Strength</div>
+                                <div class="doctor-stat-value" id="profileGrip">-</div>
+                            </div>
+                            <div class="sensor-metric-tile">
+                                <div class="doctor-stat-label">Flexion Angle</div>
+                                <div class="doctor-stat-value" id="profileFlexion">-</div>
+                            </div>
+                            <div class="sensor-metric-tile">
+                                <div class="doctor-stat-label">Repetitions Today</div>
+                                <div class="doctor-stat-value" id="profileRepetitions">-</div>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+
+                <div class="patients-graphs-grid">
+                    <article class="widget widget-green graph-card">
+                        <h3 class="widget-title">Grip Strength Over Time</h3>
+                        <div class="chart-wrap">
+                            <canvas id="patientGripProgressChart"></canvas>
+                        </div>
+                    </article>
+                    <article class="widget widget-blue graph-card">
+                        <h3 class="widget-title">Finger Flexion Range</h3>
+                        <div class="chart-wrap">
+                            <canvas id="patientFlexionProgressChart"></canvas>
+                        </div>
+                    </article>
+                </div>
+
+                <article class="widget widget-blue doctor-notes-card">
+                    <h3 class="widget-title">Doctor Notes</h3>
+                    <label class="sr-only" for="doctorNotesInput">Doctor notes</label>
+                    <textarea id="doctorNotesInput" placeholder="Write Therapy Comments And Recommendations..."></textarea>
+                    <button type="button" class="sign-in-btn notes-save-btn" id="saveDoctorNotes">Save Notes</button>
+                    <p class="notes-save-feedback" id="notesSaveFeedback" aria-live="polite"></p>
+                </article>
+            </div>
+
+        </section>
+    </main>
+
+</div>
+
+<div class="patients-modal" id="addPatientModal" role="dialog" aria-modal="true" aria-labelledby="addPatientTitle" hidden>
+    <div class="patients-modal-backdrop" id="addPatientModalBackdrop"></div>
+    <div class="patients-modal-card registration-card">
+        <button type="button" class="patients-modal-close" id="closeAddPatientModal" aria-label="Close add patient form">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <h2 id="addPatientTitle">Add New Patient</h2>
+        <form id="addPatientForm" class="registration-form" novalidate>
+            <div class="field-grid field-grid-two">
+                <label class="field-group required-field">
+                    <span>Name</span>
+                    <input type="text" name="name" required>
+                </label>
+                <label class="field-group required-field">
+                    <span>Age / DOB</span>
+                    <input type="text" name="ageDob" placeholder="E.g. 58 / 1968-04-12" required>
+                </label>
+                <label class="field-group required-field">
+                    <span>Gender</span>
+                    <select name="gender" required>
+                        <option value="" selected disabled>Select Gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </label>
+                <label class="field-group required-field">
+                    <span>Stroke Type</span>
+                    <input type="text" name="strokeType" placeholder="Ischemic / Hemorrhagic" required>
+                </label>
+                <label class="field-group required-field">
+                    <span>Affected Hand (L/R)</span>
+                    <select name="affectedHand" required>
+                        <option value="" selected disabled>Select Hand</option>
+                        <option value="Left">Left</option>
+                        <option value="Right">Right</option>
+                    </select>
+                </label>
+                <label class="field-group required-field">
+                    <span>Contact</span>
+                    <input type="text" name="contact" placeholder="Phone Or Email" required>
+                </label>
+                <label class="field-group required-field">
+                    <span>Username</span>
+                    <input type="text" name="username" required>
+                </label>
+                <label class="field-group required-field">
+                    <span>Password</span>
+                    <input type="password" name="password" minlength="6" required>
+                </label>
+            </div>
+            <div class="wizard-actions wizard-actions-end">
+                <button type="submit" class="sign-in-btn">Save Patient</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Theraflow Therapy Plans</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body class="therapy-plans-page">
+
+<div class="container">
+
+    <aside class="sidebar is-collapsed" id="sidebar">
+
+        <div class="sidebar-top">
+</div>
+
+        <div class="logo">
+            <div class="logo-icon" aria-hidden="true"><i class="fa-solid fa-hand-holding-heart"></i></div>
+            <div class="logo-wordmark">Theraflow</div>
+        </div>
+
+        <div class="active-indicator" aria-hidden="true"></div>
+        <ul class="menu">
+            <li data-page="doctor_dashboard.html">
+                <i class="fa-solid fa-gauge-high"></i>
+                <span class="nav-label">Dashboard</span>
+            </li>
+            <li data-page="patients.html">
+                <i class="fa-solid fa-users"></i>
+                <span class="nav-label">Patients</span>
+            </li>
+            <li class="active" aria-current="page" data-page="therapy_plans.html">
+                <i class="fa-solid fa-notes-medical"></i>
+                <span class="nav-label">Therapy Plans</span>
+            </li>
+            <li data-page="progress.html">
+                <i class="fa-solid fa-chart-line"></i>
+                <span class="nav-label">Progress</span>
+            </li>
+            <li data-page="messages.html" class="has-unread">
+                <i class="fa-regular fa-message"></i>
+                <span class="nav-label">Messages</span>
+                <span class="nav-alert-dot" aria-hidden="true"></span>
+            </li>
+            <li class="settings-nav-item" data-page="settings.html">
+                <i class="fa-solid fa-gear"></i>
+                <span class="nav-label">Settings</span>
+            </li>
+        </ul>
+
+        <div class="sidebar-footer">
+<button class="logout-btn" id="logoutBtn" aria-label="Log out">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span class="nav-label">Logout</span>
+            </button>
+        </div>
+
+    </aside>
+
+    <main class="content therapy-plans-content">
+        <section class="therapy-plans-shell" id="therapyPlansRoot" aria-labelledby="therapyPlansTitle">
+            <div class="therapy-plans-header-row">
+                <div>
+                    <h1 id="therapyPlansTitle">Therapy Plans</h1>
+                    <p class="subheader">Assign, adjust, and monitor therapy targets across all patients.</p>
+                </div>
+            </div>
+
+            <article class="widget widget-blue therapy-template-section">
+                <h2 class="widget-title">Standard Templates</h2>
+                <div class="therapy-template-grid">
+                    <div class="therapy-template-card" data-template-id="level1">
+                        <h3>Level 1: Beginner</h3>
+                        <p>Duration: <strong>15 min</strong></p>
+                        <p>Target Repetitions: <strong>30</strong></p>
+                        <p>Sessions per Day: <strong>2</strong></p>
+                    </div>
+                    <div class="therapy-template-card" data-template-id="level2">
+                        <h3>Level 2: Intermediate</h3>
+                        <p>Duration: <strong>20 min</strong></p>
+                        <p>Target Repetitions: <strong>40</strong></p>
+                        <p>Sessions per Day: <strong>3</strong></p>
+                    </div>
+                    <div class="therapy-template-card" data-template-id="level3">
+                        <h3>Level 3: Advanced</h3>
+                        <p>Duration: <strong>25 min</strong></p>
+                        <p>Target Repetitions: <strong>55</strong></p>
+                        <p>Sessions per Day: <strong>3</strong></p>
+                    </div>
+                </div>
+            </article>
+
+            <div class="therapy-plans-grid">
+                <article class="widget widget-blue therapy-assignment-card">
+                    <h2 class="widget-title">Active Assignments</h2>
+                    <div class="patients-table-wrap">
+                        <table class="doctor-table" id="therapyAssignmentsTable">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Patient</th>
+                                    <th scope="col">Current Plan</th>
+                                    <th scope="col">Duration</th>
+                                    <th scope="col">Target Repetitions</th>
+                                    <th scope="col">Sessions / Day</th>
+                                    <th scope="col">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="therapyAssignmentsBody"></tbody>
+                        </table>
+                    </div>
+                </article>
+
+                <article class="widget widget-green therapy-assign-new-card">
+                    <h2 class="widget-title">Assign New Plan</h2>
+                    <div class="field-grid">
+                        <label class="field-group required-field">
+                            <span>Select Patient</span>
+                            <select id="assignPatientSelect"></select>
+                        </label>
+                        <label class="field-group required-field">
+                            <span>Select Preset Template</span>
+                            <select id="assignTemplateSelect">
+                                <option value="level1">Level 1: Beginner</option>
+                                <option value="level2">Level 2: Intermediate</option>
+                                <option value="level3">Level 3: Advanced</option>
+                            </select>
+                        </label>
+                        <button type="button" class="sign-in-btn" id="applyTemplateBtn">Apply Template</button>
+                        <p class="notes-save-feedback" id="assignTemplateFeedback" aria-live="polite"></p>
+                    </div>
+                </article>
+            </div>
+        </section>
+    </main>
+
+</div>
+
+<div class="therapy-edit-popup" id="therapyEditPopup" hidden role="dialog" aria-modal="true" aria-labelledby="therapyEditTitle">
+    <div class="therapy-edit-popup-backdrop" id="therapyEditBackdrop"></div>
+    <div class="therapy-edit-popup-card">
+        <h3 id="therapyEditTitle">Edit Assignment Targets</h3>
+        <div class="field-grid">
+            <label class="field-group required-field">
+                <span>Duration (min)</span>
+                <input type="number" id="editDurationInput" min="1">
+            </label>
+            <label class="field-group required-field">
+                <span>Target Repetitions</span>
+                <input type="number" id="editRepetitionsInput" min="1">
+            </label>
+            <label class="field-group required-field">
+                <span>Sessions per Day</span>
+                <input type="number" id="editSessionsInput" min="1">
+            </label>
+            <div class="wizard-actions">
+                <button type="button" class="doctor-btn" id="cancelEditPlanBtn">Cancel</button>
+                <button type="button" class="sign-in-btn" id="saveEditPlanBtn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

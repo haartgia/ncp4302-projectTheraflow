@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Theraflow Doctor Dashboard</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body class="doctor-dashboard-page">
+
+<div class="container">
+
+    <aside class="sidebar is-collapsed" id="sidebar">
+
+        <div class="sidebar-top">
+</div>
+
+        <div class="logo">
+            <div class="logo-icon" aria-hidden="true"><i class="fa-solid fa-hand-holding-heart"></i></div>
+            <div class="logo-wordmark">Theraflow</div>
+        </div>
+
+        <div class="active-indicator" aria-hidden="true"></div>
+        <ul class="menu">
+            <li class="active" aria-current="page" data-page="doctor_dashboard.html">
+                <i class="fa-solid fa-gauge-high"></i>
+                <span class="nav-label">Dashboard</span>
+            </li>
+            <li data-page="patients.html">
+                <i class="fa-solid fa-users"></i>
+                <span class="nav-label">Patients</span>
+            </li>
+            <li data-page="therapy_plans.html">
+                <i class="fa-solid fa-notes-medical"></i>
+                <span class="nav-label">Therapy Plans</span>
+            </li>
+            <li data-page="progress.html">
+                <i class="fa-solid fa-chart-line"></i>
+                <span class="nav-label">Progress</span>
+            </li>
+            <li data-page="messages.html" class="has-unread">
+                <i class="fa-regular fa-message"></i>
+                <span class="nav-label">Messages</span>
+                <span class="nav-alert-dot" aria-hidden="true"></span>
+            </li>
+            <li class="settings-nav-item" data-page="settings.html">
+                <i class="fa-solid fa-gear"></i>
+                <span class="nav-label">Settings</span>
+            </li>
+        </ul>
+
+        <div class="sidebar-footer">
+<button class="logout-btn" id="logoutBtn" aria-label="Log out">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span class="nav-label">Logout</span>
+            </button>
+        </div>
+
+    </aside>
+
+    <main class="content doctor-content">
+        <section class="doctor-shell" aria-labelledby="doctorDashboardTitle">
+            <div class="doctor-header-row">
+                <div>
+                    <h1 id="doctorDashboardTitle">Doctor Dashboard</h1>
+                    <p class="subheader">Overview of patient therapy performance and priority alerts.</p>
+                </div>
+                <div class="doctor-header-date">Monday, March 16, 2026</div>
+            </div>
+
+            <div class="doctor-stats-grid" aria-label="Summary statistics">
+                <article class="widget widget-blue doctor-stat-card">
+                    <p class="doctor-stat-label">Total Patients</p>
+                    <p class="doctor-stat-value" id="dashboardTotalPatients">0</p>
+                </article>
+                <article class="widget widget-blue doctor-stat-card">
+                    <p class="doctor-stat-label">Active Patients Today</p>
+                    <p class="doctor-stat-value" id="dashboardActivePatientsToday">0</p>
+                </article>
+                <article class="widget widget-blue doctor-stat-card">
+                    <p class="doctor-stat-label">Sessions Today</p>
+                    <p class="doctor-stat-value" id="dashboardSessionsToday">0</p>
+                </article>
+                <article class="widget widget-blue doctor-stat-card">
+                    <p class="doctor-stat-label">Avg Grip Strength</p>
+                    <p class="doctor-stat-value" id="dashboardAvgGripStrength">0 N</p>
+                </article>
+            </div>
+
+            <div class="doctor-middle-grid">
+                <article class="widget widget-green doctor-graph-card">
+                    <div class="widget-title">Patient Therapy Progress (Weekly)</div>
+                    <div class="chart-wrap doctor-chart-wrap">
+                        <canvas id="doctorWeeklyProgressChart"></canvas>
+                    </div>
+                </article>
+
+                <aside class="widget widget-blue doctor-alerts-card" aria-labelledby="doctorAlertsTitle">
+                    <h2 class="widget-title" id="doctorAlertsTitle">Alerts &amp; Notifications</h2>
+                    <ul class="doctor-alert-list" id="dashboardAlertsList">
+                        <li><span class="doctor-alert-icon" aria-hidden="true">i</span> No patient alerts yet.</li>
+                    </ul>
+                </aside>
+            </div>
+
+            <div class="doctor-tables-grid">
+                <article class="widget widget-blue doctor-table-card" aria-labelledby="recentActivityTitle">
+                    <h2 class="widget-title" id="recentActivityTitle">Recent Patient Activity</h2>
+                    <div class="doctor-table-wrap">
+                        <table class="doctor-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Patient Name</th>
+                                    <th scope="col">Activity</th>
+                                    <th scope="col">Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashboardRecentActivityBody">
+                                <tr>
+                                    <td colspan="3">No recent patient activity yet.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+
+                <article class="widget widget-blue doctor-table-card" aria-labelledby="patientOverviewTitle">
+                    <h2 class="widget-title" id="patientOverviewTitle">Quick Patient Overview</h2>
+                    <div class="doctor-table-wrap">
+                        <table class="doctor-table doctor-table-clickable">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Patient Name</th>
+                                    <th scope="col">Status</th>
+                                    <th scope="col">Last Session</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashboardQuickOverviewBody">
+                                <tr>
+                                    <td colspan="3">No patients added yet.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </article>
+            </div>
+        </section>
+    </main>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

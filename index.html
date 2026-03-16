@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+// Run before page rendering to avoid flashing protected dashboard content.
+(function () {
+    var isLoggedIn = localStorage.getItem('isLoggedIn');
+    if (isLoggedIn !== 'true' && isLoggedIn !== '1') {
+        window.location.replace('login.html');
+    }
+}());
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Theraflow Dashboard</title>
@@ -10,129 +19,223 @@
 href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 
-<body>
+<body class="auth-gated-home">
 
+<div id="main-dashboard">
 <div class="container">
 
     <!-- Sidebar -->
-    <aside class="sidebar">
+    <aside class="sidebar is-collapsed" id="sidebar">
+
+        <div class="sidebar-top">
+</div>
 
         <div class="logo">
-              <img src="assets/theraflowlogo.png" alt="Theraflow Logo"
-              style="height: 60px; vertical-align: middle;">
+              <div class="logo-icon" aria-hidden="true"><i class="fa-solid fa-hand-holding-heart"></i></div>
+              <div class="logo-wordmark">Theraflow</div>
         </div>
 
-        <ul class="menu">
+        <div id="nav-links-container">
+            <div class="active-indicator" aria-hidden="true"></div>
+            <ul class="menu">
+                <li class="active restricted-access" aria-current="page" data-page="index.html"><i class="fa-solid fa-house"></i><span class="nav-label">Home</span></li>
+                <li class="restricted-access" data-page="exercise_hub.php"><i class="fa-solid fa-dumbbell"></i><span class="nav-label">Exercises</span></li>
+                <li class="restricted-access" data-page="recovery.php"><i class="fa-solid fa-chart-line"></i><span class="nav-label">Recovery Progress</span></li>
+                <li class="restricted-access" data-page="tele_message.php"><i class="fa-regular fa-message"></i><span class="nav-label">Messages</span></li>
+                <li class="restricted-access" data-page="patient_settings.php"><i class="fa-solid fa-gear"></i><span class="nav-label">Settings</span></li>
+            </ul>
+        </div>
 
-            <li class="active">
-                <i class="fa-solid fa-house"></i>
-                <span>Home</span>
-            </li>
-
-            <li>
-                <i class="fa-regular fa-file"></i>
-                <span>Reports</span>
-            </li>
-
-            <li>
-                <i class="fa-solid fa-plus"></i>
-                <span>Exercises</span>
-            </li>
-
-            <li>
-                <i class="fa-solid fa-table-cells"></i>
-                <span>Dashboard</span>
-            </li>
-
-            <li>
-                <i class="fa-regular fa-user"></i>
-                <span>Profile</span>
-            </li>
-
-            <li>
-                <i class="fa-solid fa-gear"></i>
-                <span>Account</span>
-            </li>
-
-        </ul>
+        <div class="sidebar-footer">
+<button class="logout-btn" id="logoutBtn" aria-label="Sign out" style="display:none;">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span class="nav-label">Sign Out</span>
+            </button>
+        </div>
 
     </aside>
 
     <!-- Main Content -->
     <main class="content">
 
+        <div id="protected-dashboard-content">
+
         <div class="header">
                 <div class="header-row">
                     <div class="header-left">
                         <h1>Hello, Patient!</h1>
                         <p class="subheader">Day 0 of Therapy</p>
-                    </div>
-                    <div class="header-right">
-                        <div class="widget widget-blue widget-header">
-                            <div class="widget-title">Completion progress</div>
+                        <div class="glove-status-badge is-offline" id="gloveStatusBadge">
+                            <i class="fa-solid fa-circle-xmark"></i>
+                            <span>Glove Offline</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="dashboard-grid">
-                        <div class="dashboard-row dashboard-row-top">
+                        <div class="top-section">
                             <div class="widget widget-blue widget-calendar">
-                                <div class="widget-title">Calendar</div>
+                                <div class="calendar-widget-card">
+                                    <div class="calendar-widget-title">Calendar</div>
+                                    <div class="calendar-toolbar" aria-label="Calendar navigation">
+                                        <button class="calendar-nav-btn" id="calendarPrev" aria-label="Previous month">
+                                            <i class="fa-solid fa-chevron-left"></i>
+                                        </button>
+                                        <div class="calendar-month" id="calendarMonth"></div>
+                                        <button class="calendar-nav-btn" id="calendarNext" aria-label="Next month">
+                                            <i class="fa-solid fa-chevron-right"></i>
+                                        </button>
+                                    </div>
+                                    <div class="calendar-shell" id="calendarGrid" aria-live="polite">
+                                        <div class="calendar-weekdays">
+                                            <span>Mon</span>
+                                            <span>Tue</span>
+                                            <span>Wed</span>
+                                            <span>Thu</span>
+                                            <span>Fri</span>
+                                            <span>Sat</span>
+                                            <span>Sun</span>
+                                        </div>
+                                        <div class="calendar-dates" id="calendarDates"></div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="widget widget-blue widget-streak">
-                                <div class="widget-title">Streak Information</div>
+
+                            <div class="center-stack">
+                                <div class="widget widget-blue widget-streak">
+                                    <div class="widget-head">
+                                        <div class="widget-title">Streak Information</div>
+                                        <div class="streak-badge" id="streakBadge"><i class="fa-solid fa-fire"></i> 0 day</div>
+                                    </div>
+                                    <div class="streak-track" id="streakTrack">
+                                        <span class="streak-dot" data-day-label="Mon"><i class="fa-solid fa-fire"></i></span>
+                                        <span class="streak-dot" data-day-label="Tue"><i class="fa-solid fa-fire"></i></span>
+                                        <span class="streak-dot" data-day-label="Wed"><i class="fa-solid fa-fire"></i></span>
+                                        <span class="streak-dot" data-day-label="Thu"><i class="fa-solid fa-fire"></i></span>
+                                        <span class="streak-dot" data-day-label="Fri"><i class="fa-solid fa-fire"></i></span>
+                                        <span class="streak-dot" data-day-label="Sat"><i class="fa-solid fa-fire"></i></span>
+                                        <span class="streak-dot" data-day-label="Sun"><i class="fa-solid fa-fire"></i></span>
+                                    </div>
+                                </div>
+                                <div class="widget widget-green widget-next-inline">
+                                    <div class="widget-title patient-next-title">Next Exercise</div>
+                                    <div class="widget-label">Guided finger flexion set, estimated 6 minutes</div>
+                                    <button class="exercise-btn">Start Exercise</button>
+                                </div>
+                            </div>
+
+                            <div class="widget widget-blue widget-header widget-progress-tall">
+                                <div class="widget-title">Completion Progress</div>
+                                <div class="radial-progress" id="patientCompletionRing" style="--progress: 0;" aria-label="Completion progress 0 percent">
+                                    <div class="radial-progress-inner">
+                                        <span class="radial-progress-value" id="patientCompletionValue">0%</span>
+                                        <span class="radial-progress-copy">completed</span>
+                                    </div>
+                                </div>
+                                <div class="widget-label patient-progress-label">No sessions completed yet</div>
                             </div>
                         </div>
-                        <div class="dashboard-row dashboard-row-main">
-                            <div class="dashboard-col dashboard-col-left">
-                                <div class="dashboard-row dashboard-row-sub">
-                                    <div class="widget widget-blue">
+
+                        <div class="data-row data-row-progress">
+                            <div class="metric-stack metric-stack-horizontal">
+                                <div class="widget widget-blue metric-strip">
+                                    <div class="metric-strip-header">
                                         <div class="widget-title">Grip Strength</div>
-                                        <div class="widget-icon"><i class="fa-solid fa-hand-fist"></i></div>
-                                        <div class="widget-value">0 N</div>
-                                        <div class="widget-label">Latest</div>
+                                        <div class="trend trend-up"><i class="fa-solid fa-arrow-trend-up"></i> Stable</div>
                                     </div>
-                                    <div class="widget widget-blue">
-                                        <div class="widget-title">Finger Movement</div>
-                                        <div class="widget-icon"><i class="fa-solid fa-hand-point-up"></i></div>
-                                        <div class="widget-value">Flex: 0<br>Ext: 0</div>
+                                    <div class="metric-strip-body">
+                                        <div class="action-progress-ring metric-strip-icon" data-progress-ring data-progress-kind="grip" data-progress-value="0" data-progress-total="100" aria-label="Grip strength exercise completion 0 percent">
+                                            <div class="action-progress-ring-core">
+                                                <div class="widget-icon"><i class="fa-solid fa-hand-fist"></i></div>
+                                            </div>
+                                        </div>
+                                        <div class="metric-strip-content">
+                                            <div class="widget-value patient-action-value">Ready to Start</div>
+                                            <div class="widget-label">Take your first measurement to begin tracking</div>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="dashboard-row dashboard-row-sub">
-                                    <div class="widget widget-blue">
-                                        <div class="widget-title">Repetitions</div>
-                                        <div class="widget-icon"><i class="fa-solid fa-repeat"></i></div>
-                                        <div class="widget-value">0</div>
-                                        <div class="widget-label">Today</div>
+
+                                <div class="widget widget-blue metric-strip">
+                                    <div class="metric-strip-header">
+                                        <div class="widget-title">Finger Movement</div>
+                                        <div class="trend trend-up"><i class="fa-solid fa-arrow-trend-up"></i> Baseline</div>
                                     </div>
-                                    <div class="widget widget-blue">
-                                        <div class="widget-title">Session Duration</div>
-                                        <div class="widget-icon"><i class="fa-regular fa-clock"></i></div>
-                                        <div class="widget-value">0 mins</div>
+                                    <div class="metric-strip-body">
+                                        <div class="action-progress-ring metric-strip-icon" data-progress-ring data-progress-kind="finger" data-progress-value="0" data-progress-total="100" aria-label="Finger movement exercise completion 0 percent">
+                                            <div class="action-progress-ring-core">
+                                                <div class="widget-icon"><i class="fa-solid fa-hand-point-up"></i></div>
+                                            </div>
+                                        </div>
+                                        <div class="metric-strip-content">
+                                            <div class="widget-value patient-action-value">Ready to Start</div>
+                                            <div class="widget-label">Your flexion and extension data will appear here</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="dashboard-col dashboard-col-right">
-                                <div class="widget widget-green">
-                                    <div class="widget-title">Grip Strength Progress</div>
-                                    <div class="widget-placeholder">Line Graph</div>
+
+                            <div class="widget widget-green graph-card">
+                                <div class="widget-title">Grip Strength Progress</div>
+                                <div class="chart-wrap">
+                                    <canvas id="strengthChart"></canvas>
                                 </div>
-                                <div class="widget widget-green">
-                                    <div class="widget-title">Finger Flexion / Extension</div>
-                                    <div class="widget-placeholder">Bar Graph</div>
+                            </div>
+                        </div>
+
+                        <div class="data-row data-row-progress">
+                            <div class="metric-stack metric-stack-horizontal">
+                                <div class="widget widget-blue metric-strip">
+                                    <div class="metric-strip-header">
+                                        <div class="widget-title">Repetitions</div>
+                                    </div>
+                                    <div class="metric-strip-body">
+                                        <div class="action-progress-ring metric-strip-icon" data-progress-ring data-progress-kind="repetitions" aria-label="Repetitions progress 0 percent">
+                                            <div class="action-progress-ring-core">
+                                                <div class="widget-icon"><i class="fa-solid fa-repeat"></i></div>
+                                            </div>
+                                        </div>
+                                        <div class="metric-strip-content">
+                                            <div class="widget-value patient-action-value">0</div>
+                                            <div class="widget-label">Today, your first set is waiting</div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="widget widget-green widget-tall">
-                                    <div class="widget-title">Next Exercise</div>
-                                    <button class="exercise-btn">Start Exercise</button>
+
+                                <div class="widget widget-blue metric-strip">
+                                    <div class="metric-strip-header">
+                                        <div class="widget-title">Session Duration</div>
+                                    </div>
+                                    <div class="metric-strip-body">
+                                        <div class="action-progress-ring metric-strip-icon" data-progress-ring data-progress-kind="duration" aria-label="Session duration progress 0 percent">
+                                            <div class="action-progress-ring-core">
+                                                <div class="widget-icon"><i class="fa-regular fa-clock"></i></div>
+                                            </div>
+                                        </div>
+                                        <div class="metric-strip-content">
+                                            <div class="widget-value patient-action-value">0 min</div>
+                                            <div class="widget-label">Start a guided exercise to log time</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="widget widget-green graph-card">
+                                <div class="widget-title">Finger Flexion / Extension</div>
+                                <div class="chart-wrap">
+                                    <canvas id="motionChart"></canvas>
                                 </div>
                             </div>
                         </div>
             </div>
+        </div>
 
     </main>
 
 </div>
+</div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="script.js"></script>
 
 </body>
