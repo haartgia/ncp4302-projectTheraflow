@@ -33,6 +33,19 @@ function getTableColumns(PDO $pdo, string $tableName): array
     return $columns;
 }
 
+function verifyPasswordCompat(string $input, string $storedHashOrPlain): array
+{
+    if ($storedHashOrPlain !== '' && password_verify($input, $storedHashOrPlain)) {
+        return ['ok' => true, 'rehash' => password_needs_rehash($storedHashOrPlain, PASSWORD_DEFAULT)];
+    }
+
+    if ($storedHashOrPlain !== '' && hash_equals($storedHashOrPlain, $input)) {
+        return ['ok' => true, 'rehash' => true];
+    }
+
+    return ['ok' => false, 'rehash' => false];
+}
+
 $patient = getCurrentPatient($pdo);
 $patientId = (int) ($patient['id'] ?? 0);
 $userId = (int) ($_SESSION['user_id'] ?? 0);
@@ -42,8 +55,6 @@ if ($patientId <= 0 || $userId <= 0) {
     echo json_encode(['ok' => false, 'error' => 'Invalid patient context']);
     exit;
 }
-
-ensurePatientRecoveryDateColumn($pdo);
 
 $usersTable = resolveTableName($pdo, ['user_db.users', 'users', 'theraflow_db.users']);
 $usersColumns = $usersTable ? getTableColumns($pdo, $usersTable) : [];
@@ -63,7 +74,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         'ok' => true,
         'profile' => [
             'name' => (string) ($patient['name'] ?? ''),
-            'recoveryDate' => (string) ($patient['recovery_start_date'] ?? ''),
             'email' => $email,
             'username' => (string) ($patient['username'] ?? '')
         ]
@@ -71,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+if (!in_array($_SERVER['REQUEST_METHOD'], ['POST', 'PATCH', 'PUT'], true)) {
     http_response_code(405);
     echo json_encode(['ok' => false, 'error' => 'Method not allowed']);
     exit;
@@ -82,8 +92,8 @@ if (!is_array($payload)) {
     $payload = $_POST;
 }
 
-$name = trim((string) ($payload['name'] ?? ''));
-$recoveryDate = trim((string) ($payload['recoveryDate'] ?? ''));
+$name = trim((string) ($payload['name'] ?? ($patient['name'] ?? '')));
+$contact = trim((string) ($payload['email'] ?? $payload['contact'] ?? ($patient['contact'] ?? '')));
 $currentPassword = (string) ($payload['currentPassword'] ?? '');
 $newPassword = (string) ($payload['newPassword'] ?? '');
 
@@ -93,14 +103,42 @@ if ($name === '') {
     exit;
 }
 
-if ($recoveryDate !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $recoveryDate)) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Recovery date must use YYYY-MM-DD format']);
-    exit;
+$updatePatient = $pdo->prepare('UPDATE patients SET name = ?, contact = ? WHERE id = ?');
+$updatePatient->execute([$name, $contact !== '' ? $contact : null, $patientId]);
+
+$syncStatus = 'Saved changes.';
+
+if ($usersTable && $emailColumn && $idColumn) {
+    $updateUser = $pdo->prepare('UPDATE ' . $usersTable . ' SET ' . $emailColumn . ' = ?, first_name = ? WHERE ' . $idColumn . ' = ?');
+    $updateUser->execute([
+        $contact !== '' ? $contact : (string) ($email ?? ''),
+        $name,
+        $userId
+    ]);
+} else {
+    $syncStatus = 'Sync pending: account store unavailable.';
 }
 
-$updatePatient = $pdo->prepare('UPDATE patients SET name = ?, recovery_start_date = ? WHERE id = ?');
-$updatePatient->execute([$name, $recoveryDate !== '' ? $recoveryDate : null, $patientId]);
+try {
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS patient_sync_events (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            patient_id INT NOT NULL,
+            user_id INT NOT NULL,
+            event_type VARCHAR(40) NOT NULL,
+            payload JSON NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+    );
+    $syncPayload = json_encode([
+        'name' => $name,
+        'email' => $contact !== '' ? $contact : (string) ($email ?? '')
+    ]);
+    $syncInsert = $pdo->prepare('INSERT INTO patient_sync_events (patient_id, user_id, event_type, payload) VALUES (?, ?, ?, ?)');
+    $syncInsert->execute([$patientId, $userId, 'profile_sync', $syncPayload]);
+} catch (Throwable $e) {
+    $syncStatus = 'Sync pending: event log unavailable.';
+}
 
 if ($newPassword !== '') {
     if (strlen($newPassword) < 6) {
@@ -119,7 +157,20 @@ if ($newPassword !== '') {
     $currentStmt->execute([$userId]);
     $storedHash = (string) ($currentStmt->fetchColumn() ?: '');
 
-    if ($storedHash === '' || !password_verify($currentPassword, $storedHash)) {
+    $credential = verifyPasswordCompat($currentPassword, $storedHash);
+    if (!$credential['ok']) {
+        try {
+            $patientPasswordHash = (string) ($patient['password_hash'] ?? '');
+            $credential = verifyPasswordCompat($currentPassword, $patientPasswordHash);
+            if ($credential['ok'] && $storedHash === '') {
+                $storedHash = $patientPasswordHash;
+            }
+        } catch (Throwable $e) {
+            $credential = ['ok' => false, 'rehash' => false];
+        }
+    }
+
+    if (!$credential['ok']) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'Current password is incorrect']);
         exit;
@@ -144,6 +195,7 @@ echo json_encode([
     'ok' => true,
     'profile' => [
         'name' => $name,
-        'recoveryDate' => $recoveryDate
-    ]
+        'email' => $contact !== '' ? $contact : (string) ($email ?? '')
+    ],
+    'syncStatus' => $syncStatus
 ]);

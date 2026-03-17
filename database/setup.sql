@@ -109,6 +109,38 @@ CREATE TABLE IF NOT EXISTS diagnostic_logs (
     INDEX idx_diag_patient_id (patient_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS doctor_assignments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    patient_id INT NOT NULL,
+    duration_min INT NOT NULL DEFAULT 15,
+    target_repetitions INT NOT NULL DEFAULT 120,
+    exercise_type VARCHAR(120) NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_doctor_assignments_patient_id (patient_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS recovery_progress (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    patient_id INT NOT NULL,
+    avg_grip_strength DECIMAL(6,2) NULL,
+    avg_flexion DECIMAL(6,2) NULL,
+    avg_extension DECIMAL(6,2) NULL,
+    recorded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_recovery_patient_id (patient_id),
+    INDEX idx_recovery_recorded_at (recorded_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS patient_clinical_data (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    patient_id INT NOT NULL,
+    doctor_id INT NULL,
+    diagnosis VARCHAR(255) NULL,
+    treatment_goal VARCHAR(255) NULL,
+    reviewed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_clinical_patient_id (patient_id),
+    INDEX idx_clinical_reviewed_at (reviewed_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Optional compatibility table used by some branches
 CREATE TABLE IF NOT EXISTS therapy_assignments (
     id INT AUTO_INCREMENT PRIMARY KEY,

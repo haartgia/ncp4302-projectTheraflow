@@ -25,7 +25,7 @@ if (!isset($_SESSION['role']) || strtolower((string) $_SESSION['role']) !== 'pat
             <li data-page="exercise_hub.php"><i class="fa-solid fa-dumbbell"></i><span class="nav-label">Exercises</span></li>
             <li class="active" aria-current="page" data-page="recovery.php"><i class="fa-solid fa-chart-line"></i><span class="nav-label">Recovery Progress</span></li>
             <li data-page="tele_message.php"><i class="fa-regular fa-message"></i><span class="nav-label">Messages</span></li>
-            <li data-page="patient_settings.php"><i class="fa-solid fa-gear"></i><span class="nav-label">Settings</span></li>
+            <li data-page="patient_settings.php"><i class="fa-solid fa-user-circle"></i><span class="nav-label patient-account-label">Account &amp; Settings</span></li>
         </ul>
         <div class="sidebar-footer">
             <button class="logout-btn" id="logoutBtn" aria-label="Log out"><i class="fa-solid fa-right-from-bracket"></i><span class="nav-label">Logout</span></button>

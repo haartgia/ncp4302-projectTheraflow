@@ -44,9 +44,9 @@
                 <span class="nav-label">Messages</span>
                 <span class="nav-alert-dot" aria-hidden="true"></span>
             </li>
-            <li class="settings-nav-item" data-page="settings.html">
-                <i class="fa-solid fa-gear"></i>
-                <span class="nav-label">Settings</span>
+            <li data-page="settings.html">
+                <i class="fa-solid fa-user-circle"></i>
+                <span class="nav-label">Account &amp; Settings</span>
             </li>
         </ul>
 
@@ -170,6 +170,32 @@
                                 <div class="doctor-stat-value" id="profileRepetitions">-</div>
                             </div>
                         </div>
+                    </article>
+
+                    <article class="widget widget-blue patient-medical-card">
+                        <h3 class="widget-title">Medical Information</h3>
+                        <div class="field-grid field-grid-two">
+                            <label class="field-group field-group-span-2">
+                                <span>Diagnosis</span>
+                                <input type="text" id="clinicalDiagnosis" placeholder="Diagnosis" />
+                            </label>
+                            <label class="field-group">
+                                <span>Assigned Doctor</span>
+                                <input type="text" id="clinicalAssignedDoctor" readonly />
+                            </label>
+                            <label class="field-group">
+                                <span>Last Clinical Review</span>
+                                <input type="text" id="clinicalLastReview" readonly />
+                            </label>
+                            <label class="field-group field-group-span-2">
+                                <span>Treatment Goal</span>
+                                <input type="text" id="clinicalTreatmentGoal" placeholder="Treatment goal" />
+                            </label>
+                        </div>
+                        <div class="wizard-actions wizard-actions-end">
+                            <button type="button" class="sign-in-btn" id="saveClinicalInfo">Save Medical Info</button>
+                        </div>
+                        <p class="notes-save-feedback" id="clinicalSaveFeedback" aria-live="polite"></p>
                     </article>
                 </div>
 

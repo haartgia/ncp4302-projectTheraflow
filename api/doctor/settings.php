@@ -74,6 +74,7 @@ $doctorsColumns = getTableColumns($pdo, $doctorsTable);
 
 $userIdColumn = in_array('user_id', $usersColumns, true) ? 'user_id' : (in_array('id', $usersColumns, true) ? 'id' : null);
 $userPasswordColumn = in_array('password', $usersColumns, true) ? 'password' : (in_array('password_hash', $usersColumns, true) ? 'password_hash' : null);
+$avatarColumn = in_array('avatar_url', $doctorsColumns, true) ? 'avatar_url' : (in_array('avatar', $doctorsColumns, true) ? 'avatar' : null);
 
 if ($userIdColumn === null || $userPasswordColumn === null) {
     http_response_code(500);
@@ -127,7 +128,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             ? (string) ($doctorRow['affiliation'] ?? '')
             : (string) ($doctorRow['hospital'] ?? ''),
         'bio' => (string) ($doctorRow['bio'] ?? ''),
-        'email' => $userEmail
+        'email' => $userEmail,
+        'avatarDataUrl' => $avatarColumn ? (string) ($doctorRow[$avatarColumn] ?? '') : ''
     ];
 
     echo json_encode(['ok' => true, 'profile' => $profile]);
@@ -152,6 +154,7 @@ $specialty = trim((string) ($data['specialty'] ?? ''));
 $hospital = trim((string) ($data['hospital'] ?? ''));
 $bio = trim((string) ($data['bio'] ?? ''));
 $email = trim((string) ($data['email'] ?? ''));
+$avatarDataUrl = trim((string) ($data['avatarDataUrl'] ?? ''));
 $currentPassword = (string) ($data['currentPassword'] ?? '');
 $newPassword = (string) ($data['newPassword'] ?? '');
 
@@ -159,6 +162,15 @@ if ($displayName === '' || $title === '' || $specialty === '' || $hospital === '
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Please complete all required profile fields']);
     exit;
+}
+
+if ($avatarColumn === null && $avatarDataUrl !== '') {
+    try {
+        $pdo->exec('ALTER TABLE ' . $doctorsTable . ' ADD COLUMN avatar_url TEXT NULL');
+        $avatarColumn = 'avatar_url';
+    } catch (Throwable $e) {
+        $avatarColumn = null;
+    }
 }
 
 $changingPassword = $newPassword !== '' || $currentPassword !== '';
@@ -210,32 +222,44 @@ try {
 
     if ($usesLegacyDoctorSchema) {
         if (!empty($doctorRow['user_id'])) {
+            $legacyColumns = [
+                'full_name = ?',
+                'email = ?',
+                'specialty = ?',
+                'license_number = ?',
+                'affiliation = ?',
+                'bio = ?'
+            ];
+            $legacyValues = [$displayName, $email, $specialty, $title, $hospital, $bio];
+            if ($avatarColumn) {
+                $legacyColumns[] = $avatarColumn . ' = ?';
+                $legacyValues[] = $avatarDataUrl;
+            }
+            $legacyValues[] = $userId;
             $updateDoctor = $pdo->prepare(
-                'UPDATE ' . $doctorsTable . ' SET full_name = ?, email = ?, specialty = ?, license_number = ?, affiliation = ?, bio = ? WHERE user_id = ?'
+                'UPDATE ' . $doctorsTable . ' SET ' . implode(', ', $legacyColumns) . ' WHERE user_id = ?'
             );
-            $updateDoctor->execute([
-                $displayName,
-                $email,
-                $specialty,
-                $title,
-                $hospital,
-                $bio,
-                $userId
-            ]);
+            $updateDoctor->execute($legacyValues);
         }
     } elseif ($usesStandaloneDoctorSchema && !empty($doctorRow['id'])) {
+        $standaloneColumns = [
+            'display_name = ?',
+            'title = ?',
+            'specialty = ?',
+            'hospital = ?',
+            'bio = ?',
+            'email = ?'
+        ];
+        $standaloneValues = [$displayName, $title, $specialty, $hospital, $bio, $email];
+        if ($avatarColumn) {
+            $standaloneColumns[] = $avatarColumn . ' = ?';
+            $standaloneValues[] = $avatarDataUrl;
+        }
+        $standaloneValues[] = (int) $doctorRow['id'];
         $updateDoctor = $pdo->prepare(
-            'UPDATE ' . $doctorsTable . ' SET display_name = ?, title = ?, specialty = ?, hospital = ?, bio = ?, email = ? WHERE id = ?'
+            'UPDATE ' . $doctorsTable . ' SET ' . implode(', ', $standaloneColumns) . ' WHERE id = ?'
         );
-        $updateDoctor->execute([
-            $displayName,
-                $title,
-                $specialty,
-                $hospital,
-                $bio,
-                $email,
-                (int) $doctorRow['id']
-        ]);
+        $updateDoctor->execute($standaloneValues);
     }
 
     $pdo->commit();
@@ -248,7 +272,8 @@ try {
             'specialty' => $specialty,
             'hospital' => $hospital,
             'bio' => $bio,
-            'email' => $email
+            'email' => $email,
+            'avatarDataUrl' => $avatarDataUrl
         ]
     ]);
 } catch (Throwable $e) {

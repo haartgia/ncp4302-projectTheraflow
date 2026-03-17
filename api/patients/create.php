@@ -90,6 +90,22 @@ function ensurePatientsColumns(PDO $pdo): void
     }
 }
 
+function ensureClinicalDataTable(PDO $pdo): void
+{
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS patient_clinical_data (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            patient_id INT NOT NULL,
+            doctor_id INT NULL,
+            diagnosis VARCHAR(255) NULL,
+            treatment_goal VARCHAR(255) NULL,
+            reviewed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_clinical_patient_id (patient_id),
+            INDEX idx_clinical_reviewed_at (reviewed_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+    );
+}
+
 function splitName(string $fullName): array
 {
     $parts = preg_split('/\s+/', trim($fullName)) ?: [];
@@ -98,9 +114,39 @@ function splitName(string $fullName): array
     return [$first, $last];
 }
 
+function resolveUsersTable(PDO $pdo): ?string
+{
+    $candidates = ['users', 'user_db.users', 'theraflow_db.users'];
+    foreach ($candidates as $tableName) {
+        try {
+            $probe = $pdo->query('SELECT 1 FROM ' . $tableName . ' LIMIT 1');
+            if ($probe !== false) {
+                return $tableName;
+            }
+        } catch (Throwable $e) {
+            // try next
+        }
+    }
+
+    return null;
+}
+
+function describeColumns(PDO $pdo, string $tableName): array
+{
+    $columns = [];
+    $stmt = $pdo->query('DESCRIBE ' . $tableName);
+    foreach ($stmt->fetchAll() as $row) {
+        if (isset($row['Field'])) {
+            $columns[] = strtolower((string) $row['Field']);
+        }
+    }
+    return $columns;
+}
+
 try {
     ensurePatientsColumns($pdo);
     ensureTherapyPlansTable($pdo);
+    ensureClinicalDataTable($pdo);
 
     // Username uniqueness is enforced in patients table where username is unique.
     $existingUsername = $pdo->prepare('SELECT id FROM patients WHERE username = ? LIMIT 1');
@@ -113,25 +159,56 @@ try {
 
     // user_db.users has no username column; we keep username in patients and use a synthetic email for account auth.
     $syntheticEmail = strtolower($username) . '@patient.local';
+    $usersTable = resolveUsersTable($pdo);
+    $usersColumns = $usersTable ? describeColumns($pdo, $usersTable) : [];
 
-    $emailCheck = $pdo->prepare('SELECT id FROM user_db.users WHERE email = ? LIMIT 1');
-    $emailCheck->execute([$syntheticEmail]);
-    if ($emailCheck->fetch()) {
-        http_response_code(409);
-        echo json_encode(['ok' => false, 'error' => 'Username already taken']);
-        exit;
+    if ($usersTable && in_array('email', $usersColumns, true)) {
+        $emailCheck = $pdo->prepare('SELECT id FROM ' . $usersTable . ' WHERE email = ? LIMIT 1');
+        $emailCheck->execute([$syntheticEmail]);
+        if ($emailCheck->fetch()) {
+            http_response_code(409);
+            echo json_encode(['ok' => false, 'error' => 'Username already taken']);
+            exit;
+        }
     }
 
     [$firstName, $lastName] = splitName($name);
 
     $pdo->beginTransaction();
 
-    // Step A: create user account (role=patient).
-    $createUser = $pdo->prepare(
-        'INSERT INTO user_db.users (first_name, last_name, mobile, email, password, role) VALUES (?, ?, ?, ?, ?, ?)'
-    );
-    $createUser->execute([$firstName, $lastName, $contact, $syntheticEmail, $passwordHash, 'patient']);
-    $newUserId = (int) $pdo->lastInsertId();
+    // Step A: create user account (role=patient) if users table exists.
+    $newUserId = 0;
+    if ($usersTable && in_array('email', $usersColumns, true)) {
+        $passwordColumn = in_array('password', $usersColumns, true) ? 'password' : (in_array('password_hash', $usersColumns, true) ? 'password_hash' : null);
+        if ($passwordColumn !== null) {
+            $insertColumns = ['email', $passwordColumn];
+            $insertValues = [$syntheticEmail, $passwordHash];
+
+            if (in_array('first_name', $usersColumns, true)) {
+                $insertColumns[] = 'first_name';
+                $insertValues[] = $firstName;
+            }
+            if (in_array('last_name', $usersColumns, true)) {
+                $insertColumns[] = 'last_name';
+                $insertValues[] = $lastName;
+            }
+            if (in_array('mobile', $usersColumns, true)) {
+                $insertColumns[] = 'mobile';
+                $insertValues[] = $contact;
+            }
+            if (in_array('role', $usersColumns, true)) {
+                $insertColumns[] = 'role';
+                $insertValues[] = 'patient';
+            }
+
+            $placeholders = implode(', ', array_fill(0, count($insertColumns), '?'));
+            $createUser = $pdo->prepare(
+                'INSERT INTO ' . $usersTable . ' (' . implode(', ', $insertColumns) . ') VALUES (' . $placeholders . ')'
+            );
+            $createUser->execute($insertValues);
+            $newUserId = (int) $pdo->lastInsertId();
+        }
+    }
 
     // Step B: create patient clinical profile linked to user and doctor.
     $createPatient = $pdo->prepare(
@@ -139,7 +216,7 @@ try {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     $createPatient->execute([
-        $newUserId,
+        $newUserId ?: null,
         $doctorId,
         $name,
         $age,
@@ -155,17 +232,32 @@ try {
 
     $newPatientId = (int) $pdo->lastInsertId();
 
-        // Step C: initialize blank therapy plan row.
-        $therapyPlanInsert = $pdo->prepare(
-                'INSERT INTO therapy_plans (patient_id, template_name, duration_min, target_repetitions, sessions_per_day)
-                 VALUES (?, ?, ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE
-                     template_name = VALUES(template_name),
-                     duration_min = VALUES(duration_min),
-                     target_repetitions = VALUES(target_repetitions),
-                     sessions_per_day = VALUES(sessions_per_day)'
-        );
-        $therapyPlanInsert->execute([$newPatientId, 'Default', 0, 0, 0]);
+    // Step C: initialize clinical summary from intake details.
+    $diagnosisLabel = $strokeType !== ''
+        ? ($affectedHand !== '' ? $strokeType . ' (' . $affectedHand . ' hand)' : $strokeType)
+        : 'Pending clinical intake';
+    $clinicalInsert = $pdo->prepare(
+        'INSERT INTO patient_clinical_data (patient_id, doctor_id, diagnosis, treatment_goal, reviewed_at)
+         VALUES (?, ?, ?, ?, NOW())'
+    );
+    $clinicalInsert->execute([
+        $newPatientId,
+        $doctorId,
+        $diagnosisLabel,
+        'Initial evaluation pending.'
+    ]);
+
+    // Step D: initialize blank therapy plan row.
+    $therapyPlanInsert = $pdo->prepare(
+        'INSERT INTO therapy_plans (patient_id, template_name, duration_min, target_repetitions, sessions_per_day)
+         VALUES (?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+             template_name = VALUES(template_name),
+             duration_min = VALUES(duration_min),
+             target_repetitions = VALUES(target_repetitions),
+             sessions_per_day = VALUES(sessions_per_day)'
+    );
+    $therapyPlanInsert->execute([$newPatientId, 'Default', 0, 0, 0]);
 
     $planTable = null;
     try {
@@ -202,8 +294,12 @@ try {
     }
 
     http_response_code(500);
-    echo json_encode([
+    $payload = [
         'ok' => false,
         'error' => 'Database connection error'
-    ]);
+    ];
+    if (getenv('THERAFLOW_DEBUG') === '1') {
+        $payload['detail'] = $e->getMessage();
+    }
+    echo json_encode($payload);
 }

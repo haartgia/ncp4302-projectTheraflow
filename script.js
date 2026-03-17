@@ -109,6 +109,13 @@ const CALENDAR_LABELS = [
 
 const todayDate = new Date();
 const calendarViewDate = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1);
+const calendarPlan = {
+    template_name: "Therapy",
+    duration_min: 20,
+    target_repetitions: 120,
+    sessions_per_day: 1,
+    source: "default"
+};
 
 function getMondayFirstDayIndex(date) {
     const jsDay = date.getDay();
@@ -117,22 +124,32 @@ function getMondayFirstDayIndex(date) {
 
 function getMonthActivityMeta(year, month, dateNum, isCurrentMonth) {
     if (!isCurrentMonth) {
-        return { label: "", showDot: false };
+        return { label: "", showDot: false, info: "" };
     }
 
-    const sampleMonthlyDates = {
-        1: { label: "Warmup", showDot: false },
-        5: { label: "Grip", showDot: true },
-        11: { label: "Flex", showDot: true },
-        18: { label: "Rest", showDot: false },
-        24: { label: "Move", showDot: true }
+    const isTodayMonth = year === todayDate.getFullYear() && month === todayDate.getMonth();
+    if (isTodayMonth && dateNum < todayDate.getDate()) {
+        return { label: "", showDot: false, info: "" };
+    }
+
+    const sessionsPerDay = Math.max(1, Number(calendarPlan.sessions_per_day || 0));
+    const duration = Number(calendarPlan.duration_min || 0);
+    const reps = Number(calendarPlan.target_repetitions || 0);
+    const planName = String(calendarPlan.template_name || "Therapy").trim() || "Therapy";
+
+    const infoParts = [planName, sessionsPerDay === 1 ? "1 session" : `${sessionsPerDay} sessions`];
+    if (duration > 0) {
+        infoParts.push(`${duration} min`);
+    }
+    if (reps > 0) {
+        infoParts.push(`${reps} reps`);
+    }
+
+    return {
+        label: "",
+        showDot: true,
+        info: infoParts.join(" • ")
     };
-
-    if (year === todayDate.getFullYear() && month === todayDate.getMonth() && sampleMonthlyDates[dateNum]) {
-        return sampleMonthlyDates[dateNum];
-    }
-
-    return { label: "", showDot: false };
 }
 
 function createCalendarCell({ year, month, dateNum, isCurrentMonth }) {
@@ -157,12 +174,15 @@ function createCalendarCell({ year, month, dateNum, isCurrentMonth }) {
     dayNumber.textContent = String(dateNum);
 
     const activityMeta = getMonthActivityMeta(year, month, dateNum, isCurrentMonth);
-    const dayLabel = document.createElement("span");
-    dayLabel.className = "calendar-cell-label";
-    dayLabel.textContent = activityMeta.label;
-
     dayCell.appendChild(dayNumber);
-    dayCell.appendChild(dayLabel);
+
+    if (activityMeta.info) {
+        const tooltip = document.createElement("span");
+        tooltip.className = "calendar-tooltip";
+        tooltip.textContent = activityMeta.info;
+        dayCell.setAttribute("aria-label", `${CALENDAR_LABELS[month]} ${dateNum}: ${activityMeta.info}`);
+        dayCell.appendChild(tooltip);
+    }
 
     if (activityMeta.showDot) {
         const activityDot = document.createElement("span");
@@ -220,6 +240,33 @@ function renderCalendar() {
 
         calendarDates.appendChild(createCalendarCell({ year, month, dateNum, isCurrentMonth }));
     }
+}
+
+function updateCalendarPlan(data) {
+    calendarPlan.template_name = String(data?.template_name || "Therapy");
+    calendarPlan.duration_min = Number(data?.duration_min || 0);
+    calendarPlan.target_repetitions = Number(data?.target_repetitions || 0);
+    calendarPlan.sessions_per_day = Number(data?.sessions_per_day || 1);
+}
+
+function loadCalendarPlan() {
+    if (!calendarMonth || !calendarDates) {
+        return;
+    }
+
+    fetch("api/patient/therapy_plan.php")
+        .then(response => response.ok ? response.json() : Promise.reject(new Error("Unable to load therapy plan.")))
+        .then(payload => {
+            if (!payload?.ok) {
+                throw new Error(payload?.error || "Unable to load therapy plan.");
+            }
+            updateCalendarPlan(payload.plan || {});
+            renderCalendar();
+        })
+        .catch(() => {
+            updateCalendarPlan({});
+            renderCalendar();
+        });
 }
 
 function updateActiveIndicator() {
@@ -316,8 +363,9 @@ function initializePatientDashboardVisuals() {
     const completionLabel = document.querySelector(".patient-progress-label");
     const actionRings = document.querySelectorAll("[data-progress-ring]");
     const daySubheader = document.querySelector(".header-left .subheader");
+    const nextExerciseDescription = document.getElementById("nextExerciseDescription");
 
-    if (!completionRing && !actionRings.length && !daySubheader) {
+    if (!completionRing && !actionRings.length && !daySubheader && !nextExerciseDescription) {
         return;
     }
 
@@ -380,7 +428,36 @@ function initializePatientDashboardVisuals() {
         });
     }
 
+    async function refreshNextExercise() {
+        if (!nextExerciseDescription) {
+            return;
+        }
+
+        try {
+            const response = await fetch("api/patient/doctor_assignments.php");
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload?.ok || !payload?.plan) {
+                throw new Error(payload?.error || "Unable to load plan");
+            }
+
+            const duration = Number(payload.plan.duration_min || 15);
+            const targetReps = Number(payload.plan.target_repetitions || 0);
+            const exerciseType = String(payload.plan.exercise_type || "Guided session");
+            const repsCopy = targetReps ? `, ${targetReps} reps` : "";
+            const hasPlan = duration > 0 || targetReps > 0;
+            if (!hasPlan && payload.source === "default") {
+                nextExerciseDescription.textContent = "No doctor plan yet — calibrate first to generate your first session.";
+                return;
+            }
+
+            nextExerciseDescription.textContent = `${exerciseType} session${repsCopy}, estimated ${duration} minutes`;
+        } catch {
+            // Keep default copy if plan isn't available (e.g., not signed in yet).
+        }
+    }
+
     refreshDashboardVisuals();
+    refreshNextExercise();
     window.addEventListener("storage", refreshDashboardVisuals);
     setInterval(refreshDashboardVisuals, 3000);
 }
@@ -480,12 +557,61 @@ function initializeDoctorDashboard() {
     const alertsList = document.getElementById("dashboardAlertsList");
     const recentActivityBody = document.getElementById("dashboardRecentActivityBody");
     const quickOverviewBody = document.getElementById("dashboardQuickOverviewBody");
+    const chartWrap = document.getElementById("doctorChartWrap");
+    const metricButtons = document.querySelectorAll(".chart-metric-toggle .metric-btn");
+    const quickActionButton = document.getElementById("dashboardQuickAction");
+    const chartTitle = document.getElementById("doctorChartTitle");
+    const chartSubtitle = document.getElementById("doctorChartSubtitle");
+    const chartEmpty = document.getElementById("doctorChartEmpty");
+    const patientSelectBtn = document.getElementById("patientSelectBtn");
+    const patientSelectMenu = document.getElementById("patientSelectMenu");
+    const patientSelectList = document.getElementById("patientSelectList");
+    const patientSelectSearch = document.getElementById("patientSelectSearch");
+    const selectedPatientLabel = document.getElementById("selectedPatientLabel");
 
     let doctorChart = null;
+    let cachedPayload = null;
+    let activeMetric = "grip";
+    let selectedPatientKey = "all";
+    let patientOptions = [];
 
     function safeText(value, fallback = "-") {
         const normalized = value === null || value === undefined ? "" : String(value).trim();
         return normalized || fallback;
+    }
+
+    function computeYAxisBounds(data) {
+        const cleaned = data.filter(value => typeof value === "number" && !Number.isNaN(value));
+        if (!cleaned.length) {
+            return { min: 0, max: 1 };
+        }
+        const min = Math.min(...cleaned);
+        const max = Math.max(...cleaned);
+        const padding = Math.max(1, (max - min) * 0.1);
+        return { min: Math.max(0, min - padding), max: max + padding };
+    }
+
+    function hasDataPoints(data) {
+        return data.some(value => typeof value === "number" && value > 0);
+    }
+
+    function resolveSeries(chartData) {
+        if (selectedPatientKey === "all") {
+            return {
+                labels: chartData?.labels,
+                series: activeMetric === "range" ? chartData?.avgRange : chartData?.avgGrip
+            };
+        }
+
+        const byPatient = chartData?.patients || chartData?.perPatient || {};
+        const patientEntry = byPatient[selectedPatientKey] || null;
+        if (!patientEntry) {
+            return { labels: chartData?.labels, series: [] };
+        }
+        return {
+            labels: patientEntry.labels || chartData?.labels,
+            series: activeMetric === "range" ? patientEntry.range : patientEntry.grip
+        };
     }
 
     function renderWeeklyChart(chartData) {
@@ -500,14 +626,23 @@ function initializeDoctorDashboard() {
             doctorChart.destroy();
         }
 
+        const resolved = resolveSeries(chartData);
+        const metricLabel = activeMetric === "range" ? "Range of Motion (deg)" : "Grip Strength (N)";
+        const metricData = Array.isArray(resolved.series) ? resolved.series : [];
+        const hasData = hasDataPoints(metricData);
+        if (chartEmpty) {
+            chartEmpty.hidden = hasData;
+        }
+        const yBounds = computeYAxisBounds(metricData);
+
         doctorChart = new Chart(doctorChartCanvas, {
             type: "line",
             data: {
-                labels: Array.isArray(chartData?.labels) ? chartData.labels : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+                labels: Array.isArray(resolved.labels) ? resolved.labels : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
                 datasets: [
                     {
-                        label: "Avg Grip Strength (N)",
-                        data: Array.isArray(chartData?.avgGrip) ? chartData.avgGrip : [0, 0, 0, 0, 0, 0, 0],
+                        label: metricLabel,
+                        data: metricData.length ? metricData : [0, 0, 0, 0, 0, 0, 0],
                         borderColor: "#0d5f73",
                         backgroundColor: "rgba(13,95,115,0.14)",
                         borderWidth: 2,
@@ -525,11 +660,204 @@ function initializeDoctorDashboard() {
                 },
                 scales: {
                     x: { ticks: { color: axisColor }, grid: { color: gridColor } },
-                    y: { beginAtZero: true, ticks: { color: axisColor }, grid: { color: gridColor } }
+                    y: {
+                        beginAtZero: false,
+                        min: yBounds.min,
+                        max: yBounds.max,
+                        ticks: { color: axisColor },
+                        grid: { color: gridColor }
+                    }
                 }
             }
         });
     }
+
+    function setTrend(elId, delta) {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        el.innerHTML = "";
+        if (delta === undefined || delta === null) return;
+        const num = Number(delta);
+        if (Number.isNaN(num)) return;
+        const up = num >= 0;
+        const arrow = document.createElement("i");
+        arrow.className = `fa-solid fa-arrow-${up ? "up" : "down"}`;
+        el.classList.toggle("up", up);
+        el.classList.toggle("down", !up);
+        el.appendChild(arrow);
+        const text = document.createElement("span");
+        text.textContent = `${Math.abs(Math.round(num))}%`;
+        el.appendChild(text);
+    }
+
+    function applyUnreadBadge(unreadCount) {
+        const messagesNav = document.querySelector('.menu li[data-page="messages.html"]');
+        if (!messagesNav) return;
+        if (unreadCount > 0) {
+            messagesNav.classList.add("has-unread");
+        } else {
+            messagesNav.classList.remove("has-unread");
+        }
+    }
+
+    function renderPatientSelector() {
+        if (!patientSelectList) return;
+        const query = (patientSelectSearch?.value || "").trim().toLowerCase();
+        const filtered = patientOptions.filter(option => option.label.toLowerCase().includes(query));
+        patientSelectList.innerHTML = filtered.map(option => {
+            const active = option.key === selectedPatientKey ? "active" : "";
+            return `<li class="selector-item ${active}" data-key="${option.key}">${option.label}</li>`;
+        }).join("");
+    }
+
+    function updateChartTitle() {
+        const activeLabel = patientOptions.find(item => item.key === selectedPatientKey)?.label || "All Patients (Avg)";
+        if (chartSubtitle) {
+            chartSubtitle.textContent = `Weekly Progress: ${activeLabel}`;
+        }
+    }
+
+    function renderDashboard(payload) {
+        cachedPayload = payload;
+        const summary = payload.summary || {};
+        if (totalPatientsEl) totalPatientsEl.textContent = String(summary.totalPatients ?? 0);
+        if (activeTodayEl) activeTodayEl.textContent = String(summary.activePatientsToday ?? 0);
+        if (sessionsTodayEl) sessionsTodayEl.textContent = String(summary.sessionsToday ?? 0);
+        if (avgGripEl) avgGripEl.textContent = `${Number(summary.avgGripStrength ?? 0).toFixed(1)} N`;
+
+        if (alertsList) {
+            const alerts = Array.isArray(payload.alerts) ? payload.alerts : [];
+            alertsList.innerHTML = alerts.length
+                ? alerts.map(alert => {
+                    const lower = String(alert).toLowerCase();
+                    const isCritical = lower.includes("decreased") || lower.includes("drop") || lower.includes("critical");
+                    return `<li class="${isCritical ? "alert-critical" : ""}"><span class="doctor-alert-icon" aria-hidden="true">i</span> ${safeText(alert)}</li>`;
+                }).join("")
+                : '<li><span class="doctor-alert-icon" aria-hidden="true">i</span> No patient alerts yet.</li>';
+        }
+
+        if (recentActivityBody) {
+            const rows = Array.isArray(payload.recentActivity) ? payload.recentActivity : [];
+            recentActivityBody.innerHTML = rows.length
+                ? rows.map(row => `
+                    <tr>
+                        <td>${safeText(row.patient_name)}</td>
+                        <td>${safeText(row.note, "Sensor reading recorded")}</td>
+                        <td>${safeText(row.recorded_at, "-")}</td>
+                    </tr>
+                `).join("")
+                : `
+                    <tr class="empty-state-row">
+                        <td colspan="3" class="empty-state">
+                            <div class="empty-illustration">🩺</div>
+                            <div>No recent patient activity yet.</div>
+                        </td>
+                    </tr>
+                `;
+        }
+
+        if (quickOverviewBody) {
+            const rows = Array.isArray(payload.quickOverview) ? payload.quickOverview : [];
+            if (!patientOptions.length) {
+                patientOptions = [
+                    { key: "all", label: "All Patients (Avg)" },
+                    ...rows.map(row => ({ key: row.id || row.name, label: row.name }))
+                ];
+                renderPatientSelector();
+            }
+            quickOverviewBody.innerHTML = rows.length
+                ? rows.map(row => {
+                    const drop = Number(row.drop_percent || row.drop || 0);
+                    const missed = !!row.missed_session;
+                    let trafficClass = "traffic-green";
+                    if (!Number.isNaN(drop) && drop >= 20) {
+                        trafficClass = "traffic-red";
+                    } else if (missed) {
+                        trafficClass = "traffic-yellow";
+                    }
+                    return `
+                        <tr>
+                            <td>${safeText(row.name)}</td>
+                            <td><span class="status-traffic"><span class="traffic-dot ${trafficClass}" aria-hidden="true"></span>${safeText(row.status, "Stable")}</span></td>
+                            <td>${safeText(row.last_session, "N/A")}</td>
+                        </tr>
+                    `;
+                }).join("")
+                : `
+                    <tr class="empty-state-row">
+                        <td colspan="3" class="empty-state">
+                            <div class="empty-illustration">👥</div>
+                            <div>No patients added yet.</div>
+                            <div><a href="patients.html" class="btn btn-primary add-patient-cta">Add Patient</a></div>
+                        </td>
+                    </tr>
+                `;
+        }
+
+        renderWeeklyChart(payload.weeklyChart || {});
+    updateChartTitle();
+
+        const trends = summary.trends || payload.trends || {};
+        setTrend("trendTotalPatients", trends.totalPatients ?? summary.deltaTotalPatients);
+        setTrend("trendActivePatients", trends.activePatientsToday ?? summary.deltaActivePatients);
+        setTrend("trendSessionsToday", trends.sessionsToday ?? summary.deltaSessions);
+        setTrend("trendAvgGrip", trends.avgGripStrength ?? summary.deltaAvgGrip);
+
+        applyUnreadBadge(Number(payload.unreadMessages ?? payload.unreadMessagesCount ?? 0));
+    }
+
+    metricButtons?.forEach(button => {
+        button.addEventListener("click", () => {
+            metricButtons.forEach(btn => btn.classList.remove("active"));
+            button.classList.add("active");
+            activeMetric = button.dataset.metric || "grip";
+            if (cachedPayload) {
+                renderWeeklyChart(cachedPayload.weeklyChart || {});
+            }
+        });
+    });
+
+    patientSelectBtn?.addEventListener("click", () => {
+        if (!patientSelectMenu) return;
+        patientSelectMenu.hidden = !patientSelectMenu.hidden;
+        if (!patientSelectMenu.hidden) {
+            patientSelectSearch?.focus();
+        }
+    });
+
+    document.addEventListener("click", event => {
+        if (!patientSelectMenu || !patientSelectBtn) return;
+        const target = event.target instanceof HTMLElement ? event.target : null;
+        if (!target) return;
+        if (patientSelectMenu.contains(target) || patientSelectBtn.contains(target)) return;
+        patientSelectMenu.hidden = true;
+    });
+
+    patientSelectSearch?.addEventListener("input", renderPatientSelector);
+
+    patientSelectList?.addEventListener("click", event => {
+        const target = event.target instanceof HTMLElement ? event.target.closest(".selector-item") : null;
+        if (!target) return;
+        const key = target.getAttribute("data-key");
+        if (!key) return;
+        selectedPatientKey = key;
+        const activeLabel = patientOptions.find(item => item.key === key)?.label || "All Patients (Avg)";
+        if (selectedPatientLabel) {
+            selectedPatientLabel.textContent = activeLabel;
+        }
+        renderPatientSelector();
+        updateChartTitle();
+        if (cachedPayload) {
+            renderWeeklyChart(cachedPayload.weeklyChart || {});
+        }
+        if (patientSelectMenu) patientSelectMenu.hidden = true;
+    });
+
+    quickActionButton?.addEventListener("click", () => {
+        window.location.href = "patients.html";
+    });
+
+    if (chartWrap) chartWrap.classList.add("is-loading");
 
     fetch("api/doctor/dashboard.php")
         .then(response => response.ok ? response.json() : Promise.reject(new Error("Unable to load dashboard data.")))
@@ -538,60 +866,14 @@ function initializeDoctorDashboard() {
                 throw new Error(payload?.error || "Unable to load dashboard data.");
             }
 
-            const summary = payload.summary || {};
-
-            if (totalPatientsEl) {
-                totalPatientsEl.textContent = String(summary.totalPatients ?? 0);
-            }
-            if (activeTodayEl) {
-                activeTodayEl.textContent = String(summary.activePatientsToday ?? 0);
-            }
-            if (sessionsTodayEl) {
-                sessionsTodayEl.textContent = String(summary.sessionsToday ?? 0);
-            }
-            if (avgGripEl) {
-                avgGripEl.textContent = `${Number(summary.avgGripStrength ?? 0).toFixed(1)} N`;
-            }
-
-            if (alertsList) {
-                const alerts = Array.isArray(payload.alerts) ? payload.alerts : [];
-                alertsList.innerHTML = alerts.length
-                    ? alerts.map(alert => `<li><span class="doctor-alert-icon" aria-hidden="true">i</span> ${safeText(alert)}</li>`).join("")
-                    : '<li><span class="doctor-alert-icon" aria-hidden="true">i</span> No patient alerts yet.</li>';
-            }
-
-            if (recentActivityBody) {
-                const rows = Array.isArray(payload.recentActivity) ? payload.recentActivity : [];
-                recentActivityBody.innerHTML = rows.length
-                    ? rows.map(row => `
-                        <tr>
-                            <td>${safeText(row.patient_name)}</td>
-                            <td>${safeText(row.note, "Sensor reading recorded")}</td>
-                            <td>${safeText(row.recorded_at, "-")}</td>
-                        </tr>
-                    `).join("")
-                    : '<tr><td colspan="3">No recent patient activity yet.</td></tr>';
-            }
-
-            if (quickOverviewBody) {
-                const rows = Array.isArray(payload.quickOverview) ? payload.quickOverview : [];
-                quickOverviewBody.innerHTML = rows.length
-                    ? rows.map(row => `
-                        <tr>
-                            <td>${safeText(row.name)}</td>
-                            <td><span class="status-pill status-stable">${safeText(row.status, "Stable")}</span></td>
-                            <td>${safeText(row.last_session, "N/A")}</td>
-                        </tr>
-                    `).join("")
-                    : '<tr><td colspan="3">No patients added yet.</td></tr>';
-            }
-
-            renderWeeklyChart(payload.weeklyChart || {});
+            renderDashboard(payload);
+            if (chartWrap) chartWrap.classList.remove("is-loading");
         })
         .catch(() => {
             if (alertsList) {
                 alertsList.innerHTML = '<li><span class="doctor-alert-icon" aria-hidden="true">i</span> Unable to load dashboard data right now.</li>';
             }
+            if (chartWrap) chartWrap.classList.remove("is-loading");
         });
 }
 
@@ -615,6 +897,12 @@ function initializePatientsPage() {
     const saveNotesButton = document.getElementById("saveDoctorNotes");
     const notesInput = document.getElementById("doctorNotesInput");
     const notesFeedback = document.getElementById("notesSaveFeedback");
+    const clinicalDiagnosisInput = document.getElementById("clinicalDiagnosis");
+    const clinicalTreatmentGoalInput = document.getElementById("clinicalTreatmentGoal");
+    const clinicalAssignedDoctorInput = document.getElementById("clinicalAssignedDoctor");
+    const clinicalLastReviewInput = document.getElementById("clinicalLastReview");
+    const saveClinicalInfoButton = document.getElementById("saveClinicalInfo");
+    const clinicalSaveFeedback = document.getElementById("clinicalSaveFeedback");
 
     const profileName = document.getElementById("profilePatientName");
     const profileBreadcrumbName = document.getElementById("patientProfileBreadcrumbName");
@@ -863,7 +1151,72 @@ function initializePatientsPage() {
             notesFeedback.textContent = "";
         }
 
+        if (clinicalSaveFeedback) {
+            clinicalSaveFeedback.textContent = "";
+        }
+        void loadClinicalData(patient.dbId || patient.id);
+
         renderProfileCharts(patient);
+    }
+
+    async function loadClinicalData(patientDbId) {
+        if (!clinicalDiagnosisInput && !clinicalTreatmentGoalInput && !notesInput) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`api/patients/clinical.php?patientId=${patientDbId}`);
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload?.ok) {
+                throw new Error(payload?.error || "Unable to load clinical data.");
+            }
+
+            const clinical = payload.clinical || {};
+            if (clinicalDiagnosisInput) clinicalDiagnosisInput.value = clinical.diagnosis || "";
+            if (clinicalTreatmentGoalInput) clinicalTreatmentGoalInput.value = clinical.treatment_goal || "";
+            if (clinicalAssignedDoctorInput) clinicalAssignedDoctorInput.value = clinical.assigned_doctor || "";
+            if (clinicalLastReviewInput) clinicalLastReviewInput.value = clinical.reviewed_at || "";
+            if (notesInput) notesInput.value = clinical.treatment_goal || notesInput.value;
+        } catch (err) {
+            if (clinicalSaveFeedback) {
+                clinicalSaveFeedback.textContent = "Unable to load medical info.";
+            }
+        }
+    }
+
+    async function saveClinicalData(patientDbId, { diagnosis, treatmentGoal }) {
+        if (!patientDbId) return false;
+        if (clinicalSaveFeedback) {
+            clinicalSaveFeedback.textContent = "Saving medical info...";
+        }
+        try {
+            const response = await fetch("api/patients/clinical.php", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    patientId: patientDbId,
+                    diagnosis,
+                    treatmentGoal
+                })
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload?.ok) {
+                throw new Error(payload?.error || "Unable to save medical info.");
+            }
+
+            if (clinicalLastReviewInput) {
+                clinicalLastReviewInput.value = payload.reviewed_at || "";
+            }
+            if (clinicalSaveFeedback) {
+                clinicalSaveFeedback.textContent = "Medical info saved.";
+            }
+            return true;
+        } catch (err) {
+            if (clinicalSaveFeedback) {
+                clinicalSaveFeedback.textContent = err instanceof Error ? err.message : "Unable to save medical info.";
+            }
+            return false;
+        }
     }
 
     function showProfileView(patientId) {
@@ -998,15 +1351,35 @@ function initializePatientsPage() {
         }
     });
 
-    saveNotesButton?.addEventListener("click", () => {
+    saveNotesButton?.addEventListener("click", async () => {
         const patient = patients.find(entry => entry.id === activePatientId);
         if (!patient || !notesInput) {
             return;
         }
 
         patient.notes = notesInput.value.trim();
+        const diagnosis = clinicalDiagnosisInput?.value.trim() || "";
+        const saved = await saveClinicalData(patient.dbId || patient.id, {
+            diagnosis,
+            treatmentGoal: patient.notes
+        });
+
         if (notesFeedback) {
-            notesFeedback.textContent = "Notes saved.";
+            notesFeedback.textContent = saved ? "Notes saved." : "Unable to save notes.";
+        }
+    });
+
+    saveClinicalInfoButton?.addEventListener("click", async () => {
+        const patient = patients.find(entry => entry.id === activePatientId);
+        if (!patient) {
+            return;
+        }
+
+        const diagnosis = clinicalDiagnosisInput?.value.trim() || "";
+        const treatmentGoal = clinicalTreatmentGoalInput?.value.trim() || "";
+        const saved = await saveClinicalData(patient.dbId || patient.id, { diagnosis, treatmentGoal });
+        if (saved && notesInput) {
+            notesInput.value = treatmentGoal;
         }
     });
 
@@ -1648,18 +2021,18 @@ function initializeExerciseHubPage() {
     const calibrateBtn      = document.getElementById("hubCalibrateBtn");
     const calibrationGrid   = document.getElementById("calibrationFingerGrid");
     const calibrationStatus = document.getElementById("hubCalibrationStatus");
+    const calibrationPrompt = document.getElementById("calibrationPrompt");
 
-    // Step 3 — Diagnostics
-    const diagPromptIcon = document.getElementById("diagPromptIcon");
-    const diagPromptText = document.getElementById("diagPromptText");
-    const diagActionBtn  = document.getElementById("hubDiagActionBtn");
-    const diagStatus     = document.getElementById("hubDiagStatus");
-    const maxExtEl       = document.getElementById("hubMaxExtension");
-    const maxFlexEl      = document.getElementById("hubMaxFlexion");
-    const peakForceEl    = document.getElementById("hubPeakForce");
-    const repTargetEl    = document.getElementById("hubRepetitions");
+    // Step 3 — Mode Selection
+    const diagStatus       = document.getElementById("hubDiagStatus");
+    const therapyStartBtn  = document.getElementById("hubTherapyStartBtn");
+    const testStartBtn     = document.getElementById("hubTestStartBtn");
+    const therapyDurationEl = document.getElementById("hubTherapyDuration");
+    const therapyRepsEl     = document.getElementById("hubTherapyReps");
+    const therapyTypeEl     = document.getElementById("hubTherapyType");
 
     // Step 4 — Session
+    const sessionIntro    = document.getElementById("hubSessionIntro");
     const targetRepsEl    = document.getElementById("hubTargetReps");
     const sessionRepsEl   = document.getElementById("hubSessionReps");
     const sessionForceEl  = document.getElementById("hubSessionForce");
@@ -1667,14 +2040,26 @@ function initializeExerciseHubPage() {
     const startSessionBtn = document.getElementById("hubStartSessionBtn");
     const endSessionBtn   = document.getElementById("hubEndSessionBtn");
     const sessionStatus   = document.getElementById("hubSessionStatus");
+    const therapySessionPane = document.getElementById("therapySessionPane");
+    const testSessionPane    = document.getElementById("testSessionPane");
+    const testPromptEl       = document.getElementById("hubTestPrompt");
+    const testActionBtn      = document.getElementById("hubTestActionBtn");
+    const testGripAvgEl      = document.getElementById("hubTestGripAvg");
+    const testFlexAvgEl      = document.getElementById("hubTestFlexAvg");
+    const testExtAvgEl       = document.getElementById("hubTestExtAvg");
+    const testTrialCountEl   = document.getElementById("hubTestTrialCount");
 
     // ── State ─────────────────────────────────────────────────────────────────
-    let bluetoothCharacteristic = null;
+    let gloveConnected = false;
     const fingerNames = ["Thumb", "Index", "Middle", "Ring", "Little"];
-    const calibrationState = fingerNames.map(name => ({ name, zero: null }));
+    const calibrationState = fingerNames.map(name => ({ name, zero: null, max: null }));
     const diagResults = { maxExtension: 0, maxFlexion: 0, peakForce: 0 };
     let planTargetReps = 120;
-    let diagStepIndex = -1; // -1 = not yet started
+    let planDurationMin = 15;
+    let planExerciseType = "Active Grip";
+    let calibrationPhase = "zero";
+    let calibrationComplete = false;
+    let selectedMode = "";
 
     const sessionState = {
         isRunning: false,
@@ -1696,13 +2081,6 @@ function initializeExerciseHubPage() {
     }
 
     async function readGloveValue(min, max) {
-        if (bluetoothCharacteristic) {
-            try {
-                const val = await bluetoothCharacteristic.readValue();
-                const n = val.getUint8(0);
-                if (Number.isFinite(n)) return Number(n);
-            } catch { /* fall through to simulation */ }
-        }
         return pseudoRandom(min, max);
     }
 
@@ -1725,43 +2103,28 @@ function initializeExerciseHubPage() {
         });
     }
 
-    // ── STEP 1: Pair ──────────────────────────────────────────────────────────
+    // ── STEP 1: Connect ───────────────────────────────────────────────────────
     pairButton?.addEventListener("click", async () => {
         pairButton.disabled = true;
         if (searchingAnim) searchingAnim.hidden = false;
-        setMsg(pairStatus, "Searching for glove…");
+        setMsg(pairStatus, "Searching for glove on Wi-Fi…");
 
-        if (!navigator.bluetooth) {
-            await new Promise(r => setTimeout(r, 1800));
+        await new Promise(r => setTimeout(r, 1600));
+
+        const found = Math.random() > 0.15;
+        if (!found) {
             if (searchingAnim) searchingAnim.hidden = true;
-            setMsg(pairStatus, "Simulation mode active — Web Bluetooth not available on this device.");
-            announceGlovePaired("Simulated Glove");
-            goToStep(2);
+            pairButton.disabled = false;
+            setMsg(pairStatus, "Glove not found. Confirm both devices are on the same 2.4GHz network and try again.");
             return;
         }
 
-        try {
-            const device = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
-                optionalServices: ["battery_service"]
-            });
-            const server = await device.gatt?.connect();
-            if (server) {
-                try {
-                    const svc = await server.getPrimaryService("battery_service");
-                    bluetoothCharacteristic = await svc.getCharacteristic("battery_level");
-                } catch { /* characteristic is optional */ }
-            }
-            if (searchingAnim) searchingAnim.hidden = true;
-            const gloveName = device.name || "Theraflow Glove";
-            setMsg(pairStatus, `Connected to ${gloveName}.`);
-            announceGlovePaired(gloveName);
-            goToStep(2);
-        } catch (err) {
-            if (searchingAnim) searchingAnim.hidden = true;
-            pairButton.disabled = false;
-            setMsg(pairStatus, (err instanceof Error ? err.message : "Pairing failed.") + " Please try again.");
-        }
+        if (searchingAnim) searchingAnim.hidden = true;
+        const gloveName = "Theraflow Glove";
+        setMsg(pairStatus, `Connected to ${gloveName} over Wi-Fi.`);
+        gloveConnected = true;
+        announceGlovePaired(gloveName);
+        goToStep(2);
     });
 
     function announceGlovePaired(name) {
@@ -1769,6 +2132,8 @@ function initializeExerciseHubPage() {
             localStorage.setItem("theraflow_glove", JSON.stringify({
                 connected: true,
                 name,
+                ip: "192.168.1.120",
+                mac: "AA:BB:CC:DD:EE:FF",
                 pairedAt: Date.now(),
                 sessionActive: false,
                 targetRepetitions: 120
@@ -1780,109 +2145,220 @@ function initializeExerciseHubPage() {
     function renderCalibrationGrid() {
         if (!calibrationGrid) return;
         calibrationGrid.innerHTML = calibrationState.map(finger => {
-            const locked = finger.zero !== null;
-            return `<div class="calibration-finger ${locked ? "is-locked" : ""}">
+            const zeroLocked = finger.zero !== null;
+            const maxLocked = finger.max !== null;
+            return `<div class="calibration-finger ${zeroLocked && maxLocked ? "is-locked" : ""}">
                 <strong>${finger.name}</strong>
                 <span>0&deg;: ${finger.zero === null ? "&mdash;" : `${finger.zero.toFixed(1)}&deg;`}</span>
+                <span>Max: ${finger.max === null ? "&mdash;" : `${finger.max.toFixed(1)}&deg;`}</span>
             </div>`;
         }).join("");
     }
 
+    function updateCalibrationPrompt() {
+        if (calibrationPhase === "zero") {
+            setMsg(calibrationStatus, "Keep hand still — reading baseline for all 5 fingers…");
+            setMsg(calibrationPrompt, "Rest your hand flat and relaxed. The system will capture the 0° baseline.");
+            if (calibrateBtn) calibrateBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Capture Zero Point';
+            return;
+        }
+
+        setMsg(calibrationStatus, "Make a firm fist — capturing maximum flex for all 5 fingers…");
+        setMsg(calibrationPrompt, "Close your hand into a fist to capture the maximum flex baseline.");
+        if (calibrateBtn) calibrateBtn.innerHTML = '<i class="fa-solid fa-hand-fist"></i> Capture Max Flex';
+    }
+
     calibrateBtn?.addEventListener("click", async () => {
         calibrateBtn.disabled = true;
-        setMsg(calibrationStatus, "Keep hand still — reading baseline for all 5 fingers…");
+        updateCalibrationPrompt();
+
+        if (calibrationPhase === "zero") {
+            for (let i = 0; i < calibrationState.length; i++) {
+                calibrationState[i].zero = await readGloveValue(0, 12);
+                renderCalibrationGrid();
+                await new Promise(r => setTimeout(r, 300));
+            }
+            calibrationPhase = "max";
+            calibrateBtn.disabled = false;
+            setMsg(calibrationStatus, "Zero point recorded. Now capture maximum flex.");
+            updateCalibrationPrompt();
+            return;
+        }
+
         for (let i = 0; i < calibrationState.length; i++) {
-            calibrationState[i].zero = await readGloveValue(0, 12);
+            calibrationState[i].max = await readGloveValue(120, 180);
             renderCalibrationGrid();
             await new Promise(r => setTimeout(r, 300));
         }
-        const count = calibrationState.filter(f => f.zero !== null).length;
-        setMsg(calibrationStatus, `${count}/5 fingers zeroed. Calibration complete.`);
+
+        calibrationComplete = true;
+        const count = calibrationState.filter(f => f.zero !== null && f.max !== null).length;
+        const avgMax = calibrationState.reduce((sum, finger) => sum + (finger.max || 0), 0) / calibrationState.length;
+        diagResults.maxFlexion = avgMax;
+        diagResults.maxExtension = avgMax;
+        setMsg(calibrationStatus, `${count}/5 fingers calibrated. Calibration complete.`);
         goToStep(3);
-        startDiagnosticFlow();
+        loadTherapyPlan();
     });
 
     renderCalibrationGrid();
 
-    // ── STEP 3: Diagnostics ───────────────────────────────────────────────────
-    const DIAG_STEPS = [
-        { icon: "fa-solid fa-hand",      text: "Stretch fingers as wide as you can and hold for 3 seconds.", key: "maxExtension", min: 140, max: 180, unit: "\u00b0", label: "Max Extension", btnLabel: "Capture Extension" },
-        { icon: "fa-solid fa-hand-fist", text: "Close your hand into a tight fist — squeeze as hard as you can.", key: "maxFlexion",   min: 120, max: 180, unit: "\u00b0", label: "Max Flexion",   btnLabel: "Capture Flexion"   },
-        { icon: "fa-solid fa-grip",      text: "Squeeze the pressure sensor firmly for 3 seconds.", key: "peakForce",    min: 20,  max: 75,  unit: " N",      label: "Peak Force",    btnLabel: "Capture Force"     }
-    ];
+    // ── STEP 3: Mode Selection ───────────────────────────────────────────────
+    const testState = {
+        trial: 0,
+        grip: [],
+        flex: [],
+        ext: []
+    };
 
-    function startDiagnosticFlow() {
-        diagStepIndex = -1;
-        setMsg(diagPromptText, "Follow the prompts below to record your maximum physical limits.");
-        if (diagActionBtn) {
-            diagActionBtn.textContent = "Start Test";
-            diagActionBtn.disabled = false;
+    function applyTherapyPlan(plan) {
+        planDurationMin = Number(plan.duration_min || plan.durationMin || 15);
+        planTargetReps = Number(plan.target_repetitions || plan.targetRepetitions || 120);
+        planExerciseType = String(plan.exercise_type || plan.exerciseType || "Active Grip");
+
+        if (therapyDurationEl) therapyDurationEl.textContent = `${planDurationMin} min`;
+        if (therapyRepsEl) therapyRepsEl.textContent = `${planTargetReps} reps`;
+        if (therapyTypeEl) therapyTypeEl.textContent = planExerciseType;
+        if (targetRepsEl) targetRepsEl.textContent = String(planTargetReps);
+
+        sessionState.targetRepetitions = planTargetReps;
+    }
+
+    function loadTherapyPlan() {
+        setMsg(diagStatus, "Loading your therapy plan…");
+        fetch("api/patient/doctor_assignments.php")
+            .then(response => response.ok ? response.json() : Promise.reject())
+            .then(payload => {
+                if (!payload?.ok || !payload?.plan) {
+                    throw new Error(payload?.error || "Unable to load plan.");
+                }
+                applyTherapyPlan(payload.plan);
+                setMsg(diagStatus, "Plan ready. Choose a mode to continue.");
+            })
+            .catch(() => {
+                applyTherapyPlan({ duration_min: 15, target_repetitions: 120, exercise_type: "Active Grip" });
+                setMsg(diagStatus, "Plan unavailable. Using default targets.");
+            });
+    }
+
+    function showSessionPane(mode) {
+        if (therapySessionPane) therapySessionPane.classList.toggle("is-hidden", mode !== "therapy");
+        if (testSessionPane) testSessionPane.classList.toggle("is-hidden", mode !== "test");
+        if (sessionIntro) {
+            sessionIntro.textContent = mode === "therapy"
+                ? "Therapy mode selected. Press Start Session to begin your prescribed movements."
+                : "Test mode selected. Complete 3 trials for each movement to record your assessment.";
         }
     }
 
-    function showDiagStep(index) {
-        const step = DIAG_STEPS[index];
-        if (!step) return;
-        if (diagPromptIcon) diagPromptIcon.innerHTML = `<i class="${step.icon}"></i>`;
-        setMsg(diagPromptText, step.text);
-        if (diagActionBtn) {
-            diagActionBtn.textContent = step.btnLabel;
-            diagActionBtn.disabled = false;
-        }
-        setMsg(diagStatus, `Diagnostic ${index + 1} of ${DIAG_STEPS.length}`);
+    function resetTestState() {
+        testState.trial = 0;
+        testState.grip = [];
+        testState.flex = [];
+        testState.ext = [];
+        if (testTrialCountEl) testTrialCountEl.textContent = "0/3";
+        if (testGripAvgEl) testGripAvgEl.textContent = "—";
+        if (testFlexAvgEl) testFlexAvgEl.textContent = "—";
+        if (testExtAvgEl) testExtAvgEl.textContent = "—";
+        if (testPromptEl) testPromptEl.textContent = "Complete 3 trials for each movement to log your assessment.";
+        if (testActionBtn) testActionBtn.textContent = "Begin Trial 1";
     }
 
-    diagActionBtn?.addEventListener("click", async () => {
-        diagActionBtn.disabled = true;
+    async function saveRecoveryProgress(payload) {
+        try {
+            const res = await fetch("api/patient/recovery_progress.php", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data?.ok) throw new Error(data?.error || "Save failed");
+            setMsg(sessionStatus, "Assessment saved. Your doctor can review the averages.");
+        } catch (err) {
+            setMsg(sessionStatus, err instanceof Error ? err.message : "Failed to save assessment.");
+        }
+    }
 
-        if (diagStepIndex === -1) {
-            diagStepIndex = 0;
-            showDiagStep(0);
+    async function recordTestTrial() {
+        if (testState.trial >= 3) return;
+        if (testActionBtn) testActionBtn.disabled = true;
+
+        const grip = await readGloveValue(20, 80);
+        const flex = await readGloveValue(120, 180);
+        const ext = await readGloveValue(140, 185);
+
+        testState.trial += 1;
+        testState.grip.push(grip);
+        testState.flex.push(flex);
+        testState.ext.push(ext);
+
+        const avgGrip = testState.grip.reduce((sum, val) => sum + val, 0) / testState.grip.length;
+        const avgFlex = testState.flex.reduce((sum, val) => sum + val, 0) / testState.flex.length;
+        const avgExt = testState.ext.reduce((sum, val) => sum + val, 0) / testState.ext.length;
+
+        if (testGripAvgEl) testGripAvgEl.textContent = `${avgGrip.toFixed(1)} N`;
+        if (testFlexAvgEl) testFlexAvgEl.textContent = `${avgFlex.toFixed(1)}°`;
+        if (testExtAvgEl) testExtAvgEl.textContent = `${avgExt.toFixed(1)}°`;
+        if (testTrialCountEl) testTrialCountEl.textContent = `${testState.trial}/3`;
+
+        if (testState.trial < 3) {
+            if (testPromptEl) testPromptEl.textContent = `Trial ${testState.trial} captured. Prepare for trial ${testState.trial + 1}.`;
+            if (testActionBtn) {
+                testActionBtn.textContent = `Begin Trial ${testState.trial + 1}`;
+                testActionBtn.disabled = false;
+            }
             return;
         }
 
-        const step = DIAG_STEPS[diagStepIndex];
-        const value = await readGloveValue(step.min, step.max);
-        diagResults[step.key] = value;
+        diagResults.peakForce = avgGrip;
+        diagResults.maxFlexion = avgFlex;
+        diagResults.maxExtension = avgExt;
 
-        if (step.key === "maxExtension" && maxExtEl)  maxExtEl.textContent  = `${value.toFixed(1)}${step.unit}`;
-        if (step.key === "maxFlexion"   && maxFlexEl) maxFlexEl.textContent = `${value.toFixed(1)}${step.unit}`;
-        if (step.key === "peakForce" && peakForceEl)  peakForceEl.textContent = `${value.toFixed(1)}${step.unit}`;
-
-        setMsg(diagStatus, `${step.label} recorded: ${value.toFixed(1)}${step.unit}`);
-        diagStepIndex++;
-
-        if (diagStepIndex < DIAG_STEPS.length) {
-            setTimeout(() => showDiagStep(diagStepIndex), 400);
-        } else {
-            await saveDiagnosticLog();
-            goToStep(4);
+        if (testPromptEl) testPromptEl.textContent = "Assessment complete. Saving averages…";
+        if (testActionBtn) {
+            testActionBtn.textContent = "Assessment Complete";
+            testActionBtn.disabled = true;
         }
+
+        await saveRecoveryProgress({
+            avgGripStrength: avgGrip,
+            avgFlexion: avgFlex,
+            avgExtension: avgExt
+        });
+    }
+
+    therapyStartBtn?.addEventListener("click", () => {
+        if (!calibrationComplete) {
+            setMsg(diagStatus, "Complete calibration before choosing a mode.");
+            return;
+        }
+        selectedMode = "therapy";
+        showSessionPane("therapy");
+        goToStep(4);
+        setMsg(sessionStatus, "");
     });
 
-    async function saveDiagnosticLog() {
-        setMsg(diagStatus, "Saving diagnostic results to your doctor's records…");
-        try {
-            const res = await fetch("api/patient/diagnostic_logs.php", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(diagResults)
-            });
-            const payload = await res.json().catch(() => ({}));
-            if (!res.ok || !payload?.ok) throw new Error(payload?.error || "Save failed");
-            const targetReps = Number(payload.targetRepetitions || planTargetReps);
-            planTargetReps = targetReps;
-            sessionState.targetRepetitions = targetReps;
-            if (targetRepsEl)  targetRepsEl.textContent  = String(targetReps);
-            if (repTargetEl)   repTargetEl.textContent   = String(targetReps);
-            setMsg(diagStatus, "Diagnostic results saved — your doctor can now see your physical limits.");
-        } catch (err) {
-            setMsg(diagStatus, (err instanceof Error ? err.message : "Could not save diagnostics.") + " Continuing anyway.");
+    testStartBtn?.addEventListener("click", () => {
+        if (!calibrationComplete) {
+            setMsg(diagStatus, "Complete calibration before choosing a mode.");
+            return;
         }
-    }
+        selectedMode = "test";
+        resetTestState();
+        showSessionPane("test");
+        goToStep(4);
+        setMsg(sessionStatus, "");
+    });
+
+    testActionBtn?.addEventListener("click", () => {
+        void recordTestTrial();
+    });
 
     // ── STEP 4: Session ───────────────────────────────────────────────────────
     startSessionBtn?.addEventListener("click", () => {
+        if (selectedMode && selectedMode !== "therapy") {
+            return;
+        }
         if (sessionState.isRunning) return;
         sessionState.isRunning = true;
         sessionState.startTime = Date.now();
@@ -1891,7 +2367,7 @@ function initializeExerciseHubPage() {
         sessionState.sampleCount = 0;
         startSessionBtn.disabled = true;
         if (endSessionBtn) endSessionBtn.disabled = false;
-        setMsg(sessionStatus, "Session running — glove is streaming live data…");
+    setMsg(sessionStatus, "Session running — glove is streaming live data…");
 
         sessionState.intervalId = setInterval(async () => {
             const force   = await readGloveValue(15, 60);
@@ -1922,6 +2398,9 @@ function initializeExerciseHubPage() {
     });
 
     endSessionBtn?.addEventListener("click", async () => {
+        if (selectedMode && selectedMode !== "therapy") {
+            return;
+        }
         if (!sessionState.isRunning) return;
         clearInterval(sessionState.intervalId);
         sessionState.isRunning = false;
@@ -1962,16 +2441,7 @@ function initializeExerciseHubPage() {
     });
 
     // Prefetch plan target from server
-    fetch("api/patient/exercise_session.php")
-        .then(r => r.ok ? r.json() : Promise.reject())
-        .then(payload => {
-            if (payload?.plan?.target_repetitions) {
-                planTargetReps = Number(payload.plan.target_repetitions);
-                sessionState.targetRepetitions = planTargetReps;
-                if (targetRepsEl) targetRepsEl.textContent = String(planTargetReps);
-            }
-        })
-        .catch(() => { /* use defaults */ });
+    loadTherapyPlan();
 
     goToStep(1);
 }
@@ -2181,6 +2651,18 @@ function initializePatientMessagesPage() {
     const doctorNote = document.getElementById("patientDoctorNote");
     const doctorNameEl = document.getElementById("patientActiveDoctorName");
     const pageSubtitleEl = document.getElementById("patientMessagesSubtitle");
+    const doctorInfoButton = document.getElementById("patientDoctorInfoBtn");
+    const doctorInfoModal = document.getElementById("patientDoctorInfoModal");
+    const doctorInfoBackdrop = document.getElementById("patientDoctorInfoBackdrop");
+    const doctorInfoClose = document.getElementById("patientDoctorInfoClose");
+    const doctorInfoAvatar = document.getElementById("doctorInfoAvatar");
+    const doctorInfoName = document.getElementById("doctorInfoName");
+    const doctorInfoTitle = document.getElementById("doctorInfoTitle");
+    const doctorInfoSpecialty = document.getElementById("doctorInfoSpecialty");
+    const doctorInfoHospital = document.getElementById("doctorInfoHospital");
+    const doctorInfoEmail = document.getElementById("doctorInfoEmail");
+    const doctorInfoContact = document.getElementById("doctorInfoContact");
+    const doctorInfoBio = document.getElementById("doctorInfoBio");
     let conversation = { messages: [] };
 
     function escapeHtml(value) {
@@ -2254,6 +2736,80 @@ function initializePatientMessagesPage() {
         }
     }
 
+    function setDoctorInfoLoading() {
+        if (doctorInfoAvatar) {
+            doctorInfoAvatar.style.backgroundImage = "";
+            doctorInfoAvatar.innerHTML = '<i class="fa-solid fa-user-doctor"></i>';
+        }
+        if (doctorInfoName) doctorInfoName.textContent = "Loading...";
+        if (doctorInfoTitle) doctorInfoTitle.textContent = "--";
+        if (doctorInfoSpecialty) doctorInfoSpecialty.textContent = "--";
+        if (doctorInfoHospital) doctorInfoHospital.textContent = "--";
+        if (doctorInfoEmail) doctorInfoEmail.textContent = "--";
+        if (doctorInfoContact) doctorInfoContact.textContent = "--";
+        if (doctorInfoBio) doctorInfoBio.textContent = "--";
+    }
+
+    function setDoctorInfo(profile) {
+        if (!profile) {
+            if (doctorInfoAvatar) {
+                doctorInfoAvatar.style.backgroundImage = "";
+                doctorInfoAvatar.innerHTML = '<i class="fa-solid fa-user-doctor"></i>';
+            }
+            if (doctorInfoName) doctorInfoName.textContent = "No assigned doctor yet.";
+            if (doctorInfoTitle) doctorInfoTitle.textContent = "--";
+            if (doctorInfoSpecialty) doctorInfoSpecialty.textContent = "--";
+            if (doctorInfoHospital) doctorInfoHospital.textContent = "--";
+            if (doctorInfoEmail) doctorInfoEmail.textContent = "--";
+            if (doctorInfoContact) doctorInfoContact.textContent = "--";
+            if (doctorInfoBio) doctorInfoBio.textContent = "--";
+            return;
+        }
+
+        if (doctorInfoAvatar) {
+            const avatarUrl = String(profile.avatarDataUrl || "").trim();
+            if (avatarUrl) {
+                doctorInfoAvatar.style.backgroundImage = `url(${avatarUrl})`;
+                doctorInfoAvatar.innerHTML = "";
+            } else {
+                doctorInfoAvatar.style.backgroundImage = "";
+                doctorInfoAvatar.innerHTML = '<i class="fa-solid fa-user-doctor"></i>';
+            }
+        }
+
+        if (doctorInfoName) doctorInfoName.textContent = profile.displayName || "Doctor";
+        if (doctorInfoTitle) doctorInfoTitle.textContent = profile.title || "Doctor";
+        if (doctorInfoSpecialty) doctorInfoSpecialty.textContent = profile.specialty || "Not specified";
+        if (doctorInfoHospital) doctorInfoHospital.textContent = profile.hospital || "Not specified";
+        if (doctorInfoEmail) doctorInfoEmail.textContent = profile.email || "Not available";
+        if (doctorInfoContact) doctorInfoContact.textContent = profile.contact || "Not available";
+        if (doctorInfoBio) doctorInfoBio.textContent = profile.bio || "No bio provided.";
+    }
+
+    function openDoctorInfoModal() {
+        if (!doctorInfoModal) return;
+        doctorInfoModal.hidden = false;
+        setDoctorInfoLoading();
+
+        fetch("api/patient/doctor_profile.php")
+            .then(response => response.ok ? response.json() : Promise.reject(new Error("Unable to load doctor info.")))
+            .then(payload => {
+                if (!payload?.ok) {
+                    throw new Error(payload?.error || "Unable to load doctor info.");
+                }
+                setDoctorInfo(payload.profile || null);
+            })
+            .catch(() => {
+                setDoctorInfo(null);
+            });
+    }
+
+    function closeDoctorInfoModal() {
+        if (doctorInfoModal) {
+            doctorInfoModal.hidden = true;
+        }
+    }
+
     function renderThread() {
         if (!thread) {
             return;
@@ -2311,6 +2867,15 @@ function initializePatientMessagesPage() {
             activeMeta.textContent = "Attachments will be available soon.";
         }
     });
+
+    doctorInfoButton?.addEventListener("click", openDoctorInfoModal);
+    doctorInfoClose?.addEventListener("click", closeDoctorInfoModal);
+    doctorInfoBackdrop?.addEventListener("click", closeDoctorInfoModal);
+    window.addEventListener("keydown", event => {
+        if (event.key === "Escape" && doctorInfoModal && !doctorInfoModal.hidden) {
+            closeDoctorInfoModal();
+        }
+    });
     composeInput?.addEventListener("keydown", event => {
         if (event.key === "Enter") {
             event.preventDefault();
@@ -2352,16 +2917,39 @@ function initializePatientSettingsPage() {
 
     const form = document.getElementById("patientSettingsForm");
     const nameInput = document.getElementById("patientSettingsName");
-    const recoveryDateInput = document.getElementById("patientRecoveryDate");
     const emailInput = document.getElementById("patientSettingsEmail");
+    const togglePasswordButton = document.getElementById("patientPasswordModalBtn");
+    const passwordFields = document.getElementById("patientPasswordFields");
+    const passwordModal = document.getElementById("patientPasswordModal");
+    const passwordBackdrop = document.getElementById("patientPasswordBackdrop");
+    const passwordCloseButton = document.getElementById("patientPasswordClose");
+    const passwordCancelButton = document.getElementById("patientPasswordCancel");
+    const nameEditButton = document.getElementById("patientNameEditBtn");
+    const contactEditButton = document.getElementById("patientContactEditBtn");
     const currentPasswordInput = document.getElementById("patientCurrentPassword");
     const newPasswordInput = document.getElementById("patientNewPassword");
     const confirmPasswordInput = document.getElementById("patientConfirmPassword");
+    const passwordSaveButton = document.getElementById("patientPasswordSaveBtn");
     const feedback = document.getElementById("patientSettingsFeedback");
+    const syncStatus = document.getElementById("patientSettingsSyncStatus");
     const batteryEl = document.getElementById("diagBattery");
     const signalEl = document.getElementById("diagSignal");
     const connectionEl = document.getElementById("diagConnection");
+    const ssidEl = document.getElementById("diagSsid");
+    const batteryTile = document.getElementById("diagBatteryTile");
+    const signalTile = document.getElementById("diagSignalTile");
+    const ssidTile = document.getElementById("diagSsidTile");
+    const connectionTile = document.getElementById("diagConnectionTile");
     const refreshDiagnosticsButton = document.getElementById("diagRefreshBtn");
+    const diagnosisInput = document.getElementById("patientDiagnosis");
+    const assignedDoctorInput = document.getElementById("patientAssignedDoctor");
+    const treatmentGoalInput = document.getElementById("patientTreatmentGoal");
+    const ageInput = document.getElementById("patientAge");
+    const profileCard = form?.closest(".user-profile-card") || document.querySelector(".user-profile-card");
+
+    let initialName = "";
+    let initialContact = "";
+    let isPasswordEditing = false;
 
     function setFeedback(message) {
         if (feedback) {
@@ -2369,72 +2957,267 @@ function initializePatientSettingsPage() {
         }
     }
 
+    function setSyncStatus(message) {
+        if (syncStatus) {
+            syncStatus.textContent = message;
+        }
+    }
+
+    function setMedicalInfo(data) {
+        if (diagnosisInput) diagnosisInput.value = data?.diagnosis || "Pending clinical intake";
+        if (assignedDoctorInput) assignedDoctorInput.value = data?.assigned_doctor || "Not assigned";
+        if (treatmentGoalInput) treatmentGoalInput.value = data?.treatment_goal || "Pending provider update";
+    }
+
+    function setPatientAge(ageValue) {
+        if (!ageInput) return;
+        const parsedAge = Number(ageValue);
+        if (Number.isFinite(parsedAge) && parsedAge > 0) {
+            ageInput.value = String(parsedAge);
+        } else {
+            ageInput.value = "Not provided";
+        }
+    }
+
+    function markOffline(isOffline) {
+        [batteryTile, signalTile, ssidTile, connectionTile].forEach(tile => {
+            if (!tile) return;
+            tile.classList.toggle("is-offline", isOffline);
+        });
+    }
+
     function runDiagnostics() {
-        if (batteryEl) {
-            batteryEl.textContent = `${Math.floor(Math.random() * 30) + 70}%`;
+        let gloveState = {};
+        try {
+            gloveState = JSON.parse(localStorage.getItem("theraflow_glove") || "{}");
+        } catch {
+            gloveState = {};
         }
-        if (signalEl) {
-            signalEl.textContent = `${-1 * (Math.floor(Math.random() * 20) + 45)} dBm`;
+
+        const isOnline = Boolean(gloveState.connected || gloveState.sessionActive || gloveState.heartbeat === true);
+        if (!isOnline) {
+            markOffline(true);
+            if (batteryEl) batteryEl.textContent = "N/A";
+            if (signalEl) signalEl.textContent = "N/A";
+            if (ssidEl) ssidEl.textContent = "Offline";
+            if (connectionEl) connectionEl.textContent = "Offline";
+            return;
         }
-        if (connectionEl) {
-            connectionEl.textContent = "Connected";
+
+        markOffline(false);
+        const battery = Number(gloveState.battery || gloveState.batteryPercent || 0);
+        const rssi = Number(gloveState.rssi || gloveState.signal || -55);
+        const ssid = String(gloveState.ssid || gloveState.network || "Unknown");
+
+        if (batteryEl) batteryEl.textContent = battery ? `${battery}%` : `${Math.floor(Math.random() * 30) + 70}%`;
+        if (signalEl) signalEl.textContent = `${rssi || -55} dBm`;
+        if (ssidEl) ssidEl.textContent = ssid;
+        if (connectionEl) connectionEl.textContent = "Online (Cloud)";
+    }
+
+    function setPasswordEditing(enabled) {
+        isPasswordEditing = enabled;
+        if (profileCard) {
+            profileCard.classList.toggle("is-password-open", enabled);
+        }
+        if (passwordModal) {
+            passwordModal.hidden = !enabled;
+        }
+        if (passwordFields) {
+            passwordFields.classList.toggle("is-hidden", !enabled);
+        }
+        if (togglePasswordButton) {
+            togglePasswordButton.setAttribute("aria-expanded", String(enabled));
+        }
+        if (passwordSaveButton) {
+            passwordSaveButton.disabled = true;
+        }
+        if (!enabled) {
+            if (currentPasswordInput) currentPasswordInput.value = "";
+            if (newPasswordInput) newPasswordInput.value = "";
+            if (confirmPasswordInput) confirmPasswordInput.value = "";
+        }
+    }
+
+    function isValidContact(value) {
+        const trimmed = value.trim();
+        if (!trimmed) return false;
+        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+        const isPhone = /^[+]?\d{7,15}$/.test(trimmed.replace(/\s+/g, ""));
+        return isEmail || isPhone;
+    }
+
+    function setFieldEditing(fieldGroup, input, button, enabled) {
+        if (fieldGroup) {
+            fieldGroup.classList.toggle("is-editing", enabled);
+        }
+        if (input) {
+            input.readOnly = !enabled;
+            if (enabled) {
+                input.focus();
+            }
+        }
+        if (button) {
+            const icon = button.querySelector("i");
+            if (icon) {
+                icon.className = enabled ? "fa-solid fa-check" : "fa-solid fa-pen";
+            }
+        }
+    }
+
+    function setFieldSaving(fieldGroup, input, button) {
+        if (fieldGroup) {
+            fieldGroup.classList.remove("is-editing");
+        }
+        if (input) {
+            input.readOnly = true;
+        }
+        if (button) {
+            const icon = button.querySelector("i");
+            if (icon) {
+                icon.className = "fa-solid fa-check";
+            }
+        }
+    }
+
+    async function syncProfileUpdate({ name, contact, currentPassword, newPassword }, button) {
+        if (button) {
+            button.classList.add("is-saving");
+        }
+        setFeedback("Syncing updates...");
+        setSyncStatus("");
+
+        try {
+            const response = await fetch("api/patient/settings.php", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, email: contact, currentPassword, newPassword })
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload?.ok) {
+                throw new Error(payload?.error || "Unable to sync updates.");
+            }
+
+            initialName = String(payload.profile?.name || name || "").trim();
+            initialContact = String(payload.profile?.email || contact || "").trim();
+            if (nameInput) nameInput.value = initialName;
+            if (emailInput) emailInput.value = initialContact;
+
+            setFeedback("");
+            setSyncStatus(payload.syncStatus || "Saved changes.");
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Unable to sync updates.";
+            setFeedback(message);
+            setSyncStatus("Sync pending. Please try again.");
+        } finally {
+            if (button) {
+                button.classList.remove("is-saving");
+                const icon = button.querySelector("i");
+                if (icon) {
+                    icon.className = "fa-solid fa-pen";
+                }
+            }
         }
     }
 
     refreshDiagnosticsButton?.addEventListener("click", runDiagnostics);
+    togglePasswordButton?.addEventListener("click", () => setPasswordEditing(true));
+    passwordCloseButton?.addEventListener("click", () => setPasswordEditing(false));
+    passwordCancelButton?.addEventListener("click", () => setPasswordEditing(false));
+    passwordBackdrop?.addEventListener("click", () => setPasswordEditing(false));
+    window.addEventListener("keydown", event => {
+        if (event.key === "Escape" && passwordModal && !passwordModal.hidden) {
+            setPasswordEditing(false);
+        }
+    });
 
-    form?.addEventListener("submit", async event => {
-        event.preventDefault();
+    nameEditButton?.addEventListener("click", () => {
+        const group = nameEditButton.closest(".has-inline-edit");
+        const editing = group?.classList.contains("is-editing");
+        if (!editing) {
+            setFieldEditing(group, nameInput, nameEditButton, true);
+            return;
+        }
 
         const nextName = String(nameInput?.value || "").trim();
-        const nextRecovery = String(recoveryDateInput?.value || "").trim();
-        const currentPassword = String(currentPasswordInput?.value || "");
-        const newPassword = String(newPasswordInput?.value || "");
-        const confirmPassword = String(confirmPasswordInput?.value || "");
-
         if (!nextName) {
             setFeedback("Name is required.");
             return;
         }
 
-        if (newPassword && newPassword !== confirmPassword) {
+        setFieldSaving(group, nameInput, nameEditButton);
+        void syncProfileUpdate({ name: nextName, contact: String(emailInput?.value || "").trim() }, nameEditButton);
+    });
+
+    contactEditButton?.addEventListener("click", () => {
+        const group = contactEditButton.closest(".has-inline-edit");
+        const editing = group?.classList.contains("is-editing");
+        if (!editing) {
+            setFieldEditing(group, emailInput, contactEditButton, true);
+            return;
+        }
+
+        const nextContact = String(emailInput?.value || "").trim();
+        if (!isValidContact(nextContact)) {
+            setFeedback("Contact must be a valid email or phone number.");
+            return;
+        }
+
+        setFieldSaving(group, emailInput, contactEditButton);
+        void syncProfileUpdate({ name: String(nameInput?.value || "").trim(), contact: nextContact }, contactEditButton);
+    });
+
+    function updatePasswordSaveState() {
+        if (!passwordSaveButton || !isPasswordEditing) return;
+        const currentPassword = String(currentPasswordInput?.value || "");
+        const newPassword = String(newPasswordInput?.value || "");
+        const confirmPassword = String(confirmPasswordInput?.value || "");
+        passwordSaveButton.disabled = !(currentPassword && newPassword && confirmPassword && newPassword === confirmPassword);
+    }
+
+    currentPasswordInput?.addEventListener("input", updatePasswordSaveState);
+    newPasswordInput?.addEventListener("input", updatePasswordSaveState);
+    confirmPasswordInput?.addEventListener("input", updatePasswordSaveState);
+
+    form?.addEventListener("submit", event => {
+        event.preventDefault();
+        if (!isPasswordEditing) {
+            return;
+        }
+
+        const currentPassword = String(currentPasswordInput?.value || "");
+        const newPassword = String(newPasswordInput?.value || "");
+        const confirmPassword = String(confirmPasswordInput?.value || "");
+
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            setFeedback("To change your password, fill current, new, and confirm password.");
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
             setFeedback("New password and confirm password must match.");
             return;
         }
 
-        setFeedback("Saving settings...");
-        try {
-            const response = await fetch("api/patient/settings.php", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    name: nextName,
-                    recoveryDate: nextRecovery,
-                    currentPassword,
-                    newPassword
-                })
-            });
-
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok || !payload?.ok) {
-                throw new Error(payload?.error || "Unable to save settings.");
-            }
-
-            if (currentPasswordInput) {
-                currentPasswordInput.value = "";
-            }
-            if (newPasswordInput) {
-                newPasswordInput.value = "";
-            }
-            if (confirmPasswordInput) {
-                confirmPasswordInput.value = "";
-            }
-
-            setFeedback("Settings saved successfully.");
-        } catch (error) {
-            const message = error instanceof Error ? error.message : "Unable to save settings.";
-            setFeedback(message);
+        if (passwordSaveButton) {
+            passwordSaveButton.classList.add("is-loading");
+            passwordSaveButton.disabled = true;
         }
+
+        void syncProfileUpdate(
+            {
+                name: String(nameInput?.value || "").trim(),
+                contact: String(emailInput?.value || "").trim(),
+                currentPassword,
+                newPassword
+            },
+            passwordSaveButton
+        ).finally(() => {
+            if (passwordSaveButton) {
+                passwordSaveButton.classList.remove("is-loading");
+            }
+            setPasswordEditing(false);
+        });
     });
 
     fetch("api/patient/settings.php")
@@ -2447,16 +3230,32 @@ function initializePatientSettingsPage() {
             if (nameInput) {
                 nameInput.value = payload.profile.name || "";
             }
-            if (recoveryDateInput) {
-                recoveryDateInput.value = payload.profile.recoveryDate || "";
-            }
             if (emailInput) {
                 emailInput.value = payload.profile.email || "";
             }
+            initialName = String(payload.profile.name || "").trim();
+            initialContact = String(payload.profile.email || "").trim();
+            setFieldEditing(nameInput?.closest(".has-inline-edit"), nameInput, nameEditButton, false);
+            setFieldEditing(emailInput?.closest(".has-inline-edit"), emailInput, contactEditButton, false);
             setFeedback("");
+            setSyncStatus(payload.syncStatus || "");
         })
         .catch(() => {
             setFeedback("Unable to load profile settings.");
+        });
+
+    fetch("api/patient/profile_details.php")
+        .then(response => response.ok ? response.json() : Promise.reject(new Error("Unable to load medical profile.")))
+        .then(payload => {
+            if (!payload?.ok) {
+                throw new Error(payload?.error || "Unable to load medical profile.");
+            }
+            setMedicalInfo(payload.clinical || {});
+            setPatientAge(payload?.patient?.age ?? null);
+        })
+        .catch(() => {
+            setMedicalInfo({});
+            setPatientAge(null);
         });
 
     runDiagnostics();
@@ -2880,6 +3679,7 @@ function initializeNavGuard() {
     const restrictedItems = document.querySelectorAll(".menu .restricted-access");
     const accountNavItem = document.getElementById("accountNavItem");
     const accountNavLabel = document.getElementById("accountNavLabel");
+    const patientAccountLabels = document.querySelectorAll(".patient-account-label");
 
     if (!navLinksContainer && !restrictedItems.length) {
         return;
@@ -2906,10 +3706,22 @@ function initializeNavGuard() {
         }
     }
 
+    function getStoredRole() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEYS.session) || sessionStorage.getItem(STORAGE_KEYS.session);
+            if (!raw) return "";
+            const data = JSON.parse(raw);
+            return String(data?.role || "").toLowerCase();
+        } catch {
+            return "";
+        }
+    }
+
     const signOutBtn = document.getElementById("logoutBtn");
 
     function applyGuardState() {
         const authed = isAuthenticated();
+        const role = getStoredRole();
         if (navLinksContainer) {
             navLinksContainer.classList.toggle("is-locked", !authed);
         }
@@ -2922,6 +3734,11 @@ function initializeNavGuard() {
         }
         if (accountNavLabel) {
             accountNavLabel.textContent = "Sign In";
+        }
+        if (patientAccountLabels.length && role === "patient") {
+            patientAccountLabels.forEach(label => {
+                label.textContent = "Account & Settings";
+            });
         }
         if (signOutBtn) {
             signOutBtn.style.display = authed ? "" : "none";
@@ -3402,6 +4219,7 @@ if (calendarPrev && calendarNext) {
 initializePatientDashboardVisuals();
 initializeCharts();
 renderCalendar();
+loadCalendarPlan();
 updateActiveIndicator();
 initializeRootAuthGuard();
 bindSidebarMotionSync();

@@ -44,9 +44,9 @@
                 <span class="nav-label">Messages</span>
                 <span class="nav-alert-dot" aria-hidden="true"></span>
             </li>
-            <li class="settings-nav-item" data-page="settings.html">
-                <i class="fa-solid fa-gear"></i>
-                <span class="nav-label">Settings</span>
+            <li data-page="settings.html">
+                <i class="fa-solid fa-user-circle"></i>
+                <span class="nav-label">Account &amp; Settings</span>
             </li>
         </ul>
 
@@ -62,36 +62,64 @@
     <main class="content doctor-content">
         <section class="doctor-shell" aria-labelledby="doctorDashboardTitle">
             <div class="doctor-header-row">
-                <div>
+                <div class="doctor-header-left">
                     <h1 id="doctorDashboardTitle">Doctor Dashboard</h1>
                     <p class="subheader">Overview of patient therapy performance and priority alerts.</p>
                 </div>
-                <div class="doctor-header-date">Monday, March 16, 2026</div>
+                <div class="doctor-header-actions">
+                    <div class="doctor-header-date">Monday, March 16, 2026</div>
+                    <button class="quick-action-btn" id="dashboardQuickAction" title="Quick action">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
             </div>
 
             <div class="doctor-stats-grid" aria-label="Summary statistics">
                 <article class="widget widget-blue doctor-stat-card">
                     <p class="doctor-stat-label">Total Patients</p>
-                    <p class="doctor-stat-value" id="dashboardTotalPatients">0</p>
+                    <p class="doctor-stat-value" id="dashboardTotalPatients">0 <span class="trend-indicator" id="trendTotalPatients" aria-hidden="true"></span></p>
                 </article>
                 <article class="widget widget-blue doctor-stat-card">
                     <p class="doctor-stat-label">Active Patients Today</p>
-                    <p class="doctor-stat-value" id="dashboardActivePatientsToday">0</p>
+                    <p class="doctor-stat-value" id="dashboardActivePatientsToday">0 <span class="trend-indicator" id="trendActivePatients" aria-hidden="true"></span></p>
                 </article>
                 <article class="widget widget-blue doctor-stat-card">
                     <p class="doctor-stat-label">Sessions Today</p>
-                    <p class="doctor-stat-value" id="dashboardSessionsToday">0</p>
+                    <p class="doctor-stat-value" id="dashboardSessionsToday">0 <span class="trend-indicator" id="trendSessionsToday" aria-hidden="true"></span></p>
                 </article>
                 <article class="widget widget-blue doctor-stat-card">
                     <p class="doctor-stat-label">Avg Grip Strength</p>
-                    <p class="doctor-stat-value" id="dashboardAvgGripStrength">0 N</p>
+                    <p class="doctor-stat-value" id="dashboardAvgGripStrength">0 N <span class="trend-indicator" id="trendAvgGrip" aria-hidden="true"></span></p>
                 </article>
             </div>
 
             <div class="doctor-middle-grid">
                 <article class="widget widget-green doctor-graph-card">
-                    <div class="widget-title">Patient Therapy Progress (Weekly)</div>
-                    <div class="chart-wrap doctor-chart-wrap">
+                    <div class="doctor-chart-header">
+                        <div>
+                            <div class="widget-title" id="doctorChartTitle">Patient Therapy Progress (Weekly)</div>
+                            <div class="widget-subtitle" id="doctorChartSubtitle">Weekly Progress: All Patients (Avg)</div>
+                        </div>
+                        <div class="chart-controls">
+                            <div class="chart-metric-toggle" role="tablist" aria-label="Chart metric toggle">
+                                <button class="metric-btn active" data-metric="grip">Grip Strength</button>
+                                <button class="metric-btn" data-metric="range">Range of Motion</button>
+                            </div>
+                            <div class="chart-selector" id="patientSelect">
+                                <button class="selector-btn" id="patientSelectBtn" type="button">
+                                    <span id="selectedPatientLabel">All Patients (Avg)</span>
+                                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                                </button>
+                                <div class="selector-menu" id="patientSelectMenu" hidden>
+                                    <input class="selector-search" id="patientSelectSearch" type="text" placeholder="Search patients..." />
+                                    <ul class="selector-list" id="patientSelectList" role="listbox"></ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-wrap doctor-chart-wrap is-loading" id="doctorChartWrap">
+                        <div class="skeleton skeleton-chart" aria-hidden="true"></div>
+                        <div class="chart-empty" id="doctorChartEmpty" hidden>No data recorded for this period.</div>
                         <canvas id="doctorWeeklyProgressChart"></canvas>
                     </div>
                 </article>
@@ -117,8 +145,11 @@
                                 </tr>
                             </thead>
                             <tbody id="dashboardRecentActivityBody">
-                                <tr>
-                                    <td colspan="3">No recent patient activity yet.</td>
+                                <tr class="empty-state-row">
+                                    <td colspan="3" class="empty-state">
+                                        <div class="empty-illustration" aria-hidden="true">🩺</div>
+                                        <div>No recent patient activity yet.</div>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -137,8 +168,12 @@
                                 </tr>
                             </thead>
                             <tbody id="dashboardQuickOverviewBody">
-                                <tr>
-                                    <td colspan="3">No patients added yet.</td>
+                                <tr class="empty-state-row">
+                                    <td colspan="3" class="empty-state">
+                                        <div class="empty-illustration">👥</div>
+                                        <div>No patients added yet.</div>
+                                        <div><a href="patients.html" class="btn btn-primary add-patient-cta">Add Patient</a></div>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
