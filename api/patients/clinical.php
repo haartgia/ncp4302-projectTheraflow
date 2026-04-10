@@ -13,6 +13,20 @@ if (!isset($_SESSION['role']) || strtolower((string) $_SESSION['role']) !== 'doc
 $doctorUserId = (int) $_SESSION['user_id'];
 
 $pdo->exec(
+    'CREATE TABLE IF NOT EXISTS patient_metadata (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        patient_id INT NOT NULL,
+        diagnosis VARCHAR(255) NULL,
+        treatment_goal VARCHAR(255) NULL,
+        doctor_notes TEXT NULL,
+        updated_by_doctor_id INT NULL,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_patient_metadata_patient_id (patient_id),
+        INDEX idx_patient_metadata_updated_at (updated_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+);
+
+$pdo->exec(
     'CREATE TABLE IF NOT EXISTS patient_clinical_data (
         id INT AUTO_INCREMENT PRIMARY KEY,
         patient_id INT NOT NULL,
@@ -51,21 +65,35 @@ if (!$patient || (int) ($patient['doctor_id'] ?? 0) !== $doctorUserId) {
     exit;
 }
 
-$doctorName = '';
-$doctorStmt = $pdo->prepare('SELECT full_name FROM doctors WHERE user_id = ? OR id = ? LIMIT 1');
-$doctorStmt->execute([$doctorUserId, $doctorUserId]);
-$doctorName = (string) ($doctorStmt->fetchColumn() ?: '');
-
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $clinicalStmt = $pdo->prepare(
-        'SELECT diagnosis, treatment_goal, reviewed_at
-         FROM patient_clinical_data
+    $metadataStmt = $pdo->prepare(
+        'SELECT diagnosis, treatment_goal, doctor_notes, updated_at
+         FROM patient_metadata
          WHERE patient_id = ?
-         ORDER BY reviewed_at DESC, id DESC
          LIMIT 1'
     );
-    $clinicalStmt->execute([$patientId]);
-    $clinical = $clinicalStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    $metadataStmt->execute([$patientId]);
+    $metadata = $metadataStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    if (!$metadata) {
+        $clinicalFallbackStmt = $pdo->prepare(
+            'SELECT diagnosis, treatment_goal, reviewed_at
+             FROM patient_clinical_data
+             WHERE patient_id = ?
+             ORDER BY reviewed_at DESC, id DESC
+             LIMIT 1'
+        );
+        $clinicalFallbackStmt->execute([$patientId]);
+        $legacy = $clinicalFallbackStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        if ($legacy) {
+            $metadata = [
+                'diagnosis' => (string) ($legacy['diagnosis'] ?? ''),
+                'treatment_goal' => (string) ($legacy['treatment_goal'] ?? ''),
+                'doctor_notes' => '',
+                'updated_at' => (string) ($legacy['reviewed_at'] ?? '')
+            ];
+        }
+    }
 
     $strokeType = trim((string) ($patient['stroke_type'] ?? ''));
     $affectedHand = trim((string) ($patient['affected_hand'] ?? ''));
@@ -76,10 +104,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     echo json_encode([
         'ok' => true,
         'clinical' => [
-            'diagnosis' => (string) ($clinical['diagnosis'] ?? $fallbackDiagnosis),
-            'treatment_goal' => (string) ($clinical['treatment_goal'] ?? 'Initial evaluation pending.'),
-            'reviewed_at' => (string) ($clinical['reviewed_at'] ?? 'Not yet reviewed'),
-            'assigned_doctor' => $doctorName !== '' ? $doctorName : 'Assigned Doctor'
+            'diagnosis' => (string) ($metadata['diagnosis'] ?? $fallbackDiagnosis),
+            'treatment_goal' => (string) ($metadata['treatment_goal'] ?? 'Initial evaluation pending.'),
+            'doctor_notes' => (string) ($metadata['doctor_notes'] ?? ''),
+            'updated_at' => (string) ($metadata['updated_at'] ?? 'Not yet reviewed')
         ]
     ]);
     exit;
@@ -98,16 +126,49 @@ if (!is_array($payload)) {
 
 $diagnosis = trim((string) ($payload['diagnosis'] ?? ''));
 $treatmentGoal = trim((string) ($payload['treatmentGoal'] ?? ''));
+$doctorNotes = trim((string) ($payload['doctorNotes'] ?? ''));
 
-$insert = $pdo->prepare(
-    'INSERT INTO patient_clinical_data (patient_id, doctor_id, diagnosis, treatment_goal, reviewed_at)
-     VALUES (?, ?, ?, ?, NOW())'
+$diagnosisLimit = 50;
+$treatmentGoalLimit = 50;
+$doctorNotesLimit = 200;
+
+$diagnosisLength = function_exists('mb_strlen') ? mb_strlen($diagnosis, 'UTF-8') : strlen($diagnosis);
+$treatmentGoalLength = function_exists('mb_strlen') ? mb_strlen($treatmentGoal, 'UTF-8') : strlen($treatmentGoal);
+$doctorNotesLength = function_exists('mb_strlen') ? mb_strlen($doctorNotes, 'UTF-8') : strlen($doctorNotes);
+
+if ($diagnosisLength > $diagnosisLimit) {
+    http_response_code(422);
+    echo json_encode(['ok' => false, 'error' => 'Diagnosis must be 50 characters or fewer.']);
+    exit;
+}
+
+if ($treatmentGoalLength > $treatmentGoalLimit) {
+    http_response_code(422);
+    echo json_encode(['ok' => false, 'error' => 'Treatment goal must be 50 characters or fewer.']);
+    exit;
+}
+
+if ($doctorNotesLength > $doctorNotesLimit) {
+    http_response_code(422);
+    echo json_encode(['ok' => false, 'error' => 'Doctor notes must be 200 characters or fewer.']);
+    exit;
+}
+
+$upsert = $pdo->prepare(
+    'INSERT INTO patient_metadata (patient_id, diagnosis, treatment_goal, doctor_notes, updated_by_doctor_id, updated_at)
+     VALUES (?, ?, ?, ?, ?, NOW())
+     ON DUPLICATE KEY UPDATE
+        diagnosis = VALUES(diagnosis),
+        treatment_goal = VALUES(treatment_goal),
+        doctor_notes = VALUES(doctor_notes),
+        updated_by_doctor_id = VALUES(updated_by_doctor_id),
+        updated_at = NOW()'
 );
-$insert->execute([$patientId, $doctorUserId, $diagnosis, $treatmentGoal]);
+$upsert->execute([$patientId, $diagnosis, $treatmentGoal, $doctorNotes, $doctorUserId]);
 
 $savedAt = $pdo->query('SELECT NOW() AS ts')->fetch();
 
 echo json_encode([
     'ok' => true,
-    'reviewed_at' => $savedAt['ts'] ?? date('Y-m-d H:i:s')
+    'updated_at' => $savedAt['ts'] ?? date('Y-m-d H:i:s')
 ]);

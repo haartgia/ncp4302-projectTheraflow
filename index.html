@@ -30,10 +30,7 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
         <div class="sidebar-top">
 </div>
 
-        <div class="logo">
-              <div class="logo-icon" aria-hidden="true"><i class="fa-solid fa-hand-holding-heart"></i></div>
-              <div class="logo-wordmark">Theraflow</div>
-        </div>
+        <div class="logo"><img src="assets/logo_white.png" alt="Theraflow" class="logo-image"></div>
 
         <div id="nav-links-container">
             <div class="active-indicator" aria-hidden="true"></div>
@@ -41,7 +38,6 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
                 <li class="active restricted-access" aria-current="page" data-page="index.html"><i class="fa-solid fa-house"></i><span class="nav-label">Home</span></li>
                 <li class="restricted-access" data-page="exercise_hub.php"><i class="fa-solid fa-dumbbell"></i><span class="nav-label">Exercises</span></li>
                 <li class="restricted-access" data-page="recovery.php"><i class="fa-solid fa-chart-line"></i><span class="nav-label">Recovery Progress</span></li>
-                <li class="restricted-access" data-page="tele_message.php"><i class="fa-regular fa-message"></i><span class="nav-label">Messages</span></li>
                 <li class="restricted-access" data-page="patient_settings.php"><i class="fa-solid fa-user-circle"></i><span class="nav-label patient-account-label">Account &amp; Settings</span></li>
             </ul>
         </div>
@@ -63,12 +59,14 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
         <div class="header">
                 <div class="header-row">
                     <div class="header-left">
-                        <h1>Hello, Patient!</h1>
-                        <p class="subheader">Day 0 of Therapy</p>
-                        <div class="glove-status-badge is-offline" id="gloveStatusBadge">
-                            <i class="fa-solid fa-circle-xmark"></i>
-                            <span>Glove Offline</span>
+                        <div class="header-title-row">
+                            <h1>Hello, Patient!</h1>
+                            <div class="glove-status-badge is-offline" id="gloveStatusBadge">
+                                <i class="fa-solid fa-circle-xmark"></i>
+                                <span>Glove Offline</span>
+                            </div>
                         </div>
+                        <p class="subheader">Day 0 of Therapy</p>
                     </div>
                 </div>
 
@@ -118,9 +116,37 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
                                     </div>
                                 </div>
                                 <div class="widget widget-green widget-next-inline">
-                                    <div class="widget-title patient-next-title">Next Exercise</div>
-                                    <div class="widget-label" id="nextExerciseDescription">Guided finger flexion set, estimated 6 minutes</div>
-                                    <button class="exercise-btn">Start Exercise</button>
+                                    <div class="next-exercise-layout">
+                                        <div class="next-exercise-main">
+                                            <div class="widget-title patient-next-title">Next Exercise</div>
+                                            <div class="widget-label" id="nextExerciseDescription">Guided finger flexion set, estimated 6 minutes</div>
+                                            <div class="next-exercise-reps" id="nextExerciseReps">Target: -- reps</div>
+                                        </div>
+                                        <div class="next-exercise-cta">
+                                            <button class="exercise-btn" id="nextExerciseStartBtn" type="button">Start Exercise</button>
+                                        </div>
+                                        <aside class="next-exercise-device" aria-label="Device Status" aria-live="polite">
+                                            <div class="next-exercise-device-head">
+                                                <span><i class="fa-solid fa-wifi" aria-hidden="true"></i> Device Status</span>
+                                                <button type="button" class="next-exercise-refresh" id="nextExerciseRefreshBtn" aria-label="Refresh device status">
+                                                    <i class="fa-solid fa-rotate-right"></i>
+                                                </button>
+                                            </div>
+
+                                            <div class="next-exercise-device-offline" id="nextExerciseDeviceOffline">
+                                                <i class="fa-solid fa-plug-circle-xmark" aria-hidden="true"></i>
+                                                <span>No Glove Detected</span>
+                                            </div>
+
+                                            <div class="next-exercise-device-online" id="nextExerciseDeviceOnline" hidden>
+                                                <span class="next-exercise-connected-badge">Connected</span>
+                                                <div class="next-exercise-device-meta">
+                                                    <span class="next-exercise-device-signal"><i class="fa-solid fa-wifi" aria-hidden="true"></i> <span id="nextExerciseSignalLabel">Wi-Fi</span></span>
+                                                    <span class="next-exercise-device-battery"><i class="fa-solid fa-battery-half" id="nextExerciseBatteryIcon" aria-hidden="true"></i> <span id="nextExerciseBatteryLevel">--%</span></span>
+                                                </div>
+                                            </div>
+                                        </aside>
+                                    </div>
                                 </div>
                             </div>
 
@@ -142,6 +168,7 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
                                     <div class="metric-strip-header">
                                         <div class="widget-title">Grip Strength</div>
                                         <div class="trend trend-up"><i class="fa-solid fa-arrow-trend-up"></i> Stable</div>
+                                        <button class="metric-graph-btn" id="grip_strength_btn" type="button" data-metric-id="grip" aria-label="View graph for Grip Strength">View Graph</button>
                                     </div>
                                     <div class="metric-strip-body">
                                         <div class="action-progress-ring metric-strip-icon" data-progress-ring data-progress-kind="grip" data-progress-value="0" data-progress-total="100" aria-label="Grip strength exercise completion 0 percent">
@@ -160,6 +187,7 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
                                     <div class="metric-strip-header">
                                         <div class="widget-title">Finger Movement</div>
                                         <div class="trend trend-up"><i class="fa-solid fa-arrow-trend-up"></i> Baseline</div>
+                                        <button class="metric-graph-btn" id="finger_movement_btn" type="button" data-metric-id="finger" aria-label="View graph for Finger Movement">View Graph</button>
                                     </div>
                                     <div class="metric-strip-body">
                                         <div class="action-progress-ring metric-strip-icon" data-progress-ring data-progress-kind="finger" data-progress-value="0" data-progress-total="100" aria-label="Finger movement exercise completion 0 percent">
@@ -175,19 +203,11 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
                                 </div>
                             </div>
 
-                            <div class="widget widget-green graph-card">
-                                <div class="widget-title">Grip Strength Progress</div>
-                                <div class="chart-wrap">
-                                    <canvas id="strengthChart"></canvas>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="data-row data-row-progress">
                             <div class="metric-stack metric-stack-horizontal">
                                 <div class="widget widget-blue metric-strip">
                                     <div class="metric-strip-header">
                                         <div class="widget-title">Repetitions</div>
+                                        <button class="metric-graph-btn" id="repetitions_btn" type="button" data-metric-id="repetitions" aria-label="View graph for Repetitions">View Graph</button>
                                     </div>
                                     <div class="metric-strip-body">
                                         <div class="action-progress-ring metric-strip-icon" data-progress-ring data-progress-kind="repetitions" aria-label="Repetitions progress 0 percent">
@@ -205,6 +225,7 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
                                 <div class="widget widget-blue metric-strip">
                                     <div class="metric-strip-header">
                                         <div class="widget-title">Session Duration</div>
+                                        <button class="metric-graph-btn" id="session_duration_btn" type="button" data-metric-id="duration" aria-label="View graph for Session Duration">View Graph</button>
                                     </div>
                                     <div class="metric-strip-body">
                                         <div class="action-progress-ring metric-strip-icon" data-progress-ring data-progress-kind="duration" aria-label="Session duration progress 0 percent">
@@ -219,20 +240,39 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
                                     </div>
                                 </div>
                             </div>
-
-                            <div class="widget widget-green graph-card">
-                                <div class="widget-title">Finger Flexion / Extension</div>
-                                <div class="chart-wrap">
-                                    <canvas id="motionChart"></canvas>
-                                </div>
-                            </div>
                         </div>
+
             </div>
         </div>
 
     </main>
 
 </div>
+</div>
+
+<div class="metric-graph-modal" id="metricGraphModal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="metricGraphModalTitle">
+    <div class="metric-graph-modal-backdrop" data-modal-close="true"></div>
+    <div class="metric-graph-modal-panel">
+        <div class="metric-graph-modal-head">
+            <h2 id="metricGraphModalTitle">Metric Trend</h2>
+            <div class="metric-graph-head-actions">
+                <label class="metric-graph-values-toggle" for="metricGraphShowValues">
+                    <input type="checkbox" id="metricGraphShowValues">
+                    <span>Show Values</span>
+                </label>
+                <button type="button" class="metric-graph-modal-close" id="metricGraphModalClose" aria-label="Close graph modal">&times;</button>
+            </div>
+        </div>
+        <div class="metric-graph-modal-body">
+            <canvas id="metricGraphCanvas" aria-label="Metric line chart"></canvas>
+            <div class="metric-graph-description-wrap">
+                <p class="metric-graph-description" id="metricGraphDescription"></p>
+            </div>
+        </div>
+        <div class="metric-graph-modal-foot">
+            <button type="button" class="metric-graph-more-detail" id="metricGraphMoreDetail">More Detail</button>
+        </div>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

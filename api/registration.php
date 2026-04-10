@@ -21,7 +21,7 @@ if (!is_array($data)) {
     $data = $_POST;
 }
 
-$required = ['fullName', 'email', 'contactNumber', 'specialty', 'licenseNumber', 'yearsOfExperience', 'affiliation', 'password'];
+$required = ['fullName', 'email', 'contactNumber', 'specialty', 'licenseNumber', 'yearsOfExperience', 'affiliation', 'username', 'password'];
 foreach ($required as $field) {
     if (!isset($data[$field]) || trim((string) $data[$field]) === '') {
         http_response_code(400);
@@ -95,8 +95,29 @@ function splitFullName(string $fullName): array
     return [$firstName, $lastName];
 }
 
-$usersTable = resolveTableName($pdo, ['users', 'user_db.users', 'theraflow_db.users']);
-$doctorsTable = resolveTableName($pdo, ['doctors', 'theraflow_db.doctors', 'user_db.doctors']);
+function ensureUsersUsernameColumn(PDO $pdo, string $usersTable, array $usersColumns): array
+{
+    if (in_array('username', $usersColumns, true)) {
+        return $usersColumns;
+    }
+
+    try {
+        $pdo->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN username VARCHAR(100) NULL AFTER mobile');
+    } catch (Throwable $e) {
+        // Ignore if column already exists in environments that race schema updates.
+    }
+
+    try {
+        $pdo->exec('ALTER TABLE ' . $usersTable . ' ADD UNIQUE INDEX uq_users_username (username)');
+    } catch (Throwable $e) {
+        // Ignore when index already exists.
+    }
+
+    return getTableColumns($pdo, $usersTable);
+}
+
+$usersTable = resolveTableName($pdo, ['users', 'theraflowusers_db.users', 'theraflow_db.users']);
+$doctorsTable = resolveTableName($pdo, ['doctors', 'theraflow_db.doctors', 'theraflowusers_db.doctors']);
 
 if ($usersTable === null || $doctorsTable === null) {
     http_response_code(500);
@@ -119,6 +140,13 @@ if ($usersIdColumn === null || $usersPasswordColumn === null || !in_array('email
     exit;
 }
 
+$usersColumns = ensureUsersUsernameColumn($pdo, $usersTable, $usersColumns);
+if (!in_array('username', $usersColumns, true)) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'error' => 'Users table must include a username column for doctor registration.']);
+    exit;
+}
+
 $usesLegacyDoctorSchema = in_array('user_id', $doctorsColumns, true) && in_array('full_name', $doctorsColumns, true);
 $usesStandaloneDoctorSchema = in_array('display_name', $doctorsColumns, true) && in_array('password_hash', $doctorsColumns, true);
 
@@ -131,16 +159,14 @@ if (!$usesLegacyDoctorSchema && !$usesStandaloneDoctorSchema) {
 try {
     $pdo->beginTransaction();
 
-    if (in_array('username', $usersColumns, true)) {
-        if ($username === '') {
-            throw new RuntimeException('Username is required for this database schema');
-        }
+    if ($username === '') {
+        throw new RuntimeException('Username is required');
+    }
 
-        $dupUser = $pdo->prepare('SELECT ' . $usersIdColumn . ' FROM ' . $usersTable . ' WHERE username = ? LIMIT 1');
-        $dupUser->execute([$username]);
-        if ($dupUser->fetch()) {
-            throw new RuntimeException('Username already exists');
-        }
+    $dupUser = $pdo->prepare('SELECT ' . $usersIdColumn . ' FROM ' . $usersTable . ' WHERE username = ? LIMIT 1');
+    $dupUser->execute([$username]);
+    if ($dupUser->fetch()) {
+        throw new RuntimeException('Username already exists');
     }
 
     $dupEmail = $pdo->prepare('SELECT ' . $usersIdColumn . ' FROM ' . $usersTable . ' WHERE email = ? LIMIT 1');
@@ -160,14 +186,14 @@ try {
     // Keep hashing consistent with login.php by using PASSWORD_DEFAULT.
     [$firstName, $lastName] = splitFullName($fullName);
 
-    if (in_array('username', $usersColumns, true)) {
+    if (in_array('first_name', $usersColumns, true) && in_array('last_name', $usersColumns, true)) {
+        $insertUser = $pdo->prepare(
+            'INSERT INTO ' . $usersTable . ' (first_name, last_name, mobile, username, email, ' . $usersPasswordColumn . ', role) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        );
+        $insertUser->execute([$firstName, $lastName, $contactNumber, $username, $email, $passwordHash, 'doctor']);
+    } else {
         $insertUser = $pdo->prepare('INSERT INTO ' . $usersTable . ' (username, email, ' . $usersPasswordColumn . ', role) VALUES (?, ?, ?, ?)');
         $insertUser->execute([$username, $email, $passwordHash, 'doctor']);
-    } else {
-        $insertUser = $pdo->prepare(
-            'INSERT INTO ' . $usersTable . ' (first_name, last_name, mobile, email, ' . $usersPasswordColumn . ', role) VALUES (?, ?, ?, ?, ?, ?)'
-        );
-        $insertUser->execute([$firstName, $lastName, $contactNumber, $email, $passwordHash, 'doctor']);
     }
 
     $userId = (int) $pdo->lastInsertId();

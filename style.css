@@ -196,44 +196,62 @@ body.dark-mode .root-login-sub {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 4px 0 20px;
+  margin: 4px auto 20px;
   min-height: 48px;
-  padding-left: 0;
-}
-
-.logo-icon {
-  width: 36px;
+  padding: 0;
+  position: relative;
+  width: 100%;
   height: 36px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.95rem;
 }
 
-.logo-wordmark {
+.sidebar:not(:hover):not(.is-pinned) .logo,
+.sidebar.is-collapsed .logo {
+  width: 100%;
+  justify-content: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.logo::after {
+  content: "";
   margin-left: 10px;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   white-space: nowrap;
   opacity: 0;
   transform: translateX(-8px);
   pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease, font-size 0.2s ease;
 }
 
-.sidebar:hover .logo-wordmark,
-.sidebar.is-pinned .logo-wordmark {
-  opacity: 1;
-  transform: translateX(0);
-  transition-delay: 0.1s;
+.logo-image {
+  display: block;
+  width: 36px;
+  height: auto;
+  margin: 0 auto;
+  object-fit: contain;
+  transition: width 0.2s ease;
 }
 
 .sidebar:hover .logo,
 .sidebar.is-pinned .logo {
-  justify-content: flex-start;
-  padding-left: 6px;
+  justify-content: center;
+  padding-left: 0;
+  width: auto;
+}
+
+.sidebar:hover .logo::after,
+.sidebar.is-pinned .logo::after {
+  content: "TheraFlow";
+  font-size: 1.08rem;
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.sidebar:hover .logo-image,
+.sidebar.is-pinned .logo-image {
+  width: 60px;
 }
 
 .menu {
@@ -537,18 +555,34 @@ body.dark-mode .root-login-sub {
 
 .header-left {
   flex: 0 0 auto;
-  padding-top: 50px;
+  padding-top: 0;
+}
+
+.header-title-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
 .header-left h1 {
   font-size: 2.7rem;
   line-height: 1.1;
-  margin-bottom: 8px;
+  margin: 0 0 8px;
+}
+
+.header-title-row h1 {
+  margin: 0;
+}
+
+.header-title-row .glove-status-badge {
+  margin-top: 0;
 }
 
 .subheader {
   color: var(--text-muted);
   font-size: 1.2rem;
+  margin-top: 6px;
 }
 
 .header-right {
@@ -631,7 +665,7 @@ body.dark-mode .root-login-sub {
 }
 
 .top-section .widget-calendar {
-  min-height: 340px;
+  min-height: 400px;
 }
 
 .center-stack {
@@ -648,6 +682,12 @@ body.dark-mode .root-login-sub {
 .top-section > .widget,
 .center-stack > .widget {
   border-radius: 24px;
+}
+
+.widget-streak {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .widget-progress-tall {
@@ -719,12 +759,177 @@ body.dark-mode .root-login-sub {
 
 .widget-next-inline {
   padding: 30px;
+  display: flex;
+  align-items: center;
+}
+.next-exercise-layout {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 20px;
+  align-items: center;
+  width: 100%;
+}
+.next-exercise-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-self: start;
+  padding-right: 20px;
+}
+
+.next-exercise-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.next-exercise-reps {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #2a6e83;
+}
+.next-exercise-device {
+  justify-self: end;
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid rgba(47, 112, 135, 0.24);
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+.next-exercise-device-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #4d7382;
+}
+
+.next-exercise-device-head span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.next-exercise-refresh {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(45, 93, 99, 0.22);
+  background: rgba(45, 93, 99, 0.06);
+  color: #2d5d63;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+.next-exercise-refresh:hover,
+.next-exercise-refresh:focus-visible {
+  background: rgba(45, 93, 99, 0.14);
+  transform: rotate(20deg);
+  outline: none;
+}
+.next-exercise-device-offline,
+.next-exercise-device-online {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+}
+.next-exercise-device-offline i {
+  color: #9b5760;
+}
+.next-exercise-connected-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: rgba(47, 155, 114, 0.16);
+  color: #1f7759;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+.next-exercise-device-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  color: #3b6070;
+}
+.next-exercise-device-signal,
+.next-exercise-device-battery {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+body.auth-gated-home #nextExerciseStartBtn {
+  min-width: 250px;
+  padding: 18px 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin-top: 0;
+  cursor: pointer;
+}
+
+body.auth-gated-home #nextExerciseStartBtn:hover {
+  filter: brightness(1.1);
+}
+
+body.dark-mode .next-exercise-device {
+  background: rgba(15, 27, 34, 0.52);
+  border-color: rgba(121, 175, 196, 0.24);
+}
+
+body.dark-mode .next-exercise-device-head {
+  color: #9fc0ce;
+}
+
+body.dark-mode .next-exercise-refresh {
+  border-color: rgba(159, 192, 206, 0.28);
+  background: rgba(159, 192, 206, 0.08);
+  color: #b8d4de;
+}
+
+body.dark-mode .next-exercise-device-meta {
+  color: #b7d3de;
 }
 
 .patient-next-title {
   font-size: 1.28rem;
   font-weight: 800;
+  margin-top: -55px;
   margin-bottom: 10px;
+}
+@media (max-width: 820px) {
+  .next-exercise-layout {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .next-exercise-main,
+  .next-exercise-cta,
+  .next-exercise-device {
+    justify-self: stretch;
+  }
+
+  .next-exercise-main {
+    padding-right: 0;
+  }
+
+  .next-exercise-device {
+    width: 100%;
+  }
+
+  body.auth-gated-home #nextExerciseStartBtn {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .data-row {
@@ -757,6 +962,7 @@ body.dark-mode .root-login-sub {
 
 .metric-stack-horizontal > .widget {
   height: 100%;
+  min-height: 360px;
 }
 
 .widget-tall {
@@ -994,39 +1200,53 @@ body.dark-mode .calendar-widget-title {
   border-radius: 10px;
 }
 
-.doctor-table .empty-state {
+.doctor-table-wrap {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: var(--text-muted);
-  padding: 18px 0;
-  text-align: center;
+  height: 100%;
+}
+.doctor-table {
   width: 100%;
-  margin: 0 auto;
+  border-collapse: collapse;
 }
-.doctor-table-wrap {
-  min-height: 220px;
-}
-.doctor-table td.empty-state {
+.empty-state-container {
+  position: absolute;
+  inset: 52px 0 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 0;
   text-align: center;
-  padding-left: 0;
-  padding-right: 0;
+  color: var(--text-muted);
+  padding: 18px 14px;
 }
-.empty-state-row td {
+.empty-state-container[hidden] {
+  display: none;
+}
+.empty-state-text {
+  opacity: 0.65;
+  font-size: 0.95rem;
   text-align: center;
-  vertical-align: middle;
+  margin: 0;
 }
-.empty-illustration { font-size: 34px; }
 .add-patient-cta {
   display: inline-block;
-  margin-top: 6px;
   background: var(--cta);
   color: #fff;
-  padding: 8px 12px;
+  padding: 8px 14px;
   border-radius: 10px;
   text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background 0.2s ease;
+  cursor: pointer;
+}
+.add-patient-cta:hover {
+  background: var(--cta-hover);
 }
 
 
@@ -1036,7 +1256,7 @@ body.dark-mode .calendar-widget-title {
   justify-content: flex-start;
   align-items: stretch;
   gap: 16px;
-  min-height: 0;
+  min-height: 400px;
   padding: 24px;
 }
 
@@ -1158,8 +1378,36 @@ body.dark-mode .calendar-widget-title {
 
 .patient-action-value {
   font-size: 1.95rem;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.05;
+}
+
+body.auth-gated-home .metric-strip.status-no-data .patient-action-value,
+body.auth-gated-home .metric-strip.status-waiting .patient-action-value {
+  color: #5f7f89;
+}
+
+body.auth-gated-home .metric-strip.status-active .patient-action-value {
+  color: #1e5f74;
+}
+
+body.auth-gated-home .metric-strip.status-no-data .widget-label,
+body.auth-gated-home .metric-strip.status-waiting .widget-label {
+  color: #6f8c98;
+}
+
+body.auth-gated-home .metric-strip.status-waiting .action-progress-ring-core {
+  animation: metric-waiting-pulse 1.7s ease-in-out infinite;
+}
+
+@keyframes metric-waiting-pulse {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 1px rgba(13, 95, 115, 0.08), 0 0 0 0 rgba(45, 93, 99, 0.22);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px rgba(13, 95, 115, 0.08), 0 0 0 10px rgba(45, 93, 99, 0);
+  }
 }
 
 .metric-strip-header .widget-title {
@@ -1189,6 +1437,183 @@ body.dark-mode .calendar-widget-title {
 .trend-up {
   background: rgba(47, 155, 114, 0.14);
   color: var(--ok);
+}
+
+.metric-graph-btn {
+  border: 1px solid rgba(45, 93, 99, 0.2);
+  background: rgba(45, 93, 99, 0.08);
+  color: #2d5d63;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.metric-graph-btn:hover,
+.metric-graph-btn:focus-visible {
+  background: #2d5d63;
+  color: #ffffff;
+  border-color: #2d5d63;
+  outline: none;
+}
+
+.metric-graph-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.metric-graph-modal[hidden] {
+  display: none;
+}
+
+.metric-graph-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(45, 93, 99, 0.42);
+  backdrop-filter: blur(4px);
+}
+
+.metric-graph-modal-panel {
+  position: relative;
+  width: min(1080px, 96vw);
+  height: min(620px, 90vh);
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid rgba(45, 93, 99, 0.12);
+  box-shadow: 0 26px 48px rgba(18, 46, 50, 0.22);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.metric-graph-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.metric-graph-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.metric-graph-values-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #4b5563;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: "Poppins", "Segoe UI", sans-serif;
+  white-space: nowrap;
+}
+
+.metric-graph-values-toggle input {
+  width: 15px;
+  height: 15px;
+  accent-color: #4d869c;
+}
+
+.metric-graph-modal-head h2 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: #1f5668;
+}
+
+.metric-graph-modal-close {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(45, 93, 99, 0.12);
+  color: #2d5d63;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.metric-graph-modal-close:hover,
+.metric-graph-modal-close:focus-visible {
+  background: #2d5d63;
+  color: #ffffff;
+  outline: none;
+}
+
+.metric-graph-modal-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.metric-graph-modal-body canvas {
+  flex: 1;
+  min-height: 340px;
+  width: 100% !important;
+  height: auto !important;
+}
+
+.metric-graph-description-wrap {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 32px;
+}
+
+.metric-graph-description {
+  margin: 0;
+  color: #4b5563;
+  font-size: 1.1rem;
+  line-height: 1.45;
+  text-align: center;
+  font-style: italic;
+  font-weight: 400;
+}
+
+.metric-graph-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.metric-graph-more-detail {
+  border: 1px solid #4d869c;
+  background: #4d869c;
+  color: #ffffff;
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.metric-graph-more-detail:hover,
+.metric-graph-more-detail:focus-visible {
+  background: #3d6f83;
+  border-color: #3d6f83;
+  color: #ffffff;
+  outline: none;
+}
+
+body.graph-modal-open {
+  overflow: hidden;
 }
 
 .progress-wrap {
@@ -1414,66 +1839,142 @@ body.dark-mode .calendar-widget-card {
 
 .streak-badge {
   border-radius: 999px;
-  padding: 7px 14px;
-  font-size: 0.82rem;
+  padding: 5px 12px;
+  font-size: 0.76rem;
   font-weight: 700;
-  color: #8f98a2;
-  background: rgba(143, 152, 162, 0.16);
-  box-shadow: inset 0 0 0 1px rgba(143, 152, 162, 0.12);
+  letter-spacing: 0.01em;
+  color: #86939c;
+  background: rgba(143, 152, 162, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(143, 152, 162, 0.16);
 }
 
 .streak-badge.active {
-  background: linear-gradient(135deg, rgba(241, 159, 63, 0.24), rgba(255, 207, 87, 0.34));
-  color: #a85808;
-  box-shadow: 0 10px 24px rgba(241, 159, 63, 0.18);
+  background: linear-gradient(135deg, rgba(45, 114, 136, 0.18), rgba(47, 155, 114, 0.22));
+  color: #1f667c;
+  box-shadow: 0 8px 18px rgba(47, 155, 114, 0.14);
 }
 
 .streak-track {
+  --streak-progress: 0%;
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 8px;
-  margin-top: 14px;
+  gap: 0;
+  margin-top: 12px;
+  padding: 16px 8px 10px;
+  position: relative;
+  align-items: center;
+  min-height: 110px;
+}
+
+.streak-track::before,
+.streak-track::after {
+  content: "";
+  position: absolute;
+  left: calc((100% / 14) - 6px);
+  right: calc((100% / 14) - 6px);
+  top: 54%;
+  height: 4px;
+  border-radius: 999px;
+  transform: translateY(-50%);
+}
+
+.streak-track::before {
+  background: rgba(132, 154, 165, 0.28);
+}
+
+.streak-track::after {
+  width: var(--streak-progress);
+  right: auto;
+  background: linear-gradient(90deg, #2d7288 0%, #2f9b72 100%);
+  transition: width 0.35s ease;
+}
+
+.streak-track.is-glow-active::after {
+  box-shadow: 0 0 12px rgba(47, 155, 114, 0.28);
 }
 
 .streak-dot {
   position: relative;
-  height: 58px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(77, 134, 156, 0.12), rgba(77, 134, 156, 0.06));
-  border: 1px solid rgba(77, 134, 156, 0.1);
+  height: 64px;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(77, 134, 156, 0.34);
+  color: #8aa3af;
   overflow: hidden;
+  z-index: 1;
 }
 
 .streak-dot::before {
   content: attr(data-day-label);
   position: absolute;
-  top: 7px;
+  top: 1px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 0.64rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  color: #7b96a1;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #78919e;
 }
 
 .streak-dot i {
-  font-size: 1.05rem;
-  transform: translateY(9px);
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+  transform: translateY(10px);
+  background: #e6eff4;
+  border: 1px solid rgba(120, 145, 158, 0.22);
+  box-shadow: 0 0 0 2px var(--panel-blue);
+  transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 .streak-dot.active {
-  background: radial-gradient(circle at 50% 40%, rgba(255, 251, 236, 0.96), rgba(255, 225, 149, 0.8) 55%, rgba(241, 159, 63, 0.95) 100%);
-  color: #c86f08;
-  border-color: rgba(241, 159, 63, 0.28);
-  box-shadow: 0 0 0 1px rgba(255, 214, 122, 0.35), 0 14px 28px rgba(241, 159, 63, 0.24), 0 0 24px rgba(255, 196, 84, 0.45);
+  color: #1f7188;
 }
 
 .streak-dot.active::before {
-  color: rgba(126, 75, 6, 0.78);
+  color: #2b768b;
+}
+
+.streak-dot.is-completed {
+  color: #2b768b;
+}
+
+.streak-dot.is-completed::before {
+  color: #2b768b;
+}
+
+.streak-dot.is-completed i {
+  color: #ffffff;
+  background: linear-gradient(145deg, #4d869c, #2f9b72);
+  border-color: rgba(77, 134, 156, 0.55);
+  box-shadow: 0 0 0 2px var(--panel-blue);
+}
+
+.streak-dot.active i {
+  color: #ffffff;
+  background: linear-gradient(145deg, #2d7288, #2f9b72);
+  border-color: rgba(47, 155, 114, 0.56);
+  box-shadow: 0 0 0 2px var(--panel-blue), 0 8px 18px rgba(47, 155, 114, 0.28);
+}
+
+.streak-dot.is-today i {
+  animation: streak-today-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes streak-today-pulse {
+  0%,
+  100% {
+    transform: translateY(10px) scale(1);
+    box-shadow: 0 0 0 2px var(--panel-blue), 0 0 0 0 rgba(47, 155, 114, 0.28);
+  }
+  50% {
+    transform: translateY(10px) scale(1.06);
+    box-shadow: 0 0 0 2px var(--panel-blue), 0 0 0 10px rgba(47, 155, 114, 0);
+  }
 }
 
 .chart-wrap {
@@ -1756,6 +2257,7 @@ body.dark-mode .calendar-widget-card {
   background: transparent;
   color: #3f7a90;
   border-radius: 12px;
+  min-height: 56px;
   padding: 12px 18px;
   font-size: 0.98rem;
   font-weight: 600;
@@ -2105,6 +2607,7 @@ body.dark-mode .calendar-widget-card {
   color: #c44848;
   font-size: 0.82rem;
   font-weight: 600;
+  font-family: "Poppins", "Segoe UI", sans-serif;
 }
 
 .wizard-actions {
@@ -2113,7 +2616,40 @@ body.dark-mode .calendar-widget-card {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+  font-family: "Poppins", "Segoe UI", sans-serif;
   margin-top: 18px;
+
+.field-group select,
+.field-group option {
+  font-family: "Poppins", "Segoe UI", sans-serif;
+}
+
+.field-group input[type="date"] {
+  font-family: "Poppins", "Segoe UI", sans-serif;
+}
+
+.field-group input[type="date"]::-webkit-datetime-edit,
+.field-group input[type="date"]::-webkit-datetime-edit-year-field,
+.field-group input[type="date"]::-webkit-datetime-edit-month-field,
+.field-group input[type="date"]::-webkit-datetime-edit-day-field,
+.field-group input[type="date"]::-webkit-datetime-edit-text {
+  font-family: "Poppins", "Segoe UI", sans-serif;
+}
+
+.patients-modal .field-group input[name="dateOfBirth"] {
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid rgba(77, 134, 156, 0.24);
+  box-shadow: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  font-family: "Poppins", "Segoe UI", sans-serif;
+}
+.patients-modal .field-group input[name="dateOfBirth"]:focus {
+  border-color: #4d869c;
+  box-shadow: 0 0 0 2px rgba(77, 134, 156, 0.15);
+}
   padding-top: 0;
 }
 
@@ -2177,18 +2713,240 @@ body.dark-mode .calendar-widget-card {
   border: 0;
 }
 
+body.auth-gated-home {
+  height: 100vh;
+  overflow: hidden;
+}
+
+body.auth-gated-home #main-dashboard,
+body.auth-gated-home .container,
+body.auth-gated-home .content,
+body.auth-gated-home #protected-dashboard-content {
+  height: 100%;
+  overflow: hidden;
+}
+
+body.auth-gated-home #protected-dashboard-content,
+body.auth-gated-home .dashboard-grid {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Patient home: internal precision and centering */
+body.auth-gated-home .top-section > .widget,
+body.auth-gated-home .center-stack > .widget,
+body.auth-gated-home .metric-strip {
+  padding: 16px;
+}
+
+body.auth-gated-home .widget-progress-tall,
+body.auth-gated-home .metric-strip-body,
+body.auth-gated-home .metric-strip-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+body.auth-gated-home .widget-progress-tall {
+  text-align: center;
+}
+
+body.auth-gated-home .metric-strip-body {
+  gap: 18px;
+}
+
+body.auth-gated-home .metric-strip-content {
+  gap: 8px;
+}
+
+body.auth-gated-home .metric-strip .widget-value {
+  line-height: 1.1;
+}
+
+body.auth-gated-home .metric-strip .widget-label {
+  line-height: 1.35;
+  font-size: 0.84rem;
+}
+
+/* Header row alignment for title, trend pill, and optional graph button */
+body.auth-gated-home .metric-strip-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: 8px;
+  width: 100%;
+}
+
+body.auth-gated-home .metric-strip-header .widget-title {
+  grid-column: 1;
+  margin: 0;
+}
+
+body.auth-gated-home .metric-strip-header .trend {
+  grid-column: 2;
+  justify-self: end;
+  align-self: center;
+  margin: 0;
+}
+
+body.auth-gated-home .metric-strip-header .metric-graph-btn {
+  grid-column: 3;
+  justify-self: end;
+  align-self: center;
+}
+
+/* Patient dashboard buttons: shared geometry/motion for visual consistency */
+body.auth-gated-home .exercise-btn,
+body.auth-gated-home .metric-graph-btn {
+  border-radius: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+body.auth-gated-home .exercise-btn {
+  min-height: 44px;
+  padding: 12px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #4f89a0;
+  color: #ffffff;
+  box-shadow: 0 10px 20px rgba(31, 86, 104, 0.22);
+}
+
+body.auth-gated-home .metric-graph-btn {
+  border: 1px solid #4f89a0;
+  background: #4f89a0;
+  color: #ffffff;
+  padding: 9px 12px;
+  min-height: 34px;
+  font-size: 0.74rem;
+  letter-spacing: 0.015em;
+}
+
+body.auth-gated-home .exercise-btn:hover,
+body.auth-gated-home .metric-graph-btn:hover {
+  background: #457d93;
+  border-color: #457d93;
+  transform: translateY(-1px);
+}
+
+body.auth-gated-home .exercise-btn:focus-visible,
+body.auth-gated-home .metric-graph-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(13, 95, 115, 0.2);
+}
+
+body.auth-gated-home .metric-graph-btn:hover,
+body.auth-gated-home .metric-graph-btn:focus-visible {
+  background: #457d93;
+  border-color: #457d93;
+  color: #ffffff;
+}
+
+/* Progress rings scale by container size (with practical caps) */
+body.auth-gated-home .widget-progress-tall .radial-progress {
+  width: min(50%, 176px);
+  aspect-ratio: 1 / 1;
+  height: auto;
+  margin: 12px auto;
+}
+
+body.auth-gated-home .widget-progress-tall .radial-progress-inner {
+  width: 75%;
+  height: 75%;
+}
+
+body.auth-gated-home .metric-strip-body .action-progress-ring {
+  width: min(50%, 110px);
+  aspect-ratio: 1 / 1;
+  height: auto;
+}
+
+body.auth-gated-home .metric-strip-body .action-progress-ring-core {
+  width: 76%;
+  height: 76%;
+}
+
+/* Bottom icon consistency */
+body.auth-gated-home .metric-strip .widget-icon i,
+body.auth-gated-home .metric-strip-icon i,
+body.auth-gated-home .action-progress-ring .widget-icon i {
+  width: 48px;
+  height: 48px;
+  font-size: 48px;
+  line-height: 1;
+}
+
+/* Calendar grid centered with even breathing room */
+body.auth-gated-home .widget-calendar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.auth-gated-home .calendar-widget-card {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+
+body.auth-gated-home .calendar-shell {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 6px;
+}
+
+body.auth-gated-home .calendar-weekdays,
+body.auth-gated-home .calendar-dates {
+  width: 100%;
+}
+
 .doctor-dashboard-page {
   background: var(--content-bg);
+  height: 100vh;
+  overflow: hidden;
+}
+
+.doctor-dashboard-page .container {
+  height: 100vh;
 }
 
 .doctor-dashboard-page .content {
   padding: 24px;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .doctor-shell {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 20px;
+  height: 100%;
+  min-height: 0;
+}
+
+.doctor-body-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(420px, 34vw, 620px);
+  gap: 20px;
+  min-height: 0;
+}
+
+.doctor-main-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
+  min-height: 0;
 }
 
 .doctor-header-row {
@@ -2214,82 +2972,89 @@ body.dark-mode .calendar-widget-card {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
+  min-height: 0;
 }
 
 .doctor-stat-card {
   border-radius: 20px;
   box-shadow: var(--card-shadow);
-  padding: 18px 20px;
+  padding: 16px 16px;
 }
 
 .doctor-stat-label {
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: clamp(0.78rem, 0.7rem + 0.28vw, 0.9rem);
   font-weight: 600;
   margin-bottom: 8px;
 }
 
 .doctor-stat-value {
   color: var(--text);
-  font-size: 2rem;
+  font-size: clamp(1.25rem, 0.95rem + 1.1vw, 2rem);
   line-height: 1;
   font-weight: 700;
+  white-space: nowrap;
 }
 
-.doctor-middle-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 20px;
-  align-items: stretch;
+.doctor-main-grid {
+  display: block;
+  min-height: 0;
+  height: 100%;
 }
 
 .doctor-graph-card,
-.doctor-alerts-card,
 .doctor-table-card {
   border-radius: 20px;
   box-shadow: var(--card-shadow);
+  min-height: 0;
 }
 
 .doctor-graph-card {
-  min-height: 360px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .doctor-chart-wrap {
-  min-height: 280px;
+  min-height: 0;
+  flex: 1;
 }
 
-.doctor-alert-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 4px;
-}
-
-.doctor-alert-list li {
-  background: rgba(224, 167, 55, 0.08);
-  border-left: 3px solid rgba(224, 167, 55, 0.7);
-  border-radius: 12px;
-  padding: 11px 12px;
-  color: var(--text);
-  font-size: 0.9rem;
-  line-height: 1.45;
-}
-
-.doctor-alert-icon {
-  color: #bb6e28;
-  margin-right: 4px;
-}
-
-.doctor-tables-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
+.doctor-chart-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .doctor-table-wrap {
-  overflow-x: auto;
+  overflow: hidden;
   margin-top: 4px;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.doctor-overview-card,
+.doctor-activity-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.doctor-sidebar-stack {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  min-height: 0;
+}
+
+.doctor-sidebar-stack > .doctor-table-card {
+  height: 100%;
+}
+
+.doctor-overview-card .doctor-table-wrap,
+.doctor-activity-card .doctor-table-wrap {
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .doctor-table {
@@ -2302,6 +3067,11 @@ body.dark-mode .calendar-widget-card {
   text-align: left;
   padding: 12px 8px;
   border-bottom: 1px solid var(--panel-border);
+}
+
+.doctor-sidebar-stack .doctor-table th,
+.doctor-sidebar-stack .doctor-table td {
+  padding: 12px 14px;
 }
 
 .doctor-table th {
@@ -2397,14 +3167,36 @@ body.dark-mode .calendar-widget-card {
   box-shadow: 8px -8px 0 8px var(--content-bg);
 }
 
+html,
+body.patients-page {
+  height: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 .patients-page {
   background: var(--content-bg);
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.patients-page .container {
+  min-height: 100vh;
+}
+
+.patients-page .content {
+  min-height: 100vh;
+  overflow: visible;
 }
 
 .patients-shell {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-height: 100%;
+  height: auto;
+  overflow: visible;
 }
 
 .patients-list-view,
@@ -2412,6 +3204,7 @@ body.dark-mode .calendar-widget-card {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-height: 0;
 }
 
 .patients-list-view.is-hidden {
@@ -2420,6 +3213,17 @@ body.dark-mode .calendar-widget-card {
 
 .patients-profile-view.is-hidden {
   display: none;
+}
+
+.patients-list-view {
+  min-height: auto;
+  overflow: visible;
+}
+
+.patients-list-card {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .patients-header-row {
@@ -2483,7 +3287,9 @@ body.dark-mode .calendar-widget-card {
 }
 
 .patients-table-wrap {
-  overflow-x: auto;
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
 }
 
 .patients-table .table-view-btn {
@@ -2501,96 +3307,130 @@ body.dark-mode .calendar-widget-card {
   filter: brightness(92%);
 }
 
-.patient-profile-breadcrumb {
-  margin: 20px 0 0 20px;
+
+.patient-profile-header {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.08fr) minmax(340px, 1.28fr) minmax(260px, 0.84fr);
+  align-items: center;
+  gap: 20px;
+  margin: 0;
 }
 
 .patient-back-link {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  width: fit-content;
-  padding: 12px 18px;
-  border: 1.5px solid rgba(63, 122, 144, 0.35);
-  border-radius: 999px;
-  background: transparent;
-  color: #2d7288;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 12px;
+  background: #4d869c;
+  color: #ffffff;
   cursor: pointer;
-  margin-bottom: -2px;
-  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  transition: filter 0.2s ease;
 }
 
 .patient-back-link:hover,
 .patient-back-link:focus-visible {
-  background: #f0f7f9;
-  border-color: rgba(63, 122, 144, 0.48);
+  filter: brightness(90%);
   text-decoration: none;
 }
 
 .patient-back-link:focus-visible {
-  outline: 2px solid rgba(77, 134, 156, 0.24);
+  outline: 2px solid rgba(77, 134, 156, 0.35);
   outline-offset: 2px;
 }
 
 .patient-back-link-icon,
 .patient-back-link-copy {
-  transition: transform 0.18s ease;
+  transition: opacity 0.18s ease;
 }
 
 .patient-back-link:hover .patient-back-link-icon,
 .patient-back-link:hover .patient-back-link-copy,
 .patient-back-link:focus-visible .patient-back-link-icon,
 .patient-back-link:focus-visible .patient-back-link-copy {
-  transform: translateX(-3px);
+  opacity: 0.98;
 }
 
 .patient-back-link-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border-radius: 999px;
-  background: rgba(77, 134, 156, 0.12);
-  color: #2d7288;
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
   flex-shrink: 0;
+  font-size: 0.78rem;
 }
 
-.patient-back-link-copy {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  font-size: 0.94rem;
-  line-height: 1.2;
-}
-
-.patient-back-link-primary {
-  color: #2d7288;
+.patient-back-link-label {
   font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
-.patient-back-link-divider,
-.patient-back-link-secondary {
-  color: #5c7783;
+.patient-profile-heading {
+  grid-column: 2 / 4;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+.patient-profile-heading h2 {
+  color: #1f5668;
+  font-size: 1.34rem;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.patient-profile-breadcrumb {
+  margin: 2px 0 0;
+  color: #0d5f73;
+  font-size: 0.92rem;
   font-weight: 600;
 }
 
-.patient-back-link-secondary strong {
-  color: #1f5668;
+.patient-profile-breadcrumb strong {
+  color: #0d5f73;
   font-weight: 700;
 }
 
 .patient-summary-card {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 20px;
+  gap: 10px;
+  padding: 10px 12px;
+  min-height: 100%;
+}
+
+.patient-summary-row {
+  display: block;
+}
+
+.patient-summary-row .patient-summary-card {
+  min-height: 0;
+}
+
+.patient-summary-sensor-row {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.88fr) minmax(250px, 0.96fr) minmax(300px, 1.16fr);
+  gap: 20px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.patient-summary-sensor-row > article {
+  height: 100%;
+  min-height: 320px;
 }
 
 .patient-summary-photo {
-  width: 72px;
-  height: 72px;
+  width: 56px;
+  height: 56px;
   border-radius: 999px;
   background: rgba(77, 134, 156, 0.14);
   color: #2d7288;
@@ -2600,43 +3440,140 @@ body.dark-mode .calendar-widget-card {
 }
 
 .patient-summary-photo i {
-  font-size: 2rem;
+  font-size: 1.5rem;
 }
 
 .patient-summary-info h2 {
   color: var(--text);
-  font-size: 1.4rem;
-  margin-bottom: 8px;
+  font-size: 1.16rem;
+  margin-bottom: 4px;
 }
 
 .patient-summary-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 8px;
   color: var(--text-muted);
-  font-size: 0.95rem;
+  font-size: 0.88rem;
 }
 
-.patients-profile-grid {
+.patient-top-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.patient-main-tri-row {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.08fr) minmax(340px, 1.28fr) minmax(260px, 0.84fr);
+  --profile-top-row-height: 120px;
+  --profile-bottom-row-height: 320px;
+  gap: 20px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.patient-main-tri-row > article,
+.patient-main-tri-row > .patient-center-stack,
+.patient-main-tri-row > .patient-left-stack {
+  min-height: calc(var(--profile-top-row-height) + var(--profile-bottom-row-height) + 20px);
+  height: 100%;
+}
+
+.patient-left-stack {
+  display: grid;
+  grid-template-rows: var(--profile-top-row-height) var(--profile-bottom-row-height);
   gap: 20px;
 }
 
+.patient-left-stack > article {
+  min-height: 0;
+  height: 100%;
+}
+
+.patient-center-stack {
+  display: grid;
+  grid-template-rows: var(--profile-top-row-height) var(--profile-bottom-row-height);
+  gap: 20px;
+}
+
+.patient-center-stack > article {
+  min-height: 0;
+  height: 100%;
+}
+
+.patient-left-stack > .patient-summary-card,
+.patient-center-stack > .sensor-summary-card {
+  min-height: var(--profile-top-row-height);
+}
+
+.patient-left-stack > .therapy-plan-card,
+.patient-center-stack > .patient-medical-card {
+  min-height: var(--profile-bottom-row-height);
+}
+
+.patient-top-main {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.patient-top-main > article {
+  min-height: 420px;
+  height: 100%;
+}
+
 .patient-medical-card {
-  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+}
+
+.patient-medical-card .field-grid {
+  flex: 1;
+  align-content: start;
+}
+
+.patient-medical-card .wizard-actions {
+  width: 100%;
+  margin-top: 24px;
+  justify-content: stretch;
+  align-self: stretch;
+}
+
+.patient-medical-card .wizard-actions .profile-action-btn {
+  width: 100%;
+}
+
+.sensor-summary-full-row {
+  width: 100%;
+  min-height: 0;
+}
+
+.sensor-summary-card {
+  background: linear-gradient(145deg, #edf7fc 0%, #e8f6ef 100%);
+  border: 1px solid rgba(45, 106, 79, 0.24);
 }
 
 .sensor-metrics-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 4px;
 }
 
 .sensor-metric-tile {
   border-radius: 16px;
-  padding: 12px;
+  padding: 6px 7px;
   background: rgba(77, 134, 156, 0.08);
+}
+
+.sensor-summary-card .doctor-stat-label {
+  font-size: 0.72rem;
+  margin-bottom: 2px;
 }
 
 .sensor-metric-tile.is-offline {
@@ -2649,41 +3586,186 @@ body.dark-mode .calendar-widget-card {
 }
 
 .sensor-metric-tile .doctor-stat-value {
-  font-size: 1.35rem;
-  margin-top: 2px;
+  font-size: 1rem;
+  margin-top: 1px;
 }
 
 .patients-graphs-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
+  align-items: stretch;
+  min-height: 0;
+  margin-top: 22px;
+}
+
+.patients-graphs-grid .graph-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 220px;
+}
+
+.patients-profile-view .patients-graphs-grid .graph-card {
+  background: #e7f5f2;
+  border: 1px solid #ffffff;
+}
+
+.patients-graphs-grid .chart-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+.patients-profile-view {
+  height: auto;
+  display: grid;
+  grid-template-rows: auto auto auto auto;
+  overflow: visible;
+}
+
+.therapy-plan-card,
+.sensor-summary-card,
+.patient-medical-card {
+  min-height: 0;
+}
+
+.doctor-notes-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+  height: 100%;
+}
+
+.doctor-notes-top-card {
+  min-height: calc(var(--profile-top-row-height) + var(--profile-bottom-row-height) + 20px);
+}
+
+.doctor-notes-sidebar textarea {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  resize: none;
+}
+
+.doctor-notes-sidebar .notes-save-btn {
+  margin-top: 24px;
+  width: 100%;
+  align-self: stretch;
+}
+
+.doctor-notes-sidebar .notes-save-feedback {
+  margin-top: 8px;
 }
 
 .doctor-notes-card textarea {
   width: 100%;
-  min-height: 130px;
-  border: none;
+  min-height: 220px;
+  border: 1px solid var(--panel-border);
   border-radius: 12px;
   background: #f5f7f8;
   color: #425863;
-  padding: 14px 16px;
-  font-size: 0.95rem;
+  padding: 14px 16px 30px;
+  font-size: 1rem;
+  line-height: 1.55;
   font-weight: 500;
-  resize: vertical;
+  resize: none;
   outline: none;
-  box-shadow: inset 0 0 0 2px transparent;
-  transition: box-shadow 0.2s ease;
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.doctor-notes-card {
+  min-height: calc(var(--profile-top-row-height) + var(--profile-bottom-row-height) + 20px);
+  overflow: visible;
+}
+
+.patients-profile-view .field-group input,
+.patients-profile-view .field-group select,
+.patients-profile-view .field-group textarea,
+.patients-profile-view .doctor-notes-card textarea {
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  background: #edf7fc;
 }
 
 .doctor-notes-card textarea:focus {
-  box-shadow: inset 0 0 0 2px #4d869c;
+  border-color: #4d869c;
+  box-shadow: 0 0 0 2px rgba(77, 134, 156, 0.18);
 }
 
 .notes-save-btn {
-  width: auto;
-  padding: 10px 18px;
+  width: 100%;
+  padding: 10px 24px;
   border-radius: 12px;
+  background: #4d869c;
   margin-top: 12px;
+}
+
+.patients-profile-view .widget {
+  background: var(--panel-blue);
+  border: 1px solid var(--panel-border);
+  border-radius: 24px;
+}
+
+.input-with-counter {
+  position: relative;
+}
+
+.input-with-counter > input,
+.input-with-counter > textarea {
+  padding-right: 58px;
+}
+
+.char-counter {
+  position: absolute;
+  right: 12px;
+  bottom: 9px;
+  color: #6a8591;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.notes-input-wrap {
+  flex: 1;
+  display: flex;
+}
+
+.notes-input-wrap textarea {
+  flex: 1;
+}
+
+.profile-action-btn {
+  width: auto;
+  min-height: 42px;
+  margin-top: 0;
+  padding: 10px 24px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  border: none;
+  background: #4d869c;
+  color: #ffffff;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-align: center;
+  transition: filter 0.2s ease;
+}
+
+.profile-action-btn:hover,
+.profile-action-btn:focus-visible {
+  filter: brightness(90%);
+}
+
+.profile-action-btn:focus-visible {
+  outline: 2px solid rgba(77, 134, 156, 0.35);
+  outline-offset: 2px;
+}
+
+.patient-medical-card .wizard-actions,
+.doctor-notes-sidebar .notes-save-btn {
+  justify-content: stretch;
+  align-self: stretch;
 }
 
 .notes-save-feedback {
@@ -2741,6 +3823,71 @@ body.dark-mode .calendar-widget-card {
   color: #1f5668;
   font-size: 1.7rem;
   margin-bottom: 18px;
+}
+
+.patients-modal-step-label {
+  margin: -6px 0 16px;
+  color: #5d7480;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.add-patient-step[hidden] {
+  display: none;
+}
+
+.add-patient-nav-btn {
+  width: auto;
+  min-width: 0;
+  height: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: #2f7289;
+}
+
+.add-patient-nav-btn i {
+  font-size: 1.15rem;
+}
+
+.add-patient-nav-btn.is-hidden-nav {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.add-patient-nav-btn:hover,
+.add-patient-nav-btn:focus-visible {
+  background: transparent;
+  border: none;
+  color: #1f5668;
+}
+
+.add-patient-page-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 0;
+}
+
+#addPatientForm .wizard-actions {
+  justify-content: center;
+}
+
+.add-patient-page-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(77, 134, 156, 0.28);
+  transition: transform 0.18s ease, background-color 0.18s ease;
+}
+
+.add-patient-page-dot.is-active {
+  background: #2f7289;
+  transform: scale(1.18);
 }
 
 /* Keep circular active state while collapsed and use a notched active item in expanded mode. */
@@ -2809,28 +3956,24 @@ body.dark-mode .calendar-widget-card {
 }
 
 .therapy-plans-page,
-.progress-page,
 .messages-page {
   background: var(--content-bg);
 }
 
 .therapy-plans-page .widget,
-.progress-page .widget,
 .messages-page .widget {
   border-radius: 24px;
   box-shadow: var(--card-shadow);
 }
 
 .therapy-plans-shell,
-.progress-shell,
 .messages-shell {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-.therapy-plans-header-row h1,
-.progress-header-row h1 {
+.therapy-plans-header-row h1 {
   font-size: 2.2rem;
   line-height: 1.1;
   margin-bottom: 8px;
@@ -2922,62 +4065,6 @@ body.dark-mode .calendar-widget-card {
   color: var(--text);
   font-size: 1.2rem;
   margin-bottom: 12px;
-}
-
-.progress-header-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.progress-comparison-card {
-  min-height: 360px;
-}
-
-.progress-lower-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-.progress-leaderboard-list {
-  margin-left: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.progress-leaderboard-list li {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.progress-heatmap-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.heatmap-day {
-  border-radius: 12px;
-  padding: 10px 6px;
-  text-align: center;
-  color: #ffffff;
-  min-height: 74px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-}
-
-.heatmap-day strong {
-  font-size: 1rem;
-}
-
-.heatmap-day span {
-  font-size: 0.75rem;
-  opacity: 0.9;
 }
 
 .messages-split-layout {
@@ -3227,6 +4314,22 @@ body.dark-mode .calendar-widget-card {
   gap: 20px;
 }
 
+body.exercise-hub-page .patient-shell {
+  width: min(1020px, 100%);
+  margin: 0 auto;
+  padding: 20px 18px 24px;
+  border-radius: 24px;
+  background: #f7fbfd;
+  border: 1px solid rgba(77, 134, 156, 0.2);
+  box-shadow: 0 14px 32px rgba(31, 86, 104, 0.08);
+}
+
+body.dark-mode.exercise-hub-page .patient-shell {
+  background: #142833;
+  border-color: rgba(121, 175, 196, 0.24);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+}
+
 .patient-header-row h1 {
   font-size: 2.2rem;
   line-height: 1.1;
@@ -3398,7 +4501,7 @@ body.dark-mode .calendar-widget-card {
   display: flex;
   flex-direction: column;
   gap: 24px;
-  align-items: stretch;
+  align-items: center;
   max-width: 100%;
   margin: 0 auto;
   width: 100%;
@@ -3426,12 +4529,15 @@ body.dark-mode .calendar-widget-card {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  width: min(980px, 100%);
+  margin: 0 auto;
 }
 
 .account-info-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: 40px;
+  row-gap: 18px;
   align-items: start;
 }
 
@@ -3440,9 +4546,32 @@ body.dark-mode .calendar-widget-card {
   padding-left: 32px;
 }
 
-.account-info-column--medical input[readonly] {
-  background: #f6fafc;
-  border-color: transparent;
+.patient-settings-page .account-info-card .field-group input {
+  min-height: 50px;
+  border-radius: 12px;
+  border: 1px solid rgba(77, 134, 156, 0.25);
+  background: #ffffff;
+  padding: 12px 14px;
+}
+
+.patient-settings-page .account-info-card .field-group.has-inline-edit input {
+  padding-right: 42px;
+}
+
+.patient-settings-page .account-info-card .field-group input[readonly] {
+  background: #f7fbfd;
+  border-color: rgba(77, 134, 156, 0.22);
+}
+
+.patient-settings-page .account-info-card .account-locked-field input[readonly] {
+  background: linear-gradient(180deg, #f0f7fb 0%, #e8f2f7 100%);
+  border-color: rgba(45, 114, 136, 0.32);
+  color: #1d5265;
+}
+
+.patient-settings-page .account-info-card .account-locked-field > span {
+  color: #2d6b81;
+  font-weight: 700;
 }
 
 .patient-settings-page .widget.user-profile-card.is-password-open {
@@ -3457,18 +4586,21 @@ body.dark-mode .calendar-widget-card {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #f5f7f8;
+  min-height: 50px;
+  background: #f7fbfd;
+  border: 1px solid rgba(77, 134, 156, 0.22);
   border-radius: 12px;
-  padding-right: 10px;
+  padding-right: 8px;
   position: relative;
 }
 
 .password-pill input {
   border: none;
   background: transparent;
-  padding: 15px 16px;
+  padding: 12px 14px;
   flex: 1;
-  padding-right: 50px;
+  min-height: 50px;
+  padding-right: 42px;
 }
 
 .password-pill-btn {
@@ -3561,32 +4693,478 @@ body.dark-mode .calendar-widget-card {
   margin-top: 8px;
 }
 
-.recovery-quick-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+.profile-mobile-logout-wrap {
+  margin-top: 12px;
+  display: none;
 }
 
-.recovery-stat-chip {
-  border-radius: 14px;
-  border: 1px solid rgba(77, 134, 156, 0.22);
-  background: linear-gradient(180deg, rgba(77, 134, 156, 0.12), rgba(77, 134, 156, 0.05));
+.profile-mobile-logout-btn {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1.5px solid #2d6b81;
+  background: #ffffff;
+  color: #2d6b81;
+  font-size: 1rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.profile-mobile-logout-btn:hover,
+.profile-mobile-logout-btn:focus-visible {
+  background: rgba(45, 107, 129, 0.08);
+  outline: none;
+}
+
+.session-management-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.session-logout-btn {
+  border: 1.5px solid #ad3a3a;
+  background: rgba(227, 92, 92, 0.1);
+  color: #8f2727;
+  border-radius: 12px;
+  min-height: 50px;
+  font-size: 1rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.session-logout-btn:hover,
+.session-logout-btn:focus-visible {
+  background: rgba(227, 92, 92, 0.16);
+  border-color: #922f2f;
+  outline: none;
+}
+
+.recovery-progress-grid {
+  display: grid;
+  grid-template-columns: minmax(250px, 34%) minmax(0, 66%);
+  gap: 14px;
+  align-items: start;
+}
+
+.recovery-progress-history,
+.recovery-progress-analytics {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.recovery-progress-grid .widget {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 14px 28px rgba(26, 73, 88, 0.1), 0 3px 8px rgba(26, 73, 88, 0.08);
+}
+
+.recovery-history-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.recovery-history-section {
   padding: 12px 14px;
 }
 
-.recovery-stat-label {
-  color: #5a7683;
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 4px;
+.recovery-history-section + .recovery-history-section {
+  border-top: 1px solid #d1dce0;
 }
 
-.recovery-stat-value {
+.recovery-total-card {
+  padding: 16px 18px;
+}
+
+.recovery-total-value {
+  margin-top: 8px;
   color: #1f5668;
-  font-size: 1.24rem;
+  font-size: clamp(2rem, 1.6rem + 0.7vw, 2.6rem);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.recovery-session-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.recovery-session-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: none;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 10px 12px;
+  box-shadow: 0 8px 18px rgba(33, 79, 93, 0.08), 0 1px 3px rgba(33, 79, 93, 0.06);
+}
+
+.recovery-session-item-detailed {
+  align-items: flex-start;
+}
+
+.recovery-session-item.is-empty {
+  justify-content: center;
+  color: #5f7a85;
+  min-height: 54px;
+}
+
+.recovery-session-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recovery-session-date {
+  color: #2c5e71;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.recovery-session-metrics {
+  color: #5d7885;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.recovery-session-metric-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.recovery-metric-chip {
+  border-radius: 999px;
+  background: rgba(77, 134, 156, 0.1);
+  color: #1f5668;
+  padding: 5px 10px;
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.recovery-metric-chip strong {
   font-weight: 800;
+  margin-right: 5px;
+}
+
+.recovery-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.recovery-section-head .widget-title {
+  margin: 0;
+}
+
+.recovery-list-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.recovery-view-all-btn {
+  min-height: 34px;
+  border-radius: 999px;
+  font-weight: 700;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.recovery-best-card {
+  padding: 18px;
+}
+
+.recovery-best-session-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.recovery-best-session-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 10px 12px;
+  box-shadow: 0 8px 18px rgba(33, 79, 93, 0.08), 0 1px 3px rgba(33, 79, 93, 0.06);
+}
+
+.recovery-best-session-item.is-empty {
+  justify-content: center;
+  color: #5f7a85;
+  min-height: 54px;
+}
+
+.recovery-best-session-rank {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: rgba(77, 134, 156, 0.14);
+  color: #1f5668;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.recovery-best-session-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.recovery-best-session-date {
+  color: #2c5e71;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.recovery-best-session-metrics {
+  color: #5d7885;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.recovery-segmented {
+  --active-index: 0;
+  display: inline-flex;
+  position: relative;
+  background: #f3f7f8;
+  border: 1px solid #d1dce0;
+  border-radius: 999px;
+  padding: 3px;
+  gap: 3px;
+  isolation: isolate;
+}
+
+.recovery-segment-highlight {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 12px) / 3);
+  border-radius: 999px;
+  background: #4d869c;
+  transform: translateX(calc(var(--active-index) * 100%));
+  transition: transform 0.25s ease;
+  z-index: 0;
+}
+
+.recovery-segment-btn {
+  position: relative;
+  z-index: 1;
+  border: none;
+  min-height: 30px;
+  border-radius: 999px;
+  background: transparent;
+  color: #4f6f7d;
+  font-weight: 700;
+  font-size: 0.75rem;
+  padding: 0 8px;
+  cursor: pointer;
+  font-family: "Poppins", "Segoe UI", sans-serif;
+}
+
+.recovery-segment-btn.is-active {
+  color: #ffffff;
+}
+
+.recovery-week-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(77, 134, 156, 0.3);
+  border-radius: 999px;
+  padding: 3px 8px 3px 4px;
+  background: #ffffff;
+}
+
+.recovery-week-nav[hidden] {
+  display: none !important;
+}
+
+.recovery-week-nav-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(77, 134, 156, 0.1);
+  color: #1f5668;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.recovery-week-nav-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.recovery-week-range {
+  color: #3f6572;
+  font-size: 0.78rem;
+  font-weight: 700;
+  min-width: 108px;
+  text-align: center;
+}
+
+.recovery-trend-card {
+  padding: 8px 10px 10px;
+  font-family: "Poppins", "Segoe UI", sans-serif;
+}
+
+.recovery-trend-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.recovery-trend-head .widget-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.recovery-trend-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.recovery-trend-controls {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.recovery-trend-controls-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recovery-trend-highlight {
+  margin: 0;
+  color: #4d869c;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.recovery-trend-note {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.recovery-values-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: "Poppins", "Segoe UI", sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #4b5d67;
+  white-space: nowrap;
+}
+
+.recovery-values-toggle input {
+  width: 14px;
+  height: 14px;
+  accent-color: #4d869c;
+}
+
+.recovery-chart-wrap {
+  min-height: 280px;
+  height: calc(48vh - 120px);
+  position: relative;
+}
+
+.recovery-chart-wrap.is-empty canvas {
+  filter: blur(1.6px) saturate(0.88);
+  opacity: 0.82;
+}
+
+.recovery-chart-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #3f6572;
+  padding: 18px;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.recovery-chart-empty[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 860px) {
+  .recovery-trend-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .recovery-trend-controls {
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .recovery-segmented {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .recovery-week-nav {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .recovery-week-nav-btn {
+    width: 42px;
+    height: 42px;
+  }
+
+  .recovery-week-range {
+    min-width: 0;
+  }
 }
 
 .recovery-status-badge {
@@ -3606,8 +5184,97 @@ body.dark-mode .calendar-widget-card {
 }
 
 .recovery-status-badge.is-stable {
+  background: rgba(77, 134, 156, 0.16);
+  color: #1f5668;
+}
+
+.recovery-status-badge.is-great {
   background: rgba(47, 155, 114, 0.16);
   color: #1d7a58;
+}
+
+.recovery-sessions-panel {
+  width: min(860px, 92vw);
+  height: min(620px, 88vh);
+  background: #ffffff;
+  border: 1px solid rgba(77, 134, 156, 0.2);
+}
+
+.recovery-sessions-body {
+  padding-right: 4px;
+  overflow-y: auto;
+}
+
+.recovery-sessions-panel .metric-graph-modal-head {
+  background: #ffffff;
+  border-bottom: 1px solid rgba(77, 134, 156, 0.22);
+  padding: 14px 14px;
+}
+
+.recovery-sessions-panel .metric-graph-modal-head h2 {
+  font-size: 1.45rem;
+  letter-spacing: 0.01em;
+}
+
+.recovery-session-list-modal {
+  margin-top: 0;
+  gap: 12px;
+}
+
+.recovery-session-list-modal .recovery-session-item {
+  padding: 14px 14px;
+  border: 1px solid rgba(77, 134, 156, 0.2);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(245, 252, 255, 0.95));
+  box-shadow: 0 10px 20px rgba(28, 76, 92, 0.1), 0 1px 3px rgba(28, 76, 92, 0.08);
+}
+
+.recovery-session-list-modal .recovery-session-item:nth-child(even) {
+  background: linear-gradient(180deg, rgba(247, 253, 255, 0.95), rgba(240, 249, 252, 0.95));
+}
+
+.recovery-session-list-modal .recovery-session-date {
+  font-size: 1.12rem;
+  font-weight: 800;
+  color: #1d5165;
+}
+
+.recovery-session-list-modal .recovery-session-metric-chips {
+  margin-top: 8px;
+  gap: 9px;
+}
+
+.recovery-session-list-modal .recovery-metric-chip {
+  font-size: 0.9rem;
+  padding: 6px 12px;
+  background: rgba(77, 134, 156, 0.14);
+}
+
+.recovery-session-list-modal .recovery-status-badge {
+  font-size: 0.9rem;
+  padding: 7px 14px;
+  min-width: 110px;
+}
+
+.recovery-sessions-body::-webkit-scrollbar {
+  width: 10px;
+}
+
+.recovery-sessions-body::-webkit-scrollbar-thumb {
+  background: rgba(77, 134, 156, 0.45);
+  border-radius: 999px;
+}
+
+.recovery-sessions-body::-webkit-scrollbar-track {
+  background: rgba(77, 134, 156, 0.12);
+  border-radius: 999px;
+}
+
+.recovery-session-list-modal {
+  margin-top: 0;
+}
+
+body.recovery-modal-open {
+  overflow: hidden;
 }
 
 .calibration-finger-grid {
@@ -3617,21 +5284,68 @@ body.dark-mode .calendar-widget-card {
   margin-bottom: 14px;
 }
 
+body.exercise-hub-page #stepCalibrate {
+  padding: 18px;
+}
+
+body.exercise-hub-page #stepCalibrate .widget-title {
+  margin-bottom: 6px;
+}
+
+body.exercise-hub-page #stepCalibrate .widget-label {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+body.exercise-hub-page #stepCalibrate #hubCalibrateBtn {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+body.exercise-hub-page #stepCalibrate .calibration-finger-grid {
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+body.exercise-hub-page #stepCalibrate .notes-save-feedback {
+  margin-top: 0;
+}
+
 .calibration-finger {
-  border: 1px solid rgba(77, 134, 156, 0.22);
+  border: 1px solid #4d869c;
   border-radius: 12px;
   background: #ffffff;
   padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   color: #48616d;
   font-size: 0.82rem;
+  min-height: 220px;
+  align-items: center;
 }
 
 .calibration-finger.is-locked {
-  border-color: rgba(47, 155, 114, 0.44);
-  background: rgba(47, 155, 114, 0.1);
+  border-color: #4d869c;
+  background: rgba(77, 134, 156, 0.08);
+}
+
+.calibration-meter {
+  width: 24px;
+  height: 120px;
+  border-radius: 999px;
+  border: 1px solid #4d869c;
+  background: rgba(77, 134, 156, 0.12);
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+}
+
+.calibration-meter-fill {
+  width: 100%;
+  min-height: 2px;
+  background: linear-gradient(180deg, #79a9ba 0%, #4d869c 100%);
+  transition: height 0.25s ease;
 }
 
 .diagnostic-actions {
@@ -3725,85 +5439,141 @@ body.dark-mode .calendar-widget-card {
   min-height: 100vh;
 }
 /* ── Exercise Wizard ────────────────────────────────────────────────────── */
-.wizard-steps-nav {
-  display: flex;
-  align-items: flex-start;
-  gap: 0;
-  padding: 10px 0 18px;
+.exercise-stepper-viewport {
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
 }
 
-.wizard-step-dot {
-  display: flex;
-  flex-direction: column;
+.exercise-stepper-viewport.is-switching {
+  opacity: 0.55;
+  transform: translateY(4px);
+}
+
+.exercise-stepper-footer {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) auto minmax(110px, 1fr);
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
+  gap: 12px;
 }
 
-.step-number {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(77, 134, 156, 0.13);
-  color: #4d869c;
+.exercise-stepper-nav-btn {
+  width: 100%;
+  min-height: 56px;
+  border-radius: 12px;
+}
+
+.exercise-stepper-left-actions {
+  grid-column: 1;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+body.exercise-hub-page #hubStepBackBtn {
+  width: 56px;
+  min-width: 56px;
+  min-height: 56px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #3f7a90;
+  justify-self: start;
+  box-shadow: none;
+}
+
+body.exercise-hub-page #hubStepBackBtn i {
+  font-size: 1.85rem;
+  line-height: 1;
+}
+
+body.exercise-hub-page #hubStepBackBtn:hover,
+body.exercise-hub-page #hubStepBackBtn:focus-visible {
+  background: transparent;
+}
+
+body.exercise-hub-page #hubStepRetryBtn {
+  width: 56px;
+  min-width: 56px;
+  min-height: 56px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #3f7a90;
+  box-shadow: none;
+}
+
+body.exercise-hub-page #hubStepRetryBtn i {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+body.exercise-hub-page #hubStepRetryBtn:hover,
+body.exercise-hub-page #hubStepRetryBtn:focus-visible {
+  background: transparent;
+}
+
+.exercise-stepper-footer .exercise-stepper-nav-btn[hidden] {
+  display: none !important;
+}
+
+.wizard-steps-nav {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 0.95rem;
-  border: 2px solid rgba(77, 134, 156, 0.28);
-  transition: background 0.25s, border-color 0.25s, color 0.25s;
-  position: relative;
+  gap: 12px;
+  padding: 0;
 }
 
-.step-label {
-  font-size: 0.71rem;
-  font-weight: 600;
-  color: #6b8b99;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  transition: color 0.25s;
+.wizard-steps-nav-dots {
+  grid-column: 2;
+  justify-self: center;
 }
 
-.wizard-step-dot.is-active .step-number {
-  background: #1f5668;
-  border-color: #1f5668;
-  color: #ffffff;
+.wizard-panel {
+  border: 1px solid #4d869c;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, opacity 0.22s ease;
 }
 
-.wizard-step-dot.is-active .step-label {
-  color: #1f5668;
+.wizard-panel.is-active {
+  transform: scale(1.02);
+  box-shadow: 0 16px 30px rgba(77, 134, 156, 0.2);
 }
 
-.wizard-step-dot.is-done .step-number {
-  background: rgba(47, 155, 114, 0.15);
-  border-color: #2f9b72;
-  color: transparent;
+.wizard-panel.is-locked {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
-.wizard-step-dot.is-done .step-number::after {
-  content: "\2713";
-  position: absolute;
-  color: #2f9b72;
-  font-size: 0.9rem;
-  font-weight: 700;
+.wizard-step-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #4d869c;
+  background: transparent;
+  flex-shrink: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
 }
 
-.wizard-step-dot.is-done .step-label {
-  color: #2f9b72;
+.wizard-step-dot.is-active {
+  background-color: #4d869c;
+  transform: scale(1.2);
 }
 
-.wizard-step-bar {
-  flex: 1;
-  height: 2px;
-  background: rgba(77, 134, 156, 0.2);
-  margin: 17px 6px 0; /* vertically centre with the circle */
-  align-self: flex-start;
-  transition: background 0.3s;
+.wizard-step-dot.is-done {
+  background-color: #4d869c;
 }
 
-.wizard-step-bar.is-done {
-  background: #2f9b72;
+.wizard-step-dot.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wizard-step-dot:focus-visible {
+  outline: 2px solid rgba(77, 134, 156, 0.45);
+  outline-offset: 2px;
 }
 
 /* ── Searching animation (Wi-Fi pairing) ────────────────────────────────── */
@@ -3832,6 +5602,15 @@ body.dark-mode .calendar-widget-card {
   font-weight: 600;
   color: #4d869c;
   font-size: 0.9rem;
+}
+
+.searching-animation.is-searching .search-label {
+  animation: searching-label-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes searching-label-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
 }
 
 /* ── Diagnostic prompt card (Step 3) ────────────────────────────────────── */
@@ -3926,6 +5705,384 @@ body.dark-mode .diag-prompt-text {
   gap: 12px;
   flex-wrap: wrap;
   margin-top: 6px;
+}
+
+.exercise-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+@media (max-width: 1100px) {
+  .exercise-choice-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.exercise-choice-card {
+  border: 1px solid #4d869c;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #245a6d;
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+}
+
+.exercise-choice-card:hover,
+.exercise-choice-card:focus-visible {
+  border-color: rgba(31, 86, 104, 0.42);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.exercise-choice-card.is-selected {
+  border-color: #4d869c;
+  background: rgba(77, 134, 156, 0.16);
+  color: #245a6d;
+}
+
+.exercise-options-wrap {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.exercise-options-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#exerciseSpeedWrap[hidden],
+#exerciseHoldWrap[hidden] {
+  display: none !important;
+}
+
+.exercise-options-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #3f6f81;
+  text-transform: uppercase;
+}
+
+.exercise-option-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.exercise-option-chip {
+  border: 1px solid rgba(77, 134, 156, 0.3);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.76);
+  color: #2f6072;
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.exercise-option-chip.is-selected {
+  border-color: #4d869c;
+  background: rgba(77, 134, 156, 0.16);
+  color: #245a6d;
+}
+
+.exercise-plan-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.exercise-plan-meta > div {
+  border-radius: 12px;
+  border: 1px solid #4d869c;
+  background: rgba(255, 255, 255, 0.65);
+  padding: 10px 12px;
+}
+
+.exercise-plan-meta span {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5a7b89;
+  margin-bottom: 4px;
+}
+
+.exercise-plan-meta strong {
+  font-size: 0.98rem;
+  color: #1f5668;
+}
+
+body.exercise-hub-page .hub-metrics-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+body.exercise-hub-page .wizard-panel .sign-in-btn,
+body.exercise-hub-page .wizard-panel .doctor-btn {
+  min-height: 56px;
+  border-radius: 12px;
+}
+
+body.exercise-hub-page .widget-label {
+  font-size: calc(0.9rem + 2px);
+  line-height: 1.45;
+}
+
+body.exercise-hub-page .notes-save-feedback {
+  font-size: calc(0.88rem + 2px);
+}
+
+body.exercise-hub-page #stepSession .session-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+body.exercise-hub-page #stepSession .session-meta-bar {
+  display: flex;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 24px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+
+body.exercise-hub-page #stepSession .session-meta-item {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #3e6472;
+}
+
+body.exercise-hub-page #stepSession .session-meta-item strong {
+  color: #1f5668;
+  font-weight: 800;
+}
+
+body.exercise-hub-page #stepSession .session-main-grid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 12px;
+  min-height: 360px;
+}
+
+body.exercise-hub-page #stepSession .session-main-focus,
+body.exercise-hub-page #stepSession .session-side-tile {
+  border-radius: 12px;
+  border: 1px solid #d1dce0;
+  background: #ffffff;
+}
+
+body.exercise-hub-page #stepSession .session-main-focus {
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+body.exercise-hub-page #stepSession .session-side-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+}
+
+body.exercise-hub-page #stepSession .session-side-tile {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px solid #d1dce0;
+  flex: 1 1 0;
+}
+
+body.exercise-hub-page #stepSession .session-tile-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6f8691;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+body.exercise-hub-page #stepSession .session-tile-value {
+  font-size: 2.5rem;
+  line-height: 1;
+  font-weight: 800;
+  color: #1f5668;
+}
+
+body.exercise-hub-page #stepSession .session-main-reps {
+  font-size: 6rem;
+  line-height: 1;
+  font-weight: 900;
+  color: #1f5668;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.exercise-hub-page #stepSession .rep-progress-ring {
+  width: 220px;
+  height: 220px;
+  margin-top: 4px;
+}
+
+body.exercise-hub-page #stepSession .session-action-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+
+body.exercise-hub-page #stepSession .session-start-btn,
+body.exercise-hub-page #stepSession .session-end-btn {
+  width: 100%;
+  min-height: 56px;
+  border-radius: 12px;
+}
+
+body.exercise-hub-page #stepSession .session-start-btn {
+  background: #4d869c;
+  border: 2px solid #4d869c;
+  color: #ffffff;
+}
+
+body.exercise-hub-page #stepSession .session-start-btn:hover,
+body.exercise-hub-page #stepSession .session-start-btn:focus-visible {
+  filter: brightness(95%);
+}
+
+body.exercise-hub-page #stepSession .session-end-btn {
+  background: transparent;
+  border: 2px solid #4d869c;
+  color: #4d869c;
+}
+
+body.exercise-hub-page #stepSession .session-end-btn:disabled {
+  border-color: #4d869c;
+  color: #4d869c;
+  background: transparent;
+  opacity: 0.55;
+}
+
+.rep-progress-ring {
+  width: 122px;
+  height: 122px;
+  margin-top: 6px;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.rep-progress-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.rep-ring-track,
+.rep-ring-progress {
+  fill: none;
+  stroke-width: 10;
+}
+
+.rep-ring-track {
+  stroke: rgba(77, 134, 156, 0.18);
+}
+
+.rep-ring-progress {
+  stroke: #4d869c;
+  stroke-linecap: round;
+  stroke-dasharray: 289.03 289.03;
+  stroke-dashoffset: 289.03;
+  transition: stroke-dashoffset 0.28s ease;
+}
+
+.sensor-metric-tile-reps .doctor-stat-value {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+body.exercise-hub-page .patient-shell.is-focus-mode .sensor-metric-tile-reps .doctor-stat-value,
+body.exercise-hub-page .patient-shell.is-focus-mode .sensor-metric-tile-timer .doctor-stat-value {
+  font-size: 2.4rem;
+}
+
+body.exercise-hub-page .patient-shell.is-focus-mode #stepSession .hub-metrics-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+body.exercise-hub-page .patient-shell.is-focus-mode .sensor-metric-tile-reps,
+body.exercise-hub-page .patient-shell.is-focus-mode .sensor-metric-tile-timer {
+  border: 1px solid #4d869c;
+  background: rgba(77, 134, 156, 0.12);
+}
+
+body.exercise-hub-page .patient-shell.is-focus-mode #stepSession .session-main-reps,
+body.exercise-hub-page .patient-shell.is-focus-mode #stepSession #hubSessionTime {
+  font-size: clamp(4.4rem, 3.4rem + 2.8vw, 5.4rem);
+}
+
+@media (max-width: 980px) {
+  body.exercise-hub-page #stepSession .session-meta-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  body.exercise-hub-page #stepSession .session-main-grid {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  body.exercise-hub-page #stepSession .session-side-stack {
+    height: auto;
+  }
+
+  body.exercise-hub-page #stepSession .session-action-group {
+    grid-template-columns: 1fr;
+  }
+}
+
+body.dark-mode .exercise-choice-card,
+body.dark-mode .exercise-option-chip,
+body.dark-mode .exercise-plan-meta > div {
+  background: rgba(18, 40, 52, 0.72);
+  border-color: rgba(133, 203, 225, 0.24);
+  color: #c2dde8;
+}
+
+body.dark-mode .exercise-choice-card.is-selected,
+body.dark-mode .exercise-option-chip.is-selected {
+  border-color: #4d869c;
+  background: rgba(77, 134, 156, 0.24);
+  color: #d9edf5;
+}
+
+body.dark-mode .exercise-options-title,
+body.dark-mode .exercise-plan-meta span {
+  color: #98bdcc;
+}
+
+body.dark-mode .exercise-plan-meta strong {
+  color: #d9edf5;
 }
 
 .exercise-mode-grid {
@@ -4153,6 +6310,15 @@ body.dark-mode .diag-prompt-text {
   font-size: 0.9rem;
 }
 
+.patient-settings-page .inline-edit-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .has-inline-edit input[readonly] {
   background: #f6fafc;
   border-color: transparent;
@@ -4297,8 +6463,6 @@ body.dark-mode .diag-prompt-text {
 /* Keep circular active state while collapsed and use a notched active item in expanded mode. */
 .therapy-plans-page .sidebar:hover .active-indicator,
 .therapy-plans-page .sidebar.is-pinned .active-indicator,
-.progress-page .sidebar:hover .active-indicator,
-.progress-page .sidebar.is-pinned .active-indicator,
 .messages-page .sidebar:hover .active-indicator,
 .messages-page .sidebar.is-pinned .active-indicator,
 .settings-page .sidebar:hover .active-indicator,
@@ -4308,8 +6472,6 @@ body.dark-mode .diag-prompt-text {
 
 .therapy-plans-page .sidebar:hover .menu li.active,
 .therapy-plans-page .sidebar.is-pinned .menu li.active,
-.progress-page .sidebar:hover .menu li.active,
-.progress-page .sidebar.is-pinned .menu li.active,
 .messages-page .sidebar:hover .menu li.active,
 .messages-page .sidebar.is-pinned .menu li.active,
 .settings-page .sidebar:hover .menu li.active,
@@ -4322,8 +6484,6 @@ body.dark-mode .diag-prompt-text {
 
 .therapy-plans-page .sidebar:hover .menu li.active i,
 .therapy-plans-page .sidebar.is-pinned .menu li.active i,
-.progress-page .sidebar:hover .menu li.active i,
-.progress-page .sidebar.is-pinned .menu li.active i,
 .messages-page .sidebar:hover .menu li.active i,
 .messages-page .sidebar.is-pinned .menu li.active i,
 .settings-page .sidebar:hover .menu li.active i,
@@ -4335,10 +6495,6 @@ body.dark-mode .diag-prompt-text {
 .therapy-plans-page .sidebar:hover .menu li.active::after,
 .therapy-plans-page .sidebar.is-pinned .menu li.active::before,
 .therapy-plans-page .sidebar.is-pinned .menu li.active::after,
-.progress-page .sidebar:hover .menu li.active::before,
-.progress-page .sidebar:hover .menu li.active::after,
-.progress-page .sidebar.is-pinned .menu li.active::before,
-.progress-page .sidebar.is-pinned .menu li.active::after,
 .messages-page .sidebar:hover .menu li.active::before,
 .messages-page .sidebar:hover .menu li.active::after,
 .messages-page .sidebar.is-pinned .menu li.active::before,
@@ -4357,8 +6513,6 @@ body.dark-mode .diag-prompt-text {
 
 .therapy-plans-page .sidebar:hover .menu li.active::before,
 .therapy-plans-page .sidebar.is-pinned .menu li.active::before,
-.progress-page .sidebar:hover .menu li.active::before,
-.progress-page .sidebar.is-pinned .menu li.active::before,
 .messages-page .sidebar:hover .menu li.active::before,
 .messages-page .sidebar.is-pinned .menu li.active::before,
 .settings-page .sidebar:hover .menu li.active::before,
@@ -4370,8 +6524,6 @@ body.dark-mode .diag-prompt-text {
 
 .therapy-plans-page .sidebar:hover .menu li.active::after,
 .therapy-plans-page .sidebar.is-pinned .menu li.active::after,
-.progress-page .sidebar:hover .menu li.active::after,
-.progress-page .sidebar.is-pinned .menu li.active::after,
 .messages-page .sidebar:hover .menu li.active::after,
 .messages-page .sidebar.is-pinned .menu li.active::after,
 .settings-page .sidebar:hover .menu li.active::after,
@@ -4382,18 +6534,35 @@ body.dark-mode .diag-prompt-text {
 }
 
 @media (max-width: 1080px) {
+  .doctor-body-grid {
+    grid-template-columns: minmax(0, 1fr) 360px;
+  }
+
   .doctor-stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .doctor-middle-grid,
-  .doctor-tables-grid {
+  .patient-top-row,
+  .patient-top-main,
+  .patient-summary-sensor-row,
+  .patient-left-stack,
+  .patient-main-tri-row,
+  .patient-center-stack,
+  .patients-graphs-grid {
     grid-template-columns: 1fr;
   }
 
-  .patients-profile-grid,
-  .patients-graphs-grid {
+  .patient-left-stack,
+  .patient-center-stack {
+    grid-template-rows: auto;
+  }
+
+  .patient-top-row {
     grid-template-columns: 1fr;
+  }
+
+  .doctor-notes-sidebar {
+    max-height: none;
   }
 
   .patient-profile-breadcrumb {
@@ -4410,17 +6579,26 @@ body.dark-mode .diag-prompt-text {
 
   .therapy-template-grid,
   .therapy-plans-grid,
-  .progress-lower-grid,
   .messages-split-layout,
   .patient-hub-grid,
+  .recovery-progress-grid,
   .recovery-chart-grid,
   .recovery-quick-stats,
   .hub-metrics-grid {
     grid-template-columns: 1fr;
   }
 
+  .recovery-best-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .calibration-finger-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .exercise-choice-grid,
+  .exercise-plan-meta {
+    grid-template-columns: 1fr;
   }
 
   .diagnostic-actions {
@@ -4430,15 +6608,6 @@ body.dark-mode .diag-prompt-text {
   .settings-profile-grid {
     grid-template-columns: 1fr;
     justify-items: start;
-  }
-
-  .progress-header-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .progress-header-row .sign-in-btn {
-    width: 100%;
   }
 
   .header-metrics {
@@ -4542,6 +6711,10 @@ body.dark-mode .diag-prompt-text {
     align-items: flex-start;
   }
 
+  .patients-profile-view {
+    grid-template-rows: auto auto auto auto minmax(0, 1fr);
+  }
+
   .therapy-template-grid {
     gap: 10px;
   }
@@ -4562,8 +6735,42 @@ body.dark-mode .diag-prompt-text {
     width: 100%;
   }
 
+  .doctor-body-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .recovery-progress-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.exercise-hub-page #stepCalibrate .calibration-finger-grid {
+    gap: 8px;
+  }
+
+  body.exercise-hub-page #stepCalibrate .calibration-finger {
+    min-height: 160px;
+    padding: 7px;
+    gap: 4px;
+    font-size: 0.72rem;
+  }
+
+  body.exercise-hub-page #stepCalibrate .calibration-finger strong {
+    font-size: 0.92rem;
+    line-height: 1.05;
+  }
+
+  body.exercise-hub-page #stepCalibrate .calibration-meter {
+    width: 18px;
+    height: 92px;
+  }
+
   .doctor-stats-grid {
     grid-template-columns: 1fr;
+  }
+
+  .doctor-sidebar-stack {
+    min-height: 340px;
   }
 
   .sidebar {
@@ -4593,10 +6800,8 @@ body.dark-mode .diag-prompt-text {
 
   .nav-label,
   .sidebar:hover .nav-label,
-  .sidebar.is-pinned .nav-label,
-  .logo-wordmark,
-  .sidebar:hover .logo-wordmark,
-  .sidebar.is-pinned .logo-wordmark {
+  .sidebar.is-pinned .nav-label {
+    width: 132px;
     max-width: 140px;
     opacity: 1;
     transform: none;
@@ -4604,8 +6809,45 @@ body.dark-mode .diag-prompt-text {
     transition-delay: 0s;
   }
 
+  .logo-image,
+  .sidebar:hover .logo-image,
+  .sidebar.is-pinned .logo-image {
+    width: 36px;
+    max-width: 36px;
+    transform: none;
+    pointer-events: auto;
+    transition-delay: 0s;
+  }
+
   .container {
     flex-direction: column;
+  }
+
+  html,
+  body {
+    height: auto;
+    min-height: 100%;
+    overflow-y: auto;
+  }
+
+  body.auth-gated-home,
+  .doctor-dashboard-page {
+    height: auto;
+    min-height: 100vh;
+    overflow-y: auto;
+  }
+
+  body.auth-gated-home #main-dashboard,
+  body.auth-gated-home .container,
+  body.auth-gated-home .content,
+  body.auth-gated-home #protected-dashboard-content,
+  body.auth-gated-home .dashboard-grid,
+  .doctor-dashboard-page .container,
+  .doctor-dashboard-page .content,
+  .doctor-shell {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
   }
 
   .content {
@@ -4678,5 +6920,315 @@ body.dark-mode .diag-prompt-text {
 
   .wizard-actions-end {
     align-items: stretch;
+  }
+
+  .profile-mobile-logout-wrap {
+    display: block;
+  }
+}
+
+/* Mobile patient navigation: fixed bottom tab bar */
+.mobile-tabbar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  body.auth-gated-home .sidebar,
+  body.patient-portal-page .sidebar,
+  body.doctor-dashboard-page .sidebar,
+  body.patients-page .sidebar,
+  body.therapy-plans-page .sidebar,
+  body.settings-page .sidebar {
+    display: none;
+  }
+
+  body.auth-gated-home .content,
+  body.patient-portal-page .content,
+  body.auth-gated-home #protected-dashboard-content,
+  body.patient-portal-page .patient-shell,
+  body.doctor-dashboard-page .content,
+  body.patients-page .content,
+  body.therapy-plans-page .content,
+  body.settings-page .content {
+    padding-bottom: 88px;
+  }
+
+  body.doctor-dashboard-page .content,
+  body.patients-page .content,
+  body.therapy-plans-page .content,
+  body.settings-page .content {
+    padding-top: 74px;
+  }
+
+  body.exercise-hub-page .patient-shell {
+    width: 100%;
+    border-radius: 18px;
+    padding: 16px 14px 20px;
+  }
+
+  .recovery-best-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .recovery-session-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  body.exercise-hub-page #stepCalibrate .calibration-finger-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  body.exercise-hub-page #stepCalibrate .calibration-finger {
+    min-height: 146px;
+    padding: 6px;
+    gap: 4px;
+    font-size: 0.68rem;
+  }
+
+  body.exercise-hub-page #stepCalibrate .calibration-finger strong {
+    font-size: 0.88rem;
+    line-height: 1.1;
+  }
+
+  body.exercise-hub-page #stepCalibrate .calibration-meter {
+    width: 16px;
+    height: 78px;
+  }
+
+  body.exercise-hub-page #stepCalibrate .calibration-finger span {
+    line-height: 1.15;
+  }
+
+  .doctor-mobile-topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 145;
+    min-height: 60px;
+    background: #ffffff;
+    border-bottom: 1px solid rgba(77, 134, 156, 0.24);
+    box-shadow: 0 8px 16px rgba(18, 50, 62, 0.08);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 10px 14px;
+  }
+
+  .doctor-mobile-topbar-name {
+    font-size: 0.96rem;
+    font-weight: 800;
+    color: #1f5668;
+    line-height: 1.1;
+  }
+
+  .doctor-mobile-topbar-meta {
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #5f7d89;
+    margin-top: 2px;
+  }
+
+  .mobile-tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 140;
+    height: 68px;
+    background: #ffffff;
+    border-top: 1px solid rgba(77, 134, 156, 0.26);
+    box-shadow: 0 -8px 18px rgba(26, 70, 86, 0.12);
+    display: block;
+  }
+
+  .mobile-tabbar.doctor-tabbar {
+    background: #eef6fa;
+    border-top-color: rgba(61, 116, 136, 0.28);
+  }
+
+  .mobile-tabbar-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+  }
+
+  .mobile-tabbar-item {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+  }
+
+  .mobile-tabbar-link {
+    min-width: 64px;
+    text-decoration: none;
+    color: #6f8a95;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+
+  .mobile-tabbar-link i {
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .mobile-tabbar-link.is-active {
+    color: #0d5f73;
+  }
+
+  .mobile-tabbar.doctor-tabbar .mobile-tabbar-link {
+    color: #5f7d89;
+  }
+
+  .mobile-tabbar.doctor-tabbar .mobile-tabbar-link.is-active {
+    color: #0d5f73;
+  }
+
+  body.dark-mode .mobile-tabbar {
+    background: #152a35;
+    border-top-color: rgba(133, 203, 225, 0.2);
+    box-shadow: 0 -8px 18px rgba(0, 0, 0, 0.28);
+  }
+
+  body.dark-mode .doctor-mobile-topbar {
+    background: #122a35;
+    border-bottom-color: rgba(133, 203, 225, 0.2);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.28);
+  }
+
+  body.dark-mode .doctor-mobile-topbar-name {
+    color: #d5eaf2;
+  }
+
+  body.dark-mode .doctor-mobile-topbar-meta {
+    color: #9bc0ce;
+  }
+
+  body.dark-mode .mobile-tabbar-link {
+    color: #8fb0bc;
+  }
+
+  body.dark-mode .mobile-tabbar-link.is-active {
+    color: #85cbe1;
+  }
+
+  body.dark-mode .profile-mobile-logout-btn {
+    background: #17303c;
+    border-color: #4e7f92;
+    color: #d2e7ef;
+  }
+
+  body.dark-mode .profile-mobile-logout-btn:hover,
+  body.dark-mode .profile-mobile-logout-btn:focus-visible {
+    background: #1d3a47;
+  }
+
+  body.dark-mode .session-logout-btn {
+    border-color: #b95a5a;
+    background: rgba(185, 90, 90, 0.18);
+    color: #f4d7d7;
+  }
+
+  body.dark-mode .session-logout-btn:hover,
+  body.dark-mode .session-logout-btn:focus-visible {
+    background: rgba(185, 90, 90, 0.24);
+    border-color: #d07a7a;
+  }
+
+  .session-management-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .session-logout-btn {
+    width: 100%;
+  }
+
+  /* Doctor > Patient Profile view mobile fit */
+  .patients-profile-view {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    overflow: visible;
+  }
+
+  .patient-profile-header {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .patient-profile-heading {
+    grid-column: 1;
+  }
+
+  .patient-back-link {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .patient-main-tri-row,
+  .patient-left-stack,
+  .patient-center-stack,
+  .patients-graphs-grid,
+  .patient-summary-sensor-row,
+  .patient-top-main {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .patient-main-tri-row > article,
+  .patient-main-tri-row > .patient-center-stack,
+  .patient-main-tri-row > .patient-left-stack,
+  .patient-left-stack > article,
+  .patient-center-stack > article,
+  .doctor-notes-top-card,
+  .doctor-notes-sidebar,
+  .patient-medical-card,
+  .therapy-plan-card,
+  .sensor-summary-card,
+  .patient-summary-card,
+  .patients-graphs-grid .graph-card {
+    min-height: 0;
+    height: auto;
+  }
+
+  .doctor-notes-card textarea,
+  .doctor-notes-sidebar textarea {
+    min-height: 150px;
+  }
+
+  .patients-profile-view .field-grid,
+  .patients-profile-view .field-grid-two,
+  .patients-profile-view .field-group-span-2 {
+    grid-template-columns: 1fr;
+    grid-column: span 1;
+  }
+
+  .patients-profile-view .profile-action-btn,
+  .patients-profile-view .notes-save-btn,
+  .patients-profile-view .sign-in-btn,
+  .patients-profile-view .doctor-btn {
+    width: 100%;
+  }
+
+  .patients-profile-view .chart-wrap {
+    min-height: 200px;
+  }
+
+  .patients-profile-view .input-with-counter {
+    width: 100%;
   }
 }

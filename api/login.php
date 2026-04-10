@@ -30,12 +30,12 @@ if (!is_array($data)) {
     }
 }
 
-$identifier = trim((string) ($data['identifier'] ?? $data['username'] ?? $data['email'] ?? ''));
+$identifier = trim((string) ($data['user'] ?? $data['identifier'] ?? $data['username'] ?? $data['email'] ?? ''));
 $passwordInput = (string) ($data['password'] ?? '');
 
 if ($identifier === '' || $passwordInput === '') {
     http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Username/email and password are required']);
+    echo json_encode(['ok' => false, 'error' => 'User (username/email) and password are required']);
     exit;
 }
 
@@ -83,7 +83,7 @@ function getTableColumns(PDO $pdo, string $tableName): array
     return $columns;
 }
 
-$usersTable = resolveTableName($pdo, ['users', 'user_db.users', 'theraflow_db.users']);
+$usersTable = resolveTableName($pdo, ['users', 'theraflowusers_db.users', 'theraflow_db.users']);
 if ($usersTable === null) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Users table was not found. Please check database configuration.']);
@@ -106,6 +106,7 @@ if ($idColumn === null || $passwordColumn === null || ($usernameColumn === null 
 $user = false;
 $credentialVerified = false;
 $needsRehash = false;
+$sessionPatientId = 0;
 
 if ($usernameColumn !== null) {
     // Primary lookup: do not restrict by role in SQL.
@@ -136,6 +137,7 @@ if (!$user) {
 
         if ($patient) {
             $credentialVerified = true;
+            $sessionPatientId = (int) ($patient['id'] ?? 0);
             $linkedUserId = (int) ($patient['user_id'] ?? 0);
             if ($linkedUserId > 0) {
                 $userById = $pdo->prepare('SELECT * FROM ' . $usersTable . ' WHERE ' . $idColumn . ' = ? LIMIT 1');
@@ -160,7 +162,7 @@ if (!$user) {
 
 if (!$user) {
     http_response_code(401);
-    echo json_encode(['ok' => false, 'error' => 'Invalid username/email or password']);
+    echo json_encode(['ok' => false, 'error' => 'Invalid user or password']);
     exit;
 }
 
@@ -169,14 +171,14 @@ if (!$credentialVerified) {
     $cred = verifyPasswordCompat($passwordInput, $hashedPassword);
     if (!$cred['ok']) {
         http_response_code(401);
-        echo json_encode(['ok' => false, 'error' => 'Invalid username/email or password']);
+        echo json_encode(['ok' => false, 'error' => 'Invalid user or password']);
         exit;
     }
     $needsRehash = $cred['rehash'];
 }
 
 $userId = (int) ($user[$idColumn] ?? 0);
-if ($userId <= 0) {
+if ($userId <= 0 && $sessionPatientId <= 0) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Unable to establish a valid user session.']);
     exit;
@@ -216,6 +218,24 @@ if ($role !== 'doctor' && $role !== 'patient') {
 $_SESSION['user_id'] = $userId;
 $_SESSION['username'] = (string) ($usernameColumn !== null ? ($user[$usernameColumn] ?? '') : ($emailColumn !== null ? ($user[$emailColumn] ?? '') : ''));
 $_SESSION['role'] = $role;
+
+if ($role === 'patient') {
+    // Keep patient context explicit for accounts not linked to users.id.
+    if ($sessionPatientId <= 0) {
+        try {
+            $patientIdStmt = $pdo->prepare('SELECT id FROM patients WHERE user_id = ? LIMIT 1');
+            $patientIdStmt->execute([$userId]);
+            $sessionPatientId = (int) ($patientIdStmt->fetchColumn() ?: 0);
+        } catch (Throwable $e) {
+            // Ignore and proceed without patient_id if unavailable.
+        }
+    }
+
+    if ($sessionPatientId > 0) {
+        $_SESSION['patient_id'] = $sessionPatientId;
+    }
+}
+
 if ($role === 'doctor') {
     $_SESSION['doctor_id'] = $userId;
 }

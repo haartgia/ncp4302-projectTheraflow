@@ -33,9 +33,11 @@ foreach ($patients as $patient) {
 
 $sessionsToday = 0;
 $avgGrip = 0.0;
+$avgRange = 0.0;
 $recentActivity = [];
 $weeklyLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 $weeklyGrip = [0, 0, 0, 0, 0, 0, 0];
+$weeklyRange = [0, 0, 0, 0, 0, 0, 0];
 
 if (!empty($patientIds)) {
     $placeholders = implode(',', array_fill(0, count($patientIds), '?'));
@@ -52,6 +54,12 @@ if (!empty($patientIds)) {
     $avgGripStmt->execute($patientIds);
     $avgGrip = (float) (($avgGripStmt->fetch()['avg_grip'] ?? 0));
 
+    $avgRangeStmt = $pdo->prepare(
+        'SELECT AVG(flexion_angle) AS avg_range FROM sensor_data WHERE patient_id IN (' . $placeholders . ') AND flexion_angle IS NOT NULL'
+    );
+    $avgRangeStmt->execute($patientIds);
+    $avgRange = (float) (($avgRangeStmt->fetch()['avg_range'] ?? 0));
+
     $activityStmt = $pdo->prepare(
         'SELECT p.name AS patient_name, sd.note, sd.recorded_at
          FROM sensor_data sd
@@ -64,7 +72,7 @@ if (!empty($patientIds)) {
     $recentActivity = $activityStmt->fetchAll();
 
     $weeklyStmt = $pdo->prepare(
-        'SELECT WEEKDAY(recorded_at) AS wd, AVG(grip_strength) AS avg_grip
+        'SELECT WEEKDAY(recorded_at) AS wd, AVG(grip_strength) AS avg_grip, AVG(flexion_angle) AS avg_range
          FROM sensor_data
          WHERE patient_id IN (' . $placeholders . ') AND recorded_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
          GROUP BY WEEKDAY(recorded_at)
@@ -75,6 +83,7 @@ if (!empty($patientIds)) {
         $idx = (int) ($row['wd'] ?? -1);
         if ($idx >= 0 && $idx <= 6) {
             $weeklyGrip[$idx] = round((float) ($row['avg_grip'] ?? 0), 2);
+            $weeklyRange[$idx] = round((float) ($row['avg_range'] ?? 0), 2);
         }
     }
 }
@@ -92,7 +101,8 @@ echo json_encode([
         'totalPatients' => $totalPatients,
         'activePatientsToday' => $activeToday,
         'sessionsToday' => $sessionsToday,
-        'avgGripStrength' => round($avgGrip, 2)
+        'avgGripStrength' => round($avgGrip, 2),
+        'avgRangeOfMotion' => round($avgRange, 2)
     ],
     'alerts' => $alerts,
     'recentActivity' => $recentActivity,
@@ -106,6 +116,7 @@ echo json_encode([
     }, $patients), 0, 8),
     'weeklyChart' => [
         'labels' => $weeklyLabels,
-        'avgGrip' => $weeklyGrip
+        'avgGrip' => $weeklyGrip,
+        'avgRange' => $weeklyRange
     ]
 ]);

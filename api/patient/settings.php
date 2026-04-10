@@ -56,7 +56,7 @@ if ($patientId <= 0 || $userId <= 0) {
     exit;
 }
 
-$usersTable = resolveTableName($pdo, ['user_db.users', 'users', 'theraflow_db.users']);
+$usersTable = resolveTableName($pdo, ['theraflowusers_db.users', 'users', 'theraflow_db.users']);
 $usersColumns = $usersTable ? getTableColumns($pdo, $usersTable) : [];
 $passwordColumn = in_array('password', $usersColumns, true) ? 'password' : (in_array('password_hash', $usersColumns, true) ? 'password_hash' : null);
 $emailColumn = in_array('email', $usersColumns, true) ? 'email' : null;

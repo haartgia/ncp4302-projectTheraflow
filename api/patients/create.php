@@ -28,7 +28,7 @@ if (!is_array($body)) {
     $body = $_POST;
 }
 
-$required = ['name', 'age', 'gender', 'strokeType', 'affectedHand', 'contact', 'username', 'password'];
+$required = ['firstName', 'lastName', 'age', 'dateOfBirth', 'gender', 'strokeType', 'affectedHand', 'phone', 'username', 'password'];
 foreach ($required as $field) {
     if (!isset($body[$field]) || trim((string) $body[$field]) === '') {
         http_response_code(400);
@@ -38,12 +38,16 @@ foreach ($required as $field) {
 }
 
 $doctorId = (int) $_SESSION['user_id'];
-$name = trim((string) $body['name']);
+$firstName = trim((string) $body['firstName']);
+$lastName = trim((string) $body['lastName']);
+$name = trim($firstName . ' ' . $lastName);
 $age = (int) $body['age'];
+$dateOfBirth = trim((string) ($body['dateOfBirth'] ?? ''));
 $gender = trim((string) $body['gender']);
 $strokeType = trim((string) $body['strokeType']);
 $affectedHand = trim((string) $body['affectedHand']);
-$contact = trim((string) $body['contact']);
+$phone = trim((string) $body['phone']);
+$backupEmail = trim((string) ($body['backupEmail'] ?? ''));
 $username = trim((string) $body['username']);
 $passwordPlain = (string) $body['password'];
 $passwordHash = password_hash($passwordPlain, PASSWORD_DEFAULT);
@@ -51,6 +55,26 @@ $passwordHash = password_hash($passwordPlain, PASSWORD_DEFAULT);
 if ($age < 0) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Age must be a valid number']);
+    exit;
+}
+
+if (!preg_match('/^\+?\d{7,15}$/', str_replace(' ', '', $phone))) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Phone must be 7 to 15 digits']);
+    exit;
+}
+
+$dateObj = DateTime::createFromFormat('Y-m-d', $dateOfBirth);
+$isDobValid = $dateObj && $dateObj->format('Y-m-d') === $dateOfBirth;
+if (!$isDobValid) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Date of birth must be a valid date (YYYY-MM-DD)']);
+    exit;
+}
+
+if ($backupEmail !== '' && !filter_var($backupEmail, FILTER_VALIDATE_EMAIL)) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Backup contact must be a valid email']);
     exit;
 }
 
@@ -73,6 +97,22 @@ function ensurePatientsColumns(PDO $pdo): void
 
     if (!in_array('doctor_id', $columns, true)) {
         $pdo->exec('ALTER TABLE patients ADD COLUMN doctor_id INT NULL AFTER user_id');
+    }
+
+    if (!in_array('first_name', $columns, true)) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN first_name VARCHAR(120) NULL AFTER name');
+    }
+
+    if (!in_array('last_name', $columns, true)) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN last_name VARCHAR(120) NULL AFTER first_name');
+    }
+
+    if (!in_array('date_of_birth', $columns, true)) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN date_of_birth DATE NULL AFTER age');
+    }
+
+    if (!in_array('backup_email', $columns, true)) {
+        $pdo->exec('ALTER TABLE patients ADD COLUMN backup_email VARCHAR(255) NULL AFTER contact');
     }
 
     $idxRows = $pdo->query('SHOW INDEX FROM patients')->fetchAll();
@@ -106,17 +146,9 @@ function ensureClinicalDataTable(PDO $pdo): void
     );
 }
 
-function splitName(string $fullName): array
-{
-    $parts = preg_split('/\s+/', trim($fullName)) ?: [];
-    $first = $parts[0] ?? 'Patient';
-    $last = count($parts) > 1 ? implode(' ', array_slice($parts, 1)) : 'User';
-    return [$first, $last];
-}
-
 function resolveUsersTable(PDO $pdo): ?string
 {
-    $candidates = ['users', 'user_db.users', 'theraflow_db.users'];
+    $candidates = ['users', 'theraflowusers_db.users', 'theraflow_db.users'];
     foreach ($candidates as $tableName) {
         try {
             $probe = $pdo->query('SELECT 1 FROM ' . $tableName . ' LIMIT 1');
@@ -157,22 +189,22 @@ try {
         exit;
     }
 
-    // user_db.users has no username column; we keep username in patients and use a synthetic email for account auth.
+    // theraflowusers_db.users has no username column; username remains in patients.
+    // Use backup email for user auth if provided, otherwise a synthetic email.
     $syntheticEmail = strtolower($username) . '@patient.local';
+    $accountEmail = $backupEmail !== '' ? strtolower($backupEmail) : $syntheticEmail;
     $usersTable = resolveUsersTable($pdo);
     $usersColumns = $usersTable ? describeColumns($pdo, $usersTable) : [];
 
     if ($usersTable && in_array('email', $usersColumns, true)) {
         $emailCheck = $pdo->prepare('SELECT id FROM ' . $usersTable . ' WHERE email = ? LIMIT 1');
-        $emailCheck->execute([$syntheticEmail]);
+        $emailCheck->execute([$accountEmail]);
         if ($emailCheck->fetch()) {
             http_response_code(409);
-            echo json_encode(['ok' => false, 'error' => 'Username already taken']);
+            echo json_encode(['ok' => false, 'error' => $backupEmail !== '' ? 'Backup email already in use' : 'Username already taken']);
             exit;
         }
     }
-
-    [$firstName, $lastName] = splitName($name);
 
     $pdo->beginTransaction();
 
@@ -182,7 +214,7 @@ try {
         $passwordColumn = in_array('password', $usersColumns, true) ? 'password' : (in_array('password_hash', $usersColumns, true) ? 'password_hash' : null);
         if ($passwordColumn !== null) {
             $insertColumns = ['email', $passwordColumn];
-            $insertValues = [$syntheticEmail, $passwordHash];
+            $insertValues = [$accountEmail, $passwordHash];
 
             if (in_array('first_name', $usersColumns, true)) {
                 $insertColumns[] = 'first_name';
@@ -194,7 +226,7 @@ try {
             }
             if (in_array('mobile', $usersColumns, true)) {
                 $insertColumns[] = 'mobile';
-                $insertValues[] = $contact;
+                $insertValues[] = $phone;
             }
             if (in_array('role', $usersColumns, true)) {
                 $insertColumns[] = 'role';
@@ -212,18 +244,22 @@ try {
 
     // Step B: create patient clinical profile linked to user and doctor.
     $createPatient = $pdo->prepare(
-        'INSERT INTO patients (user_id, doctor_id, name, age, gender, stroke_type, affected_hand, contact, username, password_hash, status, last_session)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO patients (user_id, doctor_id, name, first_name, last_name, age, date_of_birth, gender, stroke_type, affected_hand, contact, backup_email, username, password_hash, status, last_session)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     $createPatient->execute([
         $newUserId ?: null,
         $doctorId,
         $name,
+        $firstName,
+        $lastName,
         $age,
+        $dateOfBirth,
         $gender,
         $strokeType,
         $affectedHand,
-        $contact,
+        $phone,
+        $backupEmail !== '' ? $backupEmail : null,
         $username,
         $passwordHash,
         'Stable',

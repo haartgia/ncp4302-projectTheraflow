@@ -34,74 +34,203 @@ $stmt = $pdo->prepare(
 $stmt->execute([$patientId]);
 $rows = $stmt->fetchAll();
 
-$sevenDaysAgo = strtotime('-7 days');
 $bestForce = 0.0;
 $maxFlexion = 0.0;
-$totalSessions = 0;
+$totalSessions = count($rows);
+$bestSession = null;
 
-foreach ($rows as $row) {
-    $time = strtotime((string) ($row['timestamp'] ?? 'now'));
-    if ($time < $sevenDaysAgo) {
-        continue;
+function buildTrendBuckets(array $rowsAscending, string $mode): array
+{
+    $bucketMap = [];
+
+    foreach ($rowsAscending as $row) {
+        $time = strtotime((string) ($row['timestamp'] ?? 'now'));
+        if ($time <= 0) {
+            continue;
+        }
+
+        $key = '';
+        $label = '';
+        if ($mode === 'daily') {
+            $key = date('Y-m-d', $time);
+            $label = date('M d', $time);
+        } elseif ($mode === 'weekly') {
+            $year = date('o', $time);
+            $week = date('W', $time);
+            $key = sprintf('%04d-W%02d', (int) $year, (int) $week);
+            $label = 'W' . $week . ' ' . $year;
+        } else {
+            $year = date('Y', $time);
+            $key = $year;
+            $label = $year;
+        }
+
+        if (!isset($bucketMap[$key])) {
+            $bucketMap[$key] = [
+                'label' => $label,
+                'forceTotal' => 0.0,
+                'romTotal' => 0.0,
+                'count' => 0
+            ];
+        }
+
+        $bucketMap[$key]['forceTotal'] += (float) ($row['grip_strength'] ?? 0);
+        $bucketMap[$key]['romTotal'] += (float) ($row['flexion_angle'] ?? 0);
+        $bucketMap[$key]['count'] += 1;
     }
 
-    $totalSessions += 1;
-    $bestForce = max($bestForce, (float) ($row['grip_strength'] ?? 0));
-    $maxFlexion = max($maxFlexion, (float) ($row['flexion_angle'] ?? 0));
-}
-
-$weeklyMap = [];
-foreach (array_reverse($rows) as $row) {
-    $time = strtotime((string) ($row['timestamp'] ?? 'now'));
-    $weekLabel = date('Y', $time) . '-W' . date('W', $time);
-
-    if (!isset($weeklyMap[$weekLabel])) {
-        $weeklyMap[$weekLabel] = [
-            'forceTotal' => 0.0,
-            'romTotal' => 0.0,
-            'count' => 0
+    if (!$bucketMap) {
+        return [
+            'labels' => ['No Data'],
+            'force' => [0],
+            'rom' => [0]
         ];
     }
 
-    $weeklyMap[$weekLabel]['forceTotal'] += (float) ($row['grip_strength'] ?? 0);
-    $weeklyMap[$weekLabel]['romTotal'] += (float) ($row['flexion_angle'] ?? 0);
-    $weeklyMap[$weekLabel]['count'] += 1;
+    ksort($bucketMap);
+
+    $labels = [];
+    $force = [];
+    $rom = [];
+    foreach ($bucketMap as $bucket) {
+        $count = max(1, (int) ($bucket['count'] ?? 0));
+        $labels[] = (string) ($bucket['label'] ?? '');
+        $force[] = round(((float) ($bucket['forceTotal'] ?? 0)) / $count, 2);
+        $rom[] = round(((float) ($bucket['romTotal'] ?? 0)) / $count, 2);
+    }
+
+    return [
+        'labels' => $labels,
+        'force' => $force,
+        'rom' => $rom
+    ];
 }
 
-$weekLabels = [];
-$forceTrend = [];
-$romTrend = [];
-foreach ($weeklyMap as $week => $acc) {
-    $count = max(1, (int) $acc['count']);
-    $weekLabels[] = $week;
-    $forceTrend[] = round($acc['forceTotal'] / $count, 2);
-    $romTrend[] = round($acc['romTotal'] / $count, 2);
+function parseRecoveryNoteMeta(string $note): array
+{
+    $meta = [
+        'max_extension' => null,
+        'exercise_type' => '',
+        'duration_sec' => null
+    ];
+
+    if ($note === '') {
+        return $meta;
+    }
+
+    $parts = preg_split('/\|/', $note) ?: [];
+    foreach ($parts as $part) {
+        $segment = trim((string) $part);
+        if ($segment === '') {
+            continue;
+        }
+
+        if (preg_match('/^MaxExtension\s*=\s*([\d.]+)/i', $segment, $match)) {
+            $meta['max_extension'] = (float) $match[1];
+            continue;
+        }
+
+        if (preg_match('/^ExerciseType\s*=\s*(.+)$/i', $segment, $match)) {
+            $meta['exercise_type'] = trim((string) $match[1]);
+            continue;
+        }
+
+        if (preg_match('/^DurationSec\s*=\s*(\d+)/i', $segment, $match)) {
+            $meta['duration_sec'] = (int) $match[1];
+            continue;
+        }
+    }
+
+    return $meta;
 }
 
-if (!$weekLabels) {
-    $weekLabels = ['No Data'];
-    $forceTrend = [0];
-    $romTrend = [0];
-}
-
+$rowsAscending = array_reverse($rows);
 $logs = [];
-foreach (array_slice($rows, 0, 20) as $row) {
+
+foreach ($rows as $row) {
     $grip = (float) ($row['grip_strength'] ?? 0);
     $flexion = (float) ($row['flexion_angle'] ?? 0);
     $reps = (int) ($row['repetitions'] ?? 0);
 
+    $bestForce = max($bestForce, $grip);
+    $maxFlexion = max($maxFlexion, $flexion);
+
     $metReps = $reps >= $targetRepetitions;
     $metRom = $flexion >= ($romGoal * 0.85);
-    $status = ($metReps && $metRom) ? 'Success' : 'Needs Work';
+    $status = 'Needs Work';
+    if ($metReps && $metRom) {
+        $status = 'Great Job';
+    } elseif ($metReps || $metRom) {
+        $status = 'Improving';
+    }
 
-    $logs[] = [
+    $note = (string) ($row['note'] ?? '');
+    $noteMeta = parseRecoveryNoteMeta($note);
+
+    $currentLog = [
         'timestamp' => (string) ($row['timestamp'] ?? ''),
         'grip_strength' => $grip,
         'flexion_angle' => $flexion,
+        'finger_movement' => $flexion,
+        'max_extension' => $noteMeta['max_extension'],
+        'exercise_type' => (string) ($noteMeta['exercise_type'] ?? ''),
+        'duration_sec' => $noteMeta['duration_sec'],
         'repetitions' => $reps,
         'status' => $status,
-        'note' => (string) ($row['note'] ?? '')
+        'note' => $note
     ];
+
+    $logs[] = $currentLog;
+
+    if ($bestSession === null) {
+        $bestSession = $currentLog;
+    } else {
+        $bestReps = (int) ($bestSession['repetitions'] ?? 0);
+        $bestGrip = (float) ($bestSession['grip_strength'] ?? 0);
+        $bestRom = (float) ($bestSession['flexion_angle'] ?? 0);
+
+        if ($reps > $bestReps || ($reps === $bestReps && $grip > $bestGrip) || ($reps === $bestReps && $grip === $bestGrip && $flexion > $bestRom)) {
+            $bestSession = $currentLog;
+        }
+    }
+}
+
+$recentLogs = array_slice($logs, 0, 5);
+
+$trendDaily = buildTrendBuckets($rowsAscending, 'daily');
+$trendWeekly = buildTrendBuckets($rowsAscending, 'weekly');
+$trendYearly = buildTrendBuckets($rowsAscending, 'yearly');
+
+$completedDates = [];
+foreach ($rows as $row) {
+    $reps = (int) ($row['repetitions'] ?? 0);
+    if ($reps <= 0) {
+        continue;
+    }
+
+    $time = strtotime((string) ($row['timestamp'] ?? ''));
+    if ($time <= 0) {
+        continue;
+    }
+
+    $completedDates[date('Y-m-d', $time)] = true;
+}
+
+$today = new DateTimeImmutable('today');
+$consecutiveDays = 0;
+for ($offset = 0; $offset < 366; $offset += 1) {
+    $dayKey = $today->sub(new DateInterval('P' . $offset . 'D'))->format('Y-m-d');
+    if (!isset($completedDates[$dayKey])) {
+        break;
+    }
+    $consecutiveDays += 1;
+}
+
+$monday = $today->modify('monday this week');
+$weekCompletedMondayFirst = [];
+for ($idx = 0; $idx < 7; $idx += 1) {
+    $dayKey = $monday->add(new DateInterval('P' . $idx . 'D'))->format('Y-m-d');
+    $weekCompletedMondayFirst[] = isset($completedDates[$dayKey]);
 }
 
 echo json_encode([
@@ -109,17 +238,24 @@ echo json_encode([
     'plan' => $plan,
     'targets' => [
         'targetRepetitions' => $targetRepetitions,
-        'romGoal' => $romGoal
+        'romGoal' => $romGoal,
+        'forceGoal' => 50
     ],
-    'trend' => [
-        'labels' => $weekLabels,
-        'force' => $forceTrend,
-        'rom' => $romTrend
+    'trends' => [
+        'daily' => $trendDaily,
+        'weekly' => $trendWeekly,
+        'yearly' => $trendYearly
     ],
     'quickStats' => [
         'bestForce' => round($bestForce, 1),
         'maxFlexion' => round($maxFlexion, 1),
         'totalSessions' => $totalSessions
     ],
-    'logs' => $logs
+    'streak' => [
+        'consecutiveDays' => $consecutiveDays,
+        'weekCompletedMondayFirst' => $weekCompletedMondayFirst
+    ],
+    'recentLogs' => $recentLogs,
+    'logs' => $logs,
+    'bestSession' => $bestSession
 ]);

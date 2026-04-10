@@ -345,15 +345,51 @@ function applyTheme(isDark) {
 }
 
 function initializeStreak(daysCompleted) {
-    const clampedDays = Math.max(0, Math.min(daysCompleted, streakDots.length));
+    const input = (typeof daysCompleted === "object" && daysCompleted !== null)
+        ? daysCompleted
+        : { consecutiveDays: Number(daysCompleted || 0), weekCompletedMondayFirst: [] };
+
+    const consecutiveDays = Math.max(0, Number(input.consecutiveDays || 0));
+    const weekCompletedMondayFirst = Array.isArray(input.weekCompletedMondayFirst)
+        ? input.weekCompletedMondayFirst.slice(0, streakDots.length).map(Boolean)
+        : [];
+
+    const streakTrack = document.getElementById("streakTrack");
+    const today = new Date();
+    const todayMondayIndex = (today.getDay() + 6) % 7;
+    const completedTodayOrEarlierIndexes = [];
+
+    const maxSegments = Math.max(1, streakDots.length - 1);
 
     streakDots.forEach((dot, index) => {
-        dot.classList.toggle("active", index < clampedDays);
+        const isPastOrToday = index <= todayMondayIndex;
+        const isCompleted = isPastOrToday && Boolean(weekCompletedMondayFirst[index]);
+        const isToday = index === todayMondayIndex;
+
+        dot.classList.toggle("is-completed", isCompleted);
+        dot.classList.toggle("active", isToday);
+        dot.classList.toggle("is-today", index === todayMondayIndex);
+
+        if (isCompleted) {
+            completedTodayOrEarlierIndexes.push(index);
+        }
     });
 
+    const farthestCompletedIndex = completedTodayOrEarlierIndexes.length
+        ? Math.max(...completedTodayOrEarlierIndexes)
+        : -1;
+    const completedSegments = Math.max(0, farthestCompletedIndex);
+    const progressPercent = (completedSegments / maxSegments) * 100;
+    const hasAtLeastTwoLit = completedTodayOrEarlierIndexes.length >= 2;
+
+    if (streakTrack) {
+        streakTrack.style.setProperty("--streak-progress", `${hasAtLeastTwoLit ? progressPercent : 0}%`);
+        streakTrack.classList.toggle("is-glow-active", hasAtLeastTwoLit);
+    }
+
     if (streakBadge) {
-        streakBadge.classList.toggle("active", clampedDays > 0);
-        streakBadge.innerHTML = `<i class="fa-solid fa-fire"></i> ${clampedDays} day${clampedDays === 1 ? "" : "s"}`;
+        streakBadge.classList.toggle("active", consecutiveDays > 0);
+        streakBadge.innerHTML = `<i class="fa-solid fa-fire"></i> ${consecutiveDays} day${consecutiveDays === 1 ? "" : "s"}`;
     }
 }
 
@@ -361,9 +397,29 @@ function initializePatientDashboardVisuals() {
     const completionRing = document.getElementById("patientCompletionRing");
     const completionValue = document.getElementById("patientCompletionValue");
     const completionLabel = document.querySelector(".patient-progress-label");
+    const nextExerciseReps = document.getElementById("nextExerciseReps");
+    const nextExerciseStartBtn = document.getElementById("nextExerciseStartBtn") || document.querySelector(".exercise-btn");
+    const nextExerciseRefreshBtn = document.getElementById("nextExerciseRefreshBtn");
+    const nextExerciseDeviceOffline = document.getElementById("nextExerciseDeviceOffline");
+    const nextExerciseDeviceOnline = document.getElementById("nextExerciseDeviceOnline");
+    const nextExerciseSignalLabel = document.getElementById("nextExerciseSignalLabel");
+    const nextExerciseBatteryLevel = document.getElementById("nextExerciseBatteryLevel");
+    const nextExerciseBatteryIcon = document.getElementById("nextExerciseBatteryIcon");
     const actionRings = document.querySelectorAll("[data-progress-ring]");
+    const metricCards = {
+        grip: document.querySelector('[data-progress-kind="grip"]')?.closest(".metric-strip") || null,
+        finger: document.querySelector('[data-progress-kind="finger"]')?.closest(".metric-strip") || null,
+        repetitions: document.querySelector('[data-progress-kind="repetitions"]')?.closest(".metric-strip") || null,
+        duration: document.querySelector('[data-progress-kind="duration"]')?.closest(".metric-strip") || null
+    };
     const daySubheader = document.querySelector(".header-left .subheader");
     const nextExerciseDescription = document.getElementById("nextExerciseDescription");
+    let latestHandshakeState = false;
+    let streakState = {
+        consecutiveDays: 0,
+        weekCompletedMondayFirst: new Array(streakDots.length).fill(false),
+        fetchedAt: 0
+    };
 
     if (!completionRing && !actionRings.length && !daySubheader && !nextExerciseDescription) {
         return;
@@ -378,6 +434,49 @@ function initializePatientDashboardVisuals() {
         }
     }
 
+    function batteryIconForPercent(percent) {
+        if (percent >= 85) return "fa-solid fa-battery-full";
+        if (percent >= 60) return "fa-solid fa-battery-three-quarters";
+        if (percent >= 35) return "fa-solid fa-battery-half";
+        if (percent >= 15) return "fa-solid fa-battery-quarter";
+        return "fa-solid fa-battery-empty";
+    }
+
+    function signalLabelFromState(gloveState) {
+        const rssi = Number(gloveState.rssi || gloveState.signal || 0);
+        if (!Number.isFinite(rssi) || rssi === 0) {
+            return "Wi-Fi";
+        }
+        if (rssi >= -60) return "Strong";
+        if (rssi >= -72) return "Good";
+        if (rssi >= -84) return "Fair";
+        return "Weak";
+    }
+
+    function applyDevicePanelState(isHandshakeOnline) {
+        const gloveState = readGloveState();
+        const battery = Math.max(0, Math.min(100, Number(gloveState.batteryPercent ?? gloveState.battery ?? 0)));
+
+        if (nextExerciseDeviceOffline) {
+            nextExerciseDeviceOffline.hidden = isHandshakeOnline;
+        }
+        if (nextExerciseDeviceOnline) {
+            nextExerciseDeviceOnline.hidden = !isHandshakeOnline;
+        }
+
+        if (nextExerciseSignalLabel) {
+            nextExerciseSignalLabel.textContent = signalLabelFromState(gloveState);
+        }
+
+        if (nextExerciseBatteryLevel) {
+            nextExerciseBatteryLevel.textContent = battery > 0 ? `${Math.round(battery)}%` : "--%";
+        }
+
+        if (nextExerciseBatteryIcon) {
+            nextExerciseBatteryIcon.className = batteryIconForPercent(battery);
+        }
+    }
+
     function applyProgressRing(element, percent) {
         const clampedPercent = Math.max(0, Math.min(Number(percent) || 0, 100));
         element.style.setProperty("--progress", String(clampedPercent));
@@ -385,14 +484,47 @@ function initializePatientDashboardVisuals() {
         element.setAttribute("aria-label", `${Math.round(clampedPercent)} percent complete`);
     }
 
+    function setMetricStatus(metricKey, state, valueText, labelText) {
+        const card = metricCards[metricKey];
+        if (!card) return;
+
+        const valueEl = card.querySelector(".patient-action-value");
+        const labelEl = card.querySelector(".widget-label");
+
+        card.classList.remove("status-no-data", "status-waiting", "status-active");
+        card.classList.add(`status-${state}`);
+
+        if (valueEl) {
+            valueEl.textContent = valueText;
+        }
+
+        if (labelEl) {
+            labelEl.textContent = labelText;
+        }
+    }
+
     function refreshDashboardVisuals() {
         const gloveState = readGloveState();
+        const gloveConnected = Boolean(gloveState.connected);
         const sessionReps = Math.max(0, Number(gloveState.sessionReps || 0));
+        const sessionMinutes = Math.max(0, Number(gloveState.sessionMinutes || gloveState.durationMin || 0));
         const targetRepetitions = Math.max(1, Number(gloveState.targetRepetitions || 120));
         const completionPercent = Math.round((sessionReps / targetRepetitions) * 100);
-        const streakDays = sessionReps > 0 ? 1 : 0;
+        const todayMondayIndex = (new Date().getDay() + 6) % 7;
+        const weekCompleted = Array.isArray(streakState.weekCompletedMondayFirst)
+            ? streakState.weekCompletedMondayFirst.slice(0, streakDots.length).map(Boolean)
+            : new Array(streakDots.length).fill(false);
 
-        initializeStreak(streakDays);
+        if (sessionReps > 0) {
+            weekCompleted[todayMondayIndex] = true;
+        }
+
+        const streakDays = Math.max(Number(streakState.consecutiveDays || 0), sessionReps > 0 ? 1 : 0);
+
+        initializeStreak({
+            consecutiveDays: streakDays,
+            weekCompletedMondayFirst: weekCompleted
+        });
 
         if (daySubheader) {
             daySubheader.textContent = `Day ${streakDays} of Therapy`;
@@ -426,6 +558,32 @@ function initializePatientDashboardVisuals() {
                             : 0;
             applyProgressRing(ring, ringPercent);
         });
+
+        const fingerPercent = Math.min(100, Math.round(completionPercent * 0.78));
+        const estimatedDuration = sessionMinutes > 0
+            ? sessionMinutes
+            : (sessionReps > 0 ? Math.max(1, Math.round(sessionReps / 8)) : 0);
+
+        if (sessionReps > 0) {
+            setMetricStatus("grip", "active", `${completionPercent}%`, "Grip performance updated today.");
+            setMetricStatus("finger", "active", `${fingerPercent}%`, "Movement quality updated today.");
+            setMetricStatus("repetitions", "active", String(sessionReps), `${Math.max(0, targetRepetitions - sessionReps)} reps remaining today.`);
+            setMetricStatus("duration", "active", `${estimatedDuration} min`, "Session duration updated from activity.");
+            return;
+        }
+
+        if (gloveConnected) {
+            setMetricStatus("grip", "waiting", "Waiting for Data...", "Perform an exercise to update.");
+            setMetricStatus("finger", "waiting", "Waiting for Data...", "Perform an exercise to update.");
+            setMetricStatus("repetitions", "waiting", "0", "Waiting for your first set today.");
+            setMetricStatus("duration", "waiting", "0 min", "Waiting for your first session today.");
+            return;
+        }
+
+        setMetricStatus("grip", "no-data", "--", "No data recorded today.");
+        setMetricStatus("finger", "no-data", "--", "No data recorded today.");
+        setMetricStatus("repetitions", "no-data", "0", "No data recorded today.");
+        setMetricStatus("duration", "no-data", "0 min", "No data recorded today.");
     }
 
     async function refreshNextExercise() {
@@ -445,6 +603,9 @@ function initializePatientDashboardVisuals() {
             const exerciseType = String(payload.plan.exercise_type || "Guided session");
             const repsCopy = targetReps ? `, ${targetReps} reps` : "";
             const hasPlan = duration > 0 || targetReps > 0;
+            if (nextExerciseReps) {
+                nextExerciseReps.textContent = `Target: ${targetReps > 0 ? targetReps : "--"} reps`;
+            }
             if (!hasPlan && payload.source === "default") {
                 nextExerciseDescription.textContent = "No doctor plan yet — calibrate first to generate your first session.";
                 return;
@@ -452,14 +613,79 @@ function initializePatientDashboardVisuals() {
 
             nextExerciseDescription.textContent = `${exerciseType} session${repsCopy}, estimated ${duration} minutes`;
         } catch {
+            if (nextExerciseReps) {
+                nextExerciseReps.textContent = "Target: -- reps";
+            }
             // Keep default copy if plan isn't available (e.g., not signed in yet).
         }
     }
 
+    async function refreshHandshakeState() {
+        try {
+            const response = await fetch("api/iot/handshake_status.php", { cache: "no-store" });
+            const payload = await response.json().catch(() => ({}));
+            latestHandshakeState = Boolean(response.ok && payload?.ok && payload?.handshake === true);
+        } catch {
+            latestHandshakeState = false;
+        }
+
+        applyDevicePanelState(latestHandshakeState);
+    }
+
+    async function refreshStreakFromBackend(force = false) {
+        const now = Date.now();
+        if (!force && now - Number(streakState.fetchedAt || 0) < 60000) {
+            return;
+        }
+
+        try {
+            const response = await fetch("api/patient/recovery.php", { credentials: "same-origin", cache: "no-store" });
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok || !payload?.ok) {
+                throw new Error("Unable to load streak data.");
+            }
+
+            const streak = payload?.streak || {};
+            streakState = {
+                consecutiveDays: Math.max(0, Number(streak.consecutiveDays || 0)),
+                weekCompletedMondayFirst: Array.isArray(streak.weekCompletedMondayFirst)
+                    ? streak.weekCompletedMondayFirst.slice(0, streakDots.length).map(Boolean)
+                    : new Array(streakDots.length).fill(false),
+                fetchedAt: now
+            };
+        } catch {
+            streakState = {
+                ...streakState,
+                fetchedAt: now
+            };
+        }
+
+        refreshDashboardVisuals();
+    }
+
     refreshDashboardVisuals();
-    refreshNextExercise();
-    window.addEventListener("storage", refreshDashboardVisuals);
+    void refreshNextExercise();
+    void refreshHandshakeState();
+    void refreshStreakFromBackend(true);
+
+    nextExerciseRefreshBtn?.addEventListener("click", () => {
+        void refreshHandshakeState();
+    });
+
+    window.addEventListener("storage", () => {
+        refreshDashboardVisuals();
+        applyDevicePanelState(latestHandshakeState);
+        void refreshStreakFromBackend();
+    });
+
     setInterval(refreshDashboardVisuals, 3000);
+    setInterval(() => {
+        void refreshHandshakeState();
+    }, 5000);
+    setInterval(() => {
+        void refreshStreakFromBackend();
+    }, 60000);
 }
 
 function initializeCharts() {
@@ -548,19 +774,418 @@ function initializeCharts() {
     }
 }
 
+function initializeMetricGraphModal() {
+    const modal = document.getElementById("metricGraphModal");
+    const modalClose = document.getElementById("metricGraphModalClose");
+    const modalTitle = document.getElementById("metricGraphModalTitle");
+    const canvas = document.getElementById("metricGraphCanvas");
+    const description = document.getElementById("metricGraphDescription");
+    const moreDetailBtn = document.getElementById("metricGraphMoreDetail");
+    const showValuesToggle = document.getElementById("metricGraphShowValues");
+    const modalFoot = modal?.querySelector(".metric-graph-modal-foot") || null;
+    const graphButtons = document.querySelectorAll(".metric-graph-btn[data-metric-id]");
+
+    if (!modal || !canvas || !graphButtons.length || typeof Chart === "undefined") {
+        return;
+    }
+
+    let modalChart = null;
+    let activeMetricId = "grip";
+    let cachedRecentSessions = null;
+    let showPointValues = showValuesToggle ? Boolean(showValuesToggle.checked) : true;
+    const chartFontFamily = '"Poppins", "Segoe UI", sans-serif';
+
+    function formatLongDate(dateValue) {
+        return dateValue.toLocaleDateString("en-US", {
+            month: "long",
+            day: "numeric"
+        });
+    }
+
+    function formatSessionNumberLabel(index) {
+        return `S${index + 1}`;
+    }
+
+    function getDescription(metricId) {
+        const descriptions = {
+            grip: "This shows how much strength you have when squeezing the glove.",
+            finger: "This shows how far you can bend your fingers today.",
+            repetitions: "This tracks how many times you completed the movement.",
+            duration: "This shows the total time you spent exercising."
+        };
+        return `${descriptions[metricId] || descriptions.grip} Based on your last 7 recent sessions.`;
+    }
+
+    async function fetchLastSevenRecentSessions() {
+        if (Array.isArray(cachedRecentSessions)) {
+            return cachedRecentSessions;
+        }
+
+        const response = await fetch("api/patient/recovery.php", { credentials: "same-origin" });
+        if (!response.ok) {
+            throw new Error("Unable to load session data.");
+        }
+
+        const payload = await response.json().catch(() => ({}));
+        const rawLogs = Array.isArray(payload?.logs) ? payload.logs : [];
+
+        const ordered = rawLogs
+            .map(log => {
+                const ts = new Date(String(log?.timestamp || ""));
+                return {
+                    ...log,
+                    __ts: Number.isNaN(ts.getTime()) ? 0 : ts.getTime()
+                };
+            })
+            .sort((a, b) => b.__ts - a.__ts)
+            .slice(0, 7)
+            .sort((a, b) => a.__ts - b.__ts);
+
+        cachedRecentSessions = ordered;
+        return ordered;
+    }
+
+    function buildMetricSeries(metricId, sessions) {
+        const safeSessions = Array.isArray(sessions) && sessions.length ? sessions : [];
+
+        const labels = safeSessions.length
+            ? safeSessions.map((_, index) => formatSessionNumberLabel(index))
+            : ["S1"];
+
+        const dates = safeSessions.length
+            ? safeSessions.map(session => {
+                const stamp = new Date(String(session?.timestamp || ""));
+                return Number.isNaN(stamp.getTime()) ? "Unknown date" : formatLongDate(stamp);
+            })
+            : ["Unknown date"];
+
+        const valueReaders = {
+            grip: session => Number(session?.grip_strength || 0),
+            finger: session => Number(session?.finger_movement || session?.flexion_angle || 0),
+            repetitions: session => Number(session?.repetitions || 0),
+            duration: session => {
+                const durationSec = Number(session?.duration_sec || 0);
+                return durationSec > 0 ? durationSec / 60 : Number(session?.duration_min || 0);
+            }
+        };
+
+        const seriesByMetric = {
+            grip: {
+                title: "Grip Strength Trend",
+                label: "Force (N)",
+                yAxisTitle: "Force (N)",
+                unit: " N"
+            },
+            finger: {
+                title: "Finger Movement Trend",
+                label: "Range of Motion (deg)",
+                yAxisTitle: "Range of Motion (deg)",
+                unit: "\u00b0"
+            },
+            repetitions: {
+                title: "Repetitions Trend",
+                label: "Repetitions",
+                yAxisTitle: "Repetitions",
+                unit: " reps"
+            },
+            duration: {
+                title: "Session Duration Trend",
+                label: "Minutes",
+                yAxisTitle: "Minutes",
+                unit: " min"
+            }
+        };
+
+        const selected = seriesByMetric[metricId] || seriesByMetric.grip;
+        const reader = valueReaders[metricId] || valueReaders.grip;
+        const values = safeSessions.length
+            ? safeSessions.map(reader)
+            : [0];
+
+        return {
+            labels,
+            ...selected,
+            values,
+            dates
+        };
+    }
+
+    async function openModal(metricId) {
+        const sessions = await fetchLastSevenRecentSessions().catch(() => []);
+        const series = buildMetricSeries(metricId, sessions);
+        activeMetricId = metricId;
+        modalTitle.textContent = series.title;
+        if (description) {
+            description.textContent = getDescription(metricId);
+        }
+
+        const showMoreDetail = metricId === "grip" || metricId === "finger";
+        if (moreDetailBtn) {
+            moreDetailBtn.hidden = !showMoreDetail;
+        }
+        if (modalFoot) {
+            modalFoot.hidden = !showMoreDetail;
+        }
+
+        if (modalChart) {
+            modalChart.destroy();
+        }
+
+        const axisColor = "#374151";
+        const gridColor = "rgba(107, 114, 128, 0.2)";
+        const context = canvas.getContext("2d");
+        const lineColor = "#4d869c";
+        const fillGradient = context
+            ? (() => {
+                const gradient = context.createLinearGradient(0, 0, 0, canvas.height || 280);
+                gradient.addColorStop(0, "rgba(77, 134, 156, 0.34)");
+                gradient.addColorStop(1, "rgba(77, 134, 156, 0.05)");
+                return gradient;
+            })()
+            : "rgba(77, 134, 156, 0.18)";
+
+        const latestPointGlowPlugin = {
+            id: "latestPointGlow",
+            afterDatasetsDraw(chart) {
+                const points = chart.getDatasetMeta(0)?.data || [];
+                const latestPoint = points[points.length - 1];
+                if (!latestPoint) {
+                    return;
+                }
+
+                const ctx = chart.ctx;
+                ctx.save();
+                ctx.shadowColor = "rgba(77, 134, 156, 0.45)";
+                ctx.shadowBlur = 12;
+                ctx.fillStyle = "rgba(77, 134, 156, 0.20)";
+                ctx.beginPath();
+                ctx.arc(latestPoint.x, latestPoint.y, 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        };
+
+        const pointDataLabelPlugin = {
+            id: "pointDataLabelPlugin",
+            afterDatasetsDraw(chart) {
+                if (!showPointValues) {
+                    return;
+                }
+
+                const ctx = chart.ctx;
+                const points = chart.getDatasetMeta(0)?.data || [];
+
+                ctx.save();
+                ctx.fillStyle = "#374151";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "bottom";
+                ctx.font = `600 12px ${chartFontFamily}`;
+
+                points.forEach((point, index) => {
+                    const raw = Number(series.values[index] || 0);
+                    const textValue = Number.isInteger(raw) ? String(raw) : raw.toFixed(1);
+                    const label = `${textValue}${series.unit}`;
+                    ctx.fillText(label, point.x, point.y - 10);
+                });
+
+                ctx.restore();
+            }
+        };
+
+        modalChart = new Chart(canvas, {
+            type: "line",
+            data: {
+                labels: series.labels,
+                datasets: [{
+                    label: series.label,
+                    data: series.values,
+                    borderColor: lineColor,
+                    backgroundColor: fillGradient,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: context => (context.dataIndex === series.values.length - 1 ? 10 : 7),
+                    pointHoverRadius: context => (context.dataIndex === series.values.length - 1 ? 13 : 11),
+                    pointHitRadius: 18,
+                    pointBorderWidth: 2,
+                    pointBackgroundColor: "#ffffff",
+                    pointBorderColor: lineColor
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        top: 16,
+                        right: 14,
+                        left: 10,
+                        bottom: 6
+                    }
+                },
+                interaction: {
+                    mode: "index",
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: axisColor,
+                            font: {
+                                family: chartFontFamily,
+                                size: 16,
+                                weight: "600"
+                            }
+                        }
+                    },
+                    tooltip: {
+                        enabled: true,
+                        titleFont: {
+                            family: chartFontFamily,
+                            size: 14,
+                            weight: "600"
+                        },
+                        bodyFont: {
+                            family: chartFontFamily,
+                            size: 14,
+                            weight: "500"
+                        },
+                        callbacks: {
+                            title(items) {
+                                const idx = items[0]?.dataIndex ?? 0;
+                                return `Date: ${series.dates[idx]}`;
+                            },
+                            label(context) {
+                                const raw = Number(context.raw || 0);
+                                const value = Number.isInteger(raw) ? String(raw) : raw.toFixed(1);
+                                return `${value}${series.unit}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: "Session Number",
+                            color: axisColor,
+                            font: {
+                                family: chartFontFamily,
+                                size: 16,
+                                weight: "700"
+                            }
+                        },
+                        ticks: {
+                            color: axisColor,
+                            font: {
+                                family: chartFontFamily,
+                                size: 15,
+                                weight: "500"
+                            },
+                            autoSkip: false,
+                            maxRotation: 0,
+                            minRotation: 0,
+                            padding: 10
+                        },
+                        grid: { color: gridColor }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        min: 0,
+                        title: {
+                            display: true,
+                                family: chartFontFamily,
+                            text: series.yAxisTitle,
+                            color: axisColor,
+                            font: {
+                                size: 16,
+                                weight: "700"
+                            }
+                        },
+                                family: chartFontFamily,
+                        ticks: {
+                            color: axisColor,
+                            font: {
+                                size: 15,
+                                weight: "500"
+                            }
+                        },
+                        grid: { color: gridColor }
+                    }
+                }
+            },
+            plugins: [latestPointGlowPlugin, pointDataLabelPlugin]
+        });
+
+        modal.hidden = false;
+        modal.setAttribute("aria-hidden", "false");
+        document.body.classList.add("graph-modal-open");
+    }
+
+    function closeModal() {
+        modal.hidden = true;
+        modal.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("graph-modal-open");
+    }
+
+    graphButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const metricId = button.getAttribute("data-metric-id") || "grip";
+            openModal(metricId).catch(() => {
+                if (description) {
+                    description.textContent = `Unable to load recent session data. Based on your last 7 recent sessions.`;
+                }
+            });
+        });
+    });
+
+    modal.addEventListener("click", (event) => {
+        const target = event.target;
+        if (target instanceof HTMLElement && target.dataset.modalClose === "true") {
+            closeModal();
+        }
+    });
+
+    if (modalClose) {
+        modalClose.addEventListener("click", closeModal);
+    }
+
+    if (moreDetailBtn) {
+        moreDetailBtn.addEventListener("click", () => {
+            const metricParam = encodeURIComponent(activeMetricId || "grip");
+            window.location.href = `recover.php?view=${metricParam}`;
+        });
+    }
+
+    showValuesToggle?.addEventListener("change", () => {
+        showPointValues = Boolean(showValuesToggle.checked);
+        if (!modal.hidden) {
+            openModal(activeMetricId).catch(() => {
+                if (description) {
+                    description.textContent = `Unable to load recent session data. Based on your last 7 recent sessions.`;
+                }
+            });
+        }
+    });
+
+    window.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !modal.hidden) {
+            closeModal();
+        }
+    });
+}
+
 function initializeDoctorDashboard() {
     const doctorChartCanvas = document.getElementById("doctorWeeklyProgressChart");
     const totalPatientsEl = document.getElementById("dashboardTotalPatients");
-    const activeTodayEl = document.getElementById("dashboardActivePatientsToday");
     const sessionsTodayEl = document.getElementById("dashboardSessionsToday");
     const avgGripEl = document.getElementById("dashboardAvgGripStrength");
-    const alertsList = document.getElementById("dashboardAlertsList");
+    const avgRangeEl = document.getElementById("dashboardAvgRangeMotion");
     const recentActivityBody = document.getElementById("dashboardRecentActivityBody");
     const quickOverviewBody = document.getElementById("dashboardQuickOverviewBody");
+    const recentActivityEmpty = document.getElementById("dashboardRecentActivityEmpty");
+    const quickOverviewEmpty = document.getElementById("dashboardQuickOverviewEmpty");
     const chartWrap = document.getElementById("doctorChartWrap");
     const metricButtons = document.querySelectorAll(".chart-metric-toggle .metric-btn");
-    const quickActionButton = document.getElementById("dashboardQuickAction");
-    const chartTitle = document.getElementById("doctorChartTitle");
     const chartSubtitle = document.getElementById("doctorChartSubtitle");
     const chartEmpty = document.getElementById("doctorChartEmpty");
     const patientSelectBtn = document.getElementById("patientSelectBtn");
@@ -569,15 +1194,29 @@ function initializeDoctorDashboard() {
     const patientSelectSearch = document.getElementById("patientSelectSearch");
     const selectedPatientLabel = document.getElementById("selectedPatientLabel");
 
+    if (!document.body.classList.contains("doctor-dashboard-page")) {
+        return;
+    }
+
     let doctorChart = null;
     let cachedPayload = null;
     let activeMetric = "grip";
     let selectedPatientKey = "all";
     let patientOptions = [];
+    let refreshTimer = null;
 
     function safeText(value, fallback = "-") {
         const normalized = value === null || value === undefined ? "" : String(value).trim();
         return normalized || fallback;
+    }
+
+    function toggleEmptyState(emptyNode, isVisible) {
+        if (!emptyNode) return;
+        emptyNode.hidden = !isVisible;
+        const wrap = emptyNode.closest(".doctor-table-wrap");
+        if (wrap) {
+            wrap.classList.toggle("is-empty", isVisible);
+        }
     }
 
     function computeYAxisBounds(data) {
@@ -627,7 +1266,10 @@ function initializeDoctorDashboard() {
         }
 
         const resolved = resolveSeries(chartData);
-        const metricLabel = activeMetric === "range" ? "Range of Motion (deg)" : "Grip Strength (N)";
+        const isRangeMetric = activeMetric === "range";
+        const metricLabel = isRangeMetric ? "Range of Motion (deg)" : "Grip Strength (N)";
+        const lineColor = isRangeMetric ? "#2d6a4f" : "#0d5f73";
+        const fillColor = isRangeMetric ? "rgba(45,106,79,0.18)" : "rgba(13,95,115,0.14)";
         const metricData = Array.isArray(resolved.series) ? resolved.series : [];
         const hasData = hasDataPoints(metricData);
         if (chartEmpty) {
@@ -643,8 +1285,8 @@ function initializeDoctorDashboard() {
                     {
                         label: metricLabel,
                         data: metricData.length ? metricData : [0, 0, 0, 0, 0, 0, 0],
-                        borderColor: "#0d5f73",
-                        backgroundColor: "rgba(13,95,115,0.14)",
+                        borderColor: lineColor,
+                        backgroundColor: fillColor,
                         borderWidth: 2,
                         tension: 0.35,
                         fill: true,
@@ -710,6 +1352,26 @@ function initializeDoctorDashboard() {
         }).join("");
     }
 
+    function syncPatientOptions(payload) {
+        const fromPayload = Array.isArray(payload?.patients) ? payload.patients : [];
+        patientOptions = [
+            { key: "all", label: "All Patients (Avg)" },
+            ...fromPayload.map(patient => ({
+                key: String(patient.id),
+                label: safeText(patient.name, `Patient ${patient.id}`)
+            }))
+        ];
+
+        if (selectedPatientKey !== "all" && !patientOptions.some(option => option.key === selectedPatientKey)) {
+            selectedPatientKey = "all";
+            if (selectedPatientLabel) {
+                selectedPatientLabel.textContent = "All Patients (Avg)";
+            }
+        }
+
+        renderPatientSelector();
+    }
+
     function updateChartTitle() {
         const activeLabel = patientOptions.find(item => item.key === selectedPatientKey)?.label || "All Patients (Avg)";
         if (chartSubtitle) {
@@ -719,58 +1381,46 @@ function initializeDoctorDashboard() {
 
     function renderDashboard(payload) {
         cachedPayload = payload;
+        syncPatientOptions(payload);
         const summary = payload.summary || {};
         if (totalPatientsEl) totalPatientsEl.textContent = String(summary.totalPatients ?? 0);
-        if (activeTodayEl) activeTodayEl.textContent = String(summary.activePatientsToday ?? 0);
         if (sessionsTodayEl) sessionsTodayEl.textContent = String(summary.sessionsToday ?? 0);
         if (avgGripEl) avgGripEl.textContent = `${Number(summary.avgGripStrength ?? 0).toFixed(1)} N`;
-
-        if (alertsList) {
-            const alerts = Array.isArray(payload.alerts) ? payload.alerts : [];
-            alertsList.innerHTML = alerts.length
-                ? alerts.map(alert => {
-                    const lower = String(alert).toLowerCase();
-                    const isCritical = lower.includes("decreased") || lower.includes("drop") || lower.includes("critical");
-                    return `<li class="${isCritical ? "alert-critical" : ""}"><span class="doctor-alert-icon" aria-hidden="true">i</span> ${safeText(alert)}</li>`;
-                }).join("")
-                : '<li><span class="doctor-alert-icon" aria-hidden="true">i</span> No patient alerts yet.</li>';
-        }
+        if (avgRangeEl) avgRangeEl.innerHTML = `${Number(summary.avgRangeOfMotion ?? 0).toFixed(1)}&deg; <span class="trend-indicator" id="trendAvgRange" aria-hidden="true"></span>`;
 
         if (recentActivityBody) {
             const rows = Array.isArray(payload.recentActivity) ? payload.recentActivity : [];
-            recentActivityBody.innerHTML = rows.length
-                ? rows.map(row => `
+            if (rows.length) {
+                recentActivityBody.innerHTML = rows.map(row => `
                     <tr>
                         <td>${safeText(row.patient_name)}</td>
                         <td>${safeText(row.note, "Sensor reading recorded")}</td>
                         <td>${safeText(row.recorded_at, "-")}</td>
                     </tr>
-                `).join("")
-                : `
-                    <tr class="empty-state-row">
-                        <td colspan="3" class="empty-state">
-                            <div class="empty-illustration">🩺</div>
-                            <div>No recent patient activity yet.</div>
-                        </td>
-                    </tr>
-                `;
+                `).join("");
+                toggleEmptyState(recentActivityEmpty, false);
+            } else {
+                recentActivityBody.innerHTML = "";
+                toggleEmptyState(recentActivityEmpty, true);
+            }
         }
 
         if (quickOverviewBody) {
             const rows = Array.isArray(payload.quickOverview) ? payload.quickOverview : [];
-            if (!patientOptions.length) {
-                patientOptions = [
-                    { key: "all", label: "All Patients (Avg)" },
-                    ...rows.map(row => ({ key: row.id || row.name, label: row.name }))
-                ];
-                renderPatientSelector();
-            }
-            quickOverviewBody.innerHTML = rows.length
-                ? rows.map(row => {
+            if (rows.length) {
+                quickOverviewBody.innerHTML = rows.map(row => {
                     const drop = Number(row.drop_percent || row.drop || 0);
                     const missed = !!row.missed_session;
+                    const normalizedStatus = safeText(row.status, "Stable").toLowerCase();
                     let trafficClass = "traffic-green";
-                    if (!Number.isNaN(drop) && drop >= 20) {
+
+                    if (normalizedStatus.includes("stable")) {
+                        trafficClass = "traffic-green";
+                    } else if (normalizedStatus.includes("attention")) {
+                        trafficClass = "traffic-red";
+                    } else if (normalizedStatus.includes("improving")) {
+                        trafficClass = "traffic-yellow";
+                    } else if (!Number.isNaN(drop) && drop >= 20) {
                         trafficClass = "traffic-red";
                     } else if (missed) {
                         trafficClass = "traffic-yellow";
@@ -782,16 +1432,12 @@ function initializeDoctorDashboard() {
                             <td>${safeText(row.last_session, "N/A")}</td>
                         </tr>
                     `;
-                }).join("")
-                : `
-                    <tr class="empty-state-row">
-                        <td colspan="3" class="empty-state">
-                            <div class="empty-illustration">👥</div>
-                            <div>No patients added yet.</div>
-                            <div><a href="patients.html" class="btn btn-primary add-patient-cta">Add Patient</a></div>
-                        </td>
-                    </tr>
-                `;
+                }).join("");
+                toggleEmptyState(quickOverviewEmpty, false);
+            } else {
+                quickOverviewBody.innerHTML = "";
+                toggleEmptyState(quickOverviewEmpty, true);
+            }
         }
 
         renderWeeklyChart(payload.weeklyChart || {});
@@ -799,11 +1445,39 @@ function initializeDoctorDashboard() {
 
         const trends = summary.trends || payload.trends || {};
         setTrend("trendTotalPatients", trends.totalPatients ?? summary.deltaTotalPatients);
-        setTrend("trendActivePatients", trends.activePatientsToday ?? summary.deltaActivePatients);
         setTrend("trendSessionsToday", trends.sessionsToday ?? summary.deltaSessions);
         setTrend("trendAvgGrip", trends.avgGripStrength ?? summary.deltaAvgGrip);
+        setTrend("trendAvgRange", trends.avgRangeOfMotion ?? summary.deltaAvgRange);
 
         applyUnreadBadge(Number(payload.unreadMessages ?? payload.unreadMessagesCount ?? 0));
+    }
+
+    async function fetchDashboardData(patientKey = "all", showLoader = false) {
+        if (showLoader && chartWrap) chartWrap.classList.add("is-loading");
+        const params = new URLSearchParams();
+        if (patientKey !== "all") {
+            params.set("patient_id", patientKey);
+        }
+        const queryString = params.toString();
+        const url = `api/doctor/get_patient_data.php${queryString ? `?${queryString}` : ""}`;
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error("Unable to load dashboard data.");
+            }
+
+            const payload = await response.json();
+            if (!payload?.ok) {
+                throw new Error(payload?.error || "Unable to load dashboard data.");
+            }
+
+            renderDashboard(payload);
+        } catch (error) {
+            // Keep existing values on refresh failures.
+        } finally {
+            if (showLoader && chartWrap) chartWrap.classList.remove("is-loading");
+        }
     }
 
     metricButtons?.forEach(button => {
@@ -847,34 +1521,17 @@ function initializeDoctorDashboard() {
         }
         renderPatientSelector();
         updateChartTitle();
-        if (cachedPayload) {
-            renderWeeklyChart(cachedPayload.weeklyChart || {});
-        }
         if (patientSelectMenu) patientSelectMenu.hidden = true;
+        void fetchDashboardData(selectedPatientKey, true);
     });
 
-    quickActionButton?.addEventListener("click", () => {
-        window.location.href = "patients.html";
-    });
+    void fetchDashboardData("all", true);
 
-    if (chartWrap) chartWrap.classList.add("is-loading");
-
-    fetch("api/doctor/dashboard.php")
-        .then(response => response.ok ? response.json() : Promise.reject(new Error("Unable to load dashboard data.")))
-        .then(payload => {
-            if (!payload?.ok) {
-                throw new Error(payload?.error || "Unable to load dashboard data.");
-            }
-
-            renderDashboard(payload);
-            if (chartWrap) chartWrap.classList.remove("is-loading");
-        })
-        .catch(() => {
-            if (alertsList) {
-                alertsList.innerHTML = '<li><span class="doctor-alert-icon" aria-hidden="true">i</span> Unable to load dashboard data right now.</li>';
-            }
-            if (chartWrap) chartWrap.classList.remove("is-loading");
-        });
+    refreshTimer = window.setInterval(() => {
+        if (document.visibilityState === "visible") {
+            void fetchDashboardData(selectedPatientKey, false);
+        }
+    }, 12000);
 }
 
 function initializePatientsPage() {
@@ -894,13 +1551,22 @@ function initializePatientsPage() {
     const modal = document.getElementById("addPatientModal");
     const modalBackdrop = document.getElementById("addPatientModalBackdrop");
     const addPatientForm = document.getElementById("addPatientForm");
+    const addPatientSteps = Array.from(document.querySelectorAll(".add-patient-step"));
+    const addPatientPageDots = Array.from(document.querySelectorAll(".add-patient-page-dot"));
+    const addPatientStepLabel = document.getElementById("addPatientStepLabel");
+    const addPatientNextButton = document.getElementById("addPatientNextBtn");
+    const addPatientBackButton = document.getElementById("addPatientBackBtn");
+    const addPatientSaveButton = document.getElementById("addPatientSaveBtn");
+    const addPatientAgeInput = addPatientForm?.querySelector('input[name="age"]') || null;
+    const addPatientDobInput = addPatientForm?.querySelector('input[name="dateOfBirth"]') || null;
     const saveNotesButton = document.getElementById("saveDoctorNotes");
     const notesInput = document.getElementById("doctorNotesInput");
     const notesFeedback = document.getElementById("notesSaveFeedback");
+    const notesCounter = document.getElementById("doctorNotesCounter");
     const clinicalDiagnosisInput = document.getElementById("clinicalDiagnosis");
+    const clinicalDiagnosisCounter = document.getElementById("clinicalDiagnosisCounter");
     const clinicalTreatmentGoalInput = document.getElementById("clinicalTreatmentGoal");
-    const clinicalAssignedDoctorInput = document.getElementById("clinicalAssignedDoctor");
-    const clinicalLastReviewInput = document.getElementById("clinicalLastReview");
+    const clinicalTreatmentGoalCounter = document.getElementById("clinicalTreatmentGoalCounter");
     const saveClinicalInfoButton = document.getElementById("saveClinicalInfo");
     const clinicalSaveFeedback = document.getElementById("clinicalSaveFeedback");
 
@@ -918,8 +1584,51 @@ function initializePatientsPage() {
 
     let patients = [];
     let activePatientId = "";
+    let addPatientStepIndex = 0;
     let gripChartInstance = null;
     let flexionChartInstance = null;
+    let profileMetricsTimer = null;
+    const characterCounterUpdaters = [];
+
+    function bindCharacterCounter(inputElement, counterElement, maxLength) {
+        if (!inputElement || !counterElement) {
+            return null;
+        }
+
+        const updateCounter = () => {
+            const value = String(inputElement.value || "");
+            if (value.length > maxLength) {
+                inputElement.value = value.slice(0, maxLength);
+            }
+            counterElement.textContent = `${inputElement.value.length}/${maxLength}`;
+        };
+
+        inputElement.setAttribute("maxlength", String(maxLength));
+        inputElement.addEventListener("input", updateCounter);
+        updateCounter();
+        return updateCounter;
+    }
+
+    function refreshCharacterCounters() {
+        characterCounterUpdaters.forEach(update => {
+            if (typeof update === "function") {
+                update();
+            }
+        });
+    }
+
+    characterCounterUpdaters.push(bindCharacterCounter(clinicalDiagnosisInput, clinicalDiagnosisCounter, 50));
+    characterCounterUpdaters.push(bindCharacterCounter(clinicalTreatmentGoalInput, clinicalTreatmentGoalCounter, 50));
+    characterCounterUpdaters.push(bindCharacterCounter(notesInput, notesCounter, 200));
+    refreshCharacterCounters();
+
+    function formatGrip(value) {
+        return `${Number(value || 0).toFixed(1)} N`;
+    }
+
+    function formatFlexion(value) {
+        return `${Number(value || 0).toFixed(1)} deg`;
+    }
 
     // Load patients from the API.
     fetch('api/patients/list.php')
@@ -1043,6 +1752,23 @@ function initializePatientsPage() {
 
         const axisColor = document.body.classList.contains("dark-mode") ? "#88a8b4" : "#5e7f8d";
         const gridColor = document.body.classList.contains("dark-mode") ? "rgba(136,168,180,0.2)" : "rgba(94,127,141,0.15)";
+        const gripContext = gripCanvas.getContext("2d");
+        const flexionContext = flexionCanvas.getContext("2d");
+        const gripGradient = gripContext
+            ? gripContext.createLinearGradient(0, 0, 0, gripCanvas.height || 320)
+            : null;
+        if (gripGradient) {
+            gripGradient.addColorStop(0, "rgba(13,95,115,0.26)");
+            gripGradient.addColorStop(1, "rgba(13,95,115,0.02)");
+        }
+
+        const flexionGradient = flexionContext
+            ? flexionContext.createLinearGradient(0, 0, 0, flexionCanvas.height || 320)
+            : null;
+        if (flexionGradient) {
+            flexionGradient.addColorStop(0, "rgba(47,155,114,0.88)");
+            flexionGradient.addColorStop(1, "rgba(20,121,91,0.48)");
+        }
 
         gripChartInstance = new Chart(gripCanvas, {
             type: "line",
@@ -1053,23 +1779,46 @@ function initializePatientsPage() {
                         label: "Force (N)",
                         data: patient.chart.grip,
                         borderColor: "#0d5f73",
-                        backgroundColor: "rgba(13,95,115,0.14)",
+                        borderWidth: 3,
+                        backgroundColor: gripGradient || "rgba(13,95,115,0.14)",
                         fill: true,
-                        tension: 0.35,
-                        pointRadius: 4,
-                        pointHoverRadius: 6
+                        tension: 0.42,
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
+                        pointBackgroundColor: "#ffffff",
+                        pointBorderWidth: 2,
+                        pointBorderColor: "#0d5f73"
                     }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: {
+                    mode: "index",
+                    intersect: false
+                },
                 plugins: {
-                    legend: { display: false }
+                    legend: { display: false },
+                    tooltip: {
+                        displayColors: false,
+                        backgroundColor: "rgba(15, 60, 73, 0.96)",
+                        titleColor: "#ffffff",
+                        bodyColor: "#e8f5fa",
+                        titleFont: { weight: "700" },
+                        bodyFont: { weight: "600" }
+                    }
                 },
                 scales: {
-                    x: { ticks: { color: axisColor }, grid: { color: gridColor } },
-                    y: { beginAtZero: true, ticks: { color: axisColor }, grid: { color: gridColor } }
+                    x: {
+                        ticks: { color: axisColor, font: { weight: "600" } },
+                        grid: { color: gridColor, drawBorder: false }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: axisColor, font: { weight: "600" } },
+                        grid: { color: gridColor, drawBorder: false }
+                    }
                 }
             }
         });
@@ -1082,8 +1831,13 @@ function initializePatientsPage() {
                     {
                         label: "Flexion (deg)",
                         data: patient.chart.flexion,
-                        backgroundColor: "rgba(47,155,114,0.75)",
-                        borderRadius: 8
+                        backgroundColor: flexionGradient || "rgba(47,155,114,0.75)",
+                        borderColor: "rgba(26, 121, 93, 0.95)",
+                        borderWidth: 1,
+                        borderRadius: 12,
+                        borderSkipped: false,
+                        barThickness: 28,
+                        maxBarThickness: 34
                     }
                 ]
             },
@@ -1091,13 +1845,26 @@ function initializePatientsPage() {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: {
-                        labels: { color: axisColor }
+                    legend: { display: false },
+                    tooltip: {
+                        displayColors: false,
+                        backgroundColor: "rgba(19, 74, 58, 0.96)",
+                        titleColor: "#ffffff",
+                        bodyColor: "#e8f5fa",
+                        titleFont: { weight: "700" },
+                        bodyFont: { weight: "600" }
                     }
                 },
                 scales: {
-                    x: { ticks: { color: axisColor }, grid: { color: gridColor } },
-                    y: { beginAtZero: true, ticks: { color: axisColor }, grid: { color: gridColor } }
+                    x: {
+                        ticks: { color: axisColor, font: { weight: "600" } },
+                        grid: { display: false, drawBorder: false }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: axisColor, font: { weight: "600" } },
+                        grid: { color: gridColor, drawBorder: false }
+                    }
                 }
             }
         });
@@ -1147,6 +1914,7 @@ function initializePatientsPage() {
         if (notesInput) {
             notesInput.value = patient.notes || "";
         }
+        refreshCharacterCounters();
         if (notesFeedback) {
             notesFeedback.textContent = "";
         }
@@ -1155,8 +1923,60 @@ function initializePatientsPage() {
             clinicalSaveFeedback.textContent = "";
         }
         void loadClinicalData(patient.dbId || patient.id);
+        void loadProfileMetrics(patient.dbId || patient.id, true);
 
         renderProfileCharts(patient);
+    }
+
+    async function loadProfileMetrics(patientDbId, updateCharts = false) {
+        if (!patientDbId) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`api/patients/profile_metrics.php?patientId=${patientDbId}`);
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload?.ok) {
+                throw new Error(payload?.error || "Unable to load sensor summary.");
+            }
+
+            const patient = patients.find(entry => String(entry.dbId || entry.id) === String(patientDbId));
+            if (!patient) {
+                return;
+            }
+
+            const summary = payload.summary || {};
+            patient.metrics.grip = formatGrip(summary.avgGripStrength);
+            patient.metrics.flexion = formatFlexion(summary.avgFlexionAngle);
+            patient.metrics.repetitionsToday = String(Number(summary.repetitionsToday || 0));
+
+            const plan = payload.plan || {};
+            patient.therapyPlan.duration = Number(plan.duration_min || 20);
+            patient.therapyPlan.repetitions = Number(plan.target_repetitions || 120);
+            patient.therapyPlan.sessionsPerDay = Number(plan.sessions_per_day || 2);
+
+            const weekly = payload.weeklyChart || {};
+            const gripSeries = Array.isArray(weekly.grip) ? weekly.grip : patient.chart.grip;
+            const flexionSeries = Array.isArray(weekly.flexion) ? weekly.flexion : patient.chart.flexion;
+            patient.chart = {
+                grip: gripSeries,
+                flexion: flexionSeries
+            };
+
+            if (patient.id === activePatientId) {
+                if (profileGrip) profileGrip.textContent = patient.metrics.grip;
+                if (profileFlexion) profileFlexion.textContent = patient.metrics.flexion;
+                if (profileRepetitions) profileRepetitions.textContent = patient.metrics.repetitionsToday;
+                if (planDuration) planDuration.value = String(patient.therapyPlan.duration);
+                if (planRepetitions) planRepetitions.value = String(patient.therapyPlan.repetitions);
+                if (planSessions) planSessions.value = String(patient.therapyPlan.sessionsPerDay);
+                if (updateCharts) {
+                    renderProfileCharts(patient);
+                }
+            }
+        } catch (_err) {
+            // Silent polling failure by design.
+        }
     }
 
     async function loadClinicalData(patientDbId) {
@@ -1174,9 +1994,8 @@ function initializePatientsPage() {
             const clinical = payload.clinical || {};
             if (clinicalDiagnosisInput) clinicalDiagnosisInput.value = clinical.diagnosis || "";
             if (clinicalTreatmentGoalInput) clinicalTreatmentGoalInput.value = clinical.treatment_goal || "";
-            if (clinicalAssignedDoctorInput) clinicalAssignedDoctorInput.value = clinical.assigned_doctor || "";
-            if (clinicalLastReviewInput) clinicalLastReviewInput.value = clinical.reviewed_at || "";
-            if (notesInput) notesInput.value = clinical.treatment_goal || notesInput.value;
+            if (notesInput) notesInput.value = clinical.doctor_notes || "";
+            refreshCharacterCounters();
         } catch (err) {
             if (clinicalSaveFeedback) {
                 clinicalSaveFeedback.textContent = "Unable to load medical info.";
@@ -1184,7 +2003,7 @@ function initializePatientsPage() {
         }
     }
 
-    async function saveClinicalData(patientDbId, { diagnosis, treatmentGoal }) {
+    async function saveClinicalData(patientDbId, { diagnosis, treatmentGoal, doctorNotes }) {
         if (!patientDbId) return false;
         if (clinicalSaveFeedback) {
             clinicalSaveFeedback.textContent = "Saving medical info...";
@@ -1196,16 +2015,13 @@ function initializePatientsPage() {
                 body: JSON.stringify({
                     patientId: patientDbId,
                     diagnosis,
-                    treatmentGoal
+                    treatmentGoal,
+                    doctorNotes
                 })
             });
             const payload = await response.json().catch(() => ({}));
             if (!response.ok || !payload?.ok) {
                 throw new Error(payload?.error || "Unable to save medical info.");
-            }
-
-            if (clinicalLastReviewInput) {
-                clinicalLastReviewInput.value = payload.reviewed_at || "";
             }
             if (clinicalSaveFeedback) {
                 clinicalSaveFeedback.textContent = "Medical info saved.";
@@ -1227,6 +2043,18 @@ function initializePatientsPage() {
         if (profileView) {
             profileView.classList.remove("is-hidden");
         }
+
+        const patient = patients.find(entry => entry.id === patientId);
+        if (patient) {
+            if (profileMetricsTimer) {
+                window.clearInterval(profileMetricsTimer);
+            }
+            profileMetricsTimer = window.setInterval(() => {
+                if (document.visibilityState === "visible") {
+                    void loadProfileMetrics(patient.dbId || patient.id, true);
+                }
+            }, 5000);
+        }
     }
 
     function showListView() {
@@ -1235,6 +2063,11 @@ function initializePatientsPage() {
         }
         if (listView) {
             listView.classList.remove("is-hidden");
+        }
+
+        if (profileMetricsTimer) {
+            window.clearInterval(profileMetricsTimer);
+            profileMetricsTimer = null;
         }
     }
 
@@ -1245,6 +2078,8 @@ function initializePatientsPage() {
 
         modal.hidden = false;
         document.body.style.overflow = "hidden";
+        setAddPatientStep(0);
+        syncAgeFromDob();
     }
 
     function closeModal() {
@@ -1257,27 +2092,199 @@ function initializePatientsPage() {
         if (addPatientForm) {
             addPatientForm.reset();
         }
+        if (addPatientAgeInput) {
+            addPatientAgeInput.value = "";
+        }
+        setAddPatientStep(0);
+    }
+
+    function setAddPatientStep(stepIndex) {
+        if (!addPatientSteps.length) {
+            return;
+        }
+
+        addPatientStepIndex = Math.max(0, Math.min(stepIndex, addPatientSteps.length - 1));
+        addPatientSteps.forEach((stepElement, index) => {
+            stepElement.hidden = index !== addPatientStepIndex;
+        });
+
+        if (addPatientBackButton) {
+            const hideBack = addPatientStepIndex === 0;
+            addPatientBackButton.classList.toggle("is-hidden-nav", hideBack);
+            addPatientBackButton.setAttribute("aria-hidden", String(hideBack));
+            addPatientBackButton.disabled = hideBack;
+        }
+        if (addPatientNextButton) {
+            const hideNext = addPatientStepIndex === addPatientSteps.length - 1;
+            addPatientNextButton.classList.toggle("is-hidden-nav", hideNext);
+            addPatientNextButton.setAttribute("aria-hidden", String(hideNext));
+            addPatientNextButton.disabled = hideNext;
+        }
+        if (addPatientSaveButton) {
+            addPatientSaveButton.hidden = addPatientStepIndex !== addPatientSteps.length - 1;
+        }
+
+        if (addPatientStepLabel) {
+            addPatientStepLabel.textContent = addPatientStepIndex === 0
+                ? "Step 1 of 2: Personal details"
+                : "Step 2 of 2: Clinical and login details";
+        }
+
+        addPatientPageDots.forEach((dot, index) => {
+            dot.classList.toggle("is-active", index === addPatientStepIndex);
+        });
+    }
+
+    function validateAddPatientStep(stepIndex) {
+        if (stepIndex === 0) {
+            syncAgeFromDob();
+        }
+
+        const stepElement = addPatientSteps[stepIndex];
+        if (!stepElement) {
+            return true;
+        }
+
+        const fields = Array.from(stepElement.querySelectorAll("input, select, textarea"));
+        for (const field of fields) {
+            if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) {
+                continue;
+            }
+            if (!field.checkValidity()) {
+                field.reportValidity();
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function calculateAgeFromDob(dobValue) {
+        const normalizedDob = normalizeDobToIso(dobValue);
+        if (!normalizedDob) {
+            return null;
+        }
+
+        const dob = new Date(`${normalizedDob}T00:00:00`);
+        if (Number.isNaN(dob.getTime())) {
+            return null;
+        }
+
+        const today = new Date();
+        if (dob > today) {
+            return null;
+        }
+
+        let age = today.getFullYear() - dob.getFullYear();
+        const monthDiff = today.getMonth() - dob.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+            age -= 1;
+        }
+
+        if (age < 0 || age > 130) {
+            return null;
+        }
+
+        return age;
+    }
+
+    function syncAgeFromDob() {
+        if (!addPatientDobInput || !addPatientAgeInput) {
+            return;
+        }
+
+        const computedAge = calculateAgeFromDob(String(addPatientDobInput.value || "").trim());
+        addPatientAgeInput.value = computedAge === null ? "" : String(computedAge);
+    }
+
+    function maskDobInput(rawValue) {
+        const digits = String(rawValue || "").replace(/\D/g, "").slice(0, 8);
+        const month = digits.slice(0, 2);
+        const day = digits.slice(2, 4);
+        const year = digits.slice(4, 8);
+
+        let masked = month;
+        if (day) {
+            masked += ` / ${day}`;
+        }
+        if (year) {
+            masked += ` / ${year}`;
+        }
+        return masked;
+    }
+
+    function normalizeDobToIso(dobValue) {
+        const trimmed = String(dobValue || "").trim();
+        if (!trimmed) {
+            return "";
+        }
+
+        if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+            return trimmed;
+        }
+
+        const compactSlash = trimmed.replace(/\s+/g, "");
+        const slashMatch = compactSlash.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (!slashMatch) {
+            return "";
+        }
+
+        const monthPart = slashMatch[1].padStart(2, "0");
+        const dayPart = slashMatch[2].padStart(2, "0");
+        const yearPart = slashMatch[3];
+        return `${yearPart}-${monthPart}-${dayPart}`;
     }
 
     async function addPatientFromForm(form) {
         const formData = new FormData(form);
-        const patientName = String(formData.get("name") || "").trim();
-        const ageDob      = String(formData.get("ageDob") || "").trim();
+        const firstName   = String(formData.get("firstName") || "").trim();
+        const lastName    = String(formData.get("lastName") || "").trim();
+        const patientName = `${firstName} ${lastName}`.trim();
+        const dateOfBirth = String(formData.get("dateOfBirth") || "").trim();
         const gender      = String(formData.get("gender") || "").trim();
         const strokeType  = String(formData.get("strokeType") || "").trim();
         const affectedHand = String(formData.get("affectedHand") || "").trim();
-        const contact     = String(formData.get("contact") || "").trim();
+        const phone       = String(formData.get("phone") || "").trim();
+        const backupEmail = String(formData.get("backupEmail") || "").trim();
         const username    = String(formData.get("username") || "").trim();
         const password    = String(formData.get("password") || "");
 
-        const parsedAge = Number.parseInt(ageDob, 10);
-        const age = Number.isNaN(parsedAge) ? 0 : parsedAge;
+        const normalizedPhone = phone.replace(/\s+/g, "");
+        if (!/^\+?\d{7,15}$/.test(normalizedPhone)) {
+            alert("Phone must be 7 to 15 digits (optional leading +).");
+            return;
+        }
+
+        if (backupEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(backupEmail)) {
+            alert("Backup contact must be a valid email address.");
+            return;
+        }
+
+        const computedAge = calculateAgeFromDob(dateOfBirth);
+        if (computedAge === null) {
+            alert("Please enter a valid date of birth.");
+            return;
+        }
+        const age = computedAge;
+        const isoDateOfBirth = normalizeDobToIso(dateOfBirth);
 
         try {
             const response = await fetch('api/patients/create.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: patientName, age, gender, strokeType, affectedHand, contact, username, password })
+                body: JSON.stringify({
+                    firstName,
+                    lastName,
+                    name: patientName,
+                    age,
+                    dateOfBirth: isoDateOfBirth,
+                    gender,
+                    strokeType,
+                    affectedHand,
+                    phone: normalizedPhone,
+                    backupEmail,
+                    username,
+                    password
+                })
             });
             const result = await response.json();
             if (response.ok && result.ok) {
@@ -1337,12 +2344,43 @@ function initializePatientsPage() {
             return;
         }
 
+        if (addPatientStepIndex !== addPatientSteps.length - 1) {
+            if (validateAddPatientStep(addPatientStepIndex)) {
+                setAddPatientStep(addPatientStepIndex + 1);
+            }
+            return;
+        }
+
         if (!event.currentTarget.checkValidity()) {
             event.currentTarget.reportValidity();
             return;
         }
 
         void addPatientFromForm(event.currentTarget);
+    });
+
+    addPatientDobInput?.addEventListener("input", () => {
+        if (!addPatientDobInput) {
+            return;
+        }
+        const nextValue = maskDobInput(addPatientDobInput.value);
+        if (nextValue !== addPatientDobInput.value) {
+            addPatientDobInput.value = nextValue;
+        }
+        syncAgeFromDob();
+    });
+    addPatientDobInput?.addEventListener("change", syncAgeFromDob);
+    addPatientDobInput?.addEventListener("blur", syncAgeFromDob);
+
+    addPatientNextButton?.addEventListener("click", () => {
+        if (!validateAddPatientStep(addPatientStepIndex)) {
+            return;
+        }
+        setAddPatientStep(addPatientStepIndex + 1);
+    });
+
+    addPatientBackButton?.addEventListener("click", () => {
+        setAddPatientStep(addPatientStepIndex - 1);
     });
 
     document.addEventListener("keydown", event => {
@@ -1357,11 +2395,20 @@ function initializePatientsPage() {
             return;
         }
 
+        if (notesInput.value.length > 200) {
+            if (notesFeedback) {
+                notesFeedback.textContent = "Doctor notes cannot exceed 200 characters.";
+            }
+            return;
+        }
+
         patient.notes = notesInput.value.trim();
         const diagnosis = clinicalDiagnosisInput?.value.trim() || "";
+        const treatmentGoal = clinicalTreatmentGoalInput?.value.trim() || "";
         const saved = await saveClinicalData(patient.dbId || patient.id, {
             diagnosis,
-            treatmentGoal: patient.notes
+            treatmentGoal,
+            doctorNotes: patient.notes
         });
 
         if (notesFeedback) {
@@ -1377,23 +2424,16 @@ function initializePatientsPage() {
 
         const diagnosis = clinicalDiagnosisInput?.value.trim() || "";
         const treatmentGoal = clinicalTreatmentGoalInput?.value.trim() || "";
-        const saved = await saveClinicalData(patient.dbId || patient.id, { diagnosis, treatmentGoal });
-        if (saved && notesInput) {
-            notesInput.value = treatmentGoal;
-        }
-    });
+        const doctorNotes = notesInput?.value.trim() || "";
 
-    [planDuration, planRepetitions, planSessions].forEach(input => {
-        input?.addEventListener("change", () => {
-            const patient = patients.find(entry => entry.id === activePatientId);
-            if (!patient) {
-                return;
+        if (diagnosis.length > 50 || treatmentGoal.length > 50 || doctorNotes.length > 200) {
+            if (clinicalSaveFeedback) {
+                clinicalSaveFeedback.textContent = "Please keep Diagnosis and Treatment Goal within 50 characters, and Notes within 200 characters.";
             }
+            return;
+        }
 
-            patient.therapyPlan.duration = Number(planDuration?.value || patient.therapyPlan.duration);
-            patient.therapyPlan.repetitions = Number(planRepetitions?.value || patient.therapyPlan.repetitions);
-            patient.therapyPlan.sessionsPerDay = Number(planSessions?.value || patient.therapyPlan.sessionsPerDay);
-        });
+        await saveClinicalData(patient.dbId || patient.id, { diagnosis, treatmentGoal, doctorNotes });
     });
 
     renderPatientTable();
@@ -1640,174 +2680,6 @@ function initializeTherapyPlansPage() {
     loadAssignments();
 }
 
-function initializeGlobalProgressPage() {
-    const pageRoot = document.getElementById("globalProgressRoot");
-    if (!pageRoot) {
-        return;
-    }
-
-    const leaderboardList = document.getElementById("progressLeaderboardList");
-    const heatmapGrid = document.getElementById("clinicHeatmapGrid");
-    const downloadButton = document.getElementById("downloadMonthlyReportBtn");
-
-    const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    let weeklySessions = [0, 0, 0, 0, 0, 0, 0];
-    let leaderboard = [];
-    let patientsProgressData = [];
-
-    const chartCanvas = document.getElementById("globalProgressComparisonChart");
-    let progressChart = null;
-
-    function renderChart() {
-        if (!chartCanvas || typeof Chart === "undefined") {
-            return;
-        }
-
-        const axisColor = document.body.classList.contains("dark-mode") ? "#88a8b4" : "#5e7f8d";
-        const gridColor = document.body.classList.contains("dark-mode") ? "rgba(136,168,180,0.2)" : "rgba(94,127,141,0.15)";
-        const palette = ["#0d5f73", "#2f9b72", "#4d869c", "#3f7a90", "#6aa5b8"];
-
-        if (progressChart) {
-            progressChart.destroy();
-        }
-
-        const datasets = patientsProgressData
-            .filter(patient => patient.hasData)
-            .map((patient, index) => ({
-                label: patient.name,
-                data: patient.grip,
-                borderColor: palette[index % palette.length],
-                backgroundColor: "transparent",
-                borderWidth: 2,
-                tension: 0.35,
-                pointRadius: 3
-            }));
-
-        progressChart = new Chart(chartCanvas, {
-            type: "line",
-            data: {
-                labels: dayLabels,
-                datasets: datasets.length ? datasets : [{
-                    label: "No data recorded yet",
-                    data: [0, 0, 0, 0, 0, 0, 0],
-                    borderColor: "#9ab4bf",
-                    backgroundColor: "transparent",
-                    borderWidth: 2,
-                    tension: 0.35,
-                    pointRadius: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        labels: { color: axisColor }
-                    }
-                },
-                scales: {
-                    x: { ticks: { color: axisColor }, grid: { color: gridColor } },
-                    y: { beginAtZero: true, ticks: { color: axisColor }, grid: { color: gridColor } }
-                }
-            }
-        });
-    }
-
-    function renderLeaderboard() {
-        if (!leaderboardList) {
-            return;
-        }
-
-        if (!leaderboard.length) {
-            leaderboardList.innerHTML = "<li>No data recorded yet.</li>";
-            return;
-        }
-
-        leaderboardList.innerHTML = leaderboard
-            .map((entry, index) => `<li>${index + 1}. ${entry.name} - ${Number(entry.score || 0).toFixed(1)}% weekly improvement</li>`)
-            .join("");
-    }
-
-    function renderHeatmap() {
-        if (!heatmapGrid) {
-            return;
-        }
-
-        const maxSessions = Math.max(...weeklySessions, 0);
-        heatmapGrid.innerHTML = dayLabels
-            .map((day, index) => {
-                const value = weeklySessions[index] || 0;
-                const intensity = maxSessions ? value / maxSessions : 0;
-                const lightness = 92 - intensity * 48;
-                const bgColor = `hsl(194, 36%, ${lightness}%)`;
-
-                return `
-                    <div class="heatmap-day" style="background:${bgColor}">
-                        <span>${day}</span>
-                        <strong>${value}</strong>
-                        <span>sessions</span>
-                    </div>
-                `;
-            })
-            .join("");
-    }
-
-    fetch("api/doctor/progress.php")
-        .then(response => response.ok ? response.json() : Promise.reject(new Error("Unable to load progress data.")))
-        .then(payload => {
-            if (!payload?.ok) {
-                throw new Error(payload?.error || "Unable to load progress data.");
-            }
-
-            patientsProgressData = Array.isArray(payload.datasets) ? payload.datasets : [];
-            leaderboard = Array.isArray(payload.leaderboard) ? payload.leaderboard : [];
-
-            const labels = Array.isArray(payload.labels) ? payload.labels : dayLabels;
-            const heatmap = payload.heatmap || {};
-            weeklySessions = labels.map(label => Number(heatmap[label] || 0));
-
-            renderChart();
-            renderLeaderboard();
-            renderHeatmap();
-        })
-        .catch(() => {
-            patientsProgressData = [];
-            leaderboard = [];
-            weeklySessions = [0, 0, 0, 0, 0, 0, 0];
-            renderChart();
-            renderLeaderboard();
-            renderHeatmap();
-        });
-
-    downloadButton?.addEventListener("click", () => {
-        const totalSessions = weeklySessions.reduce((sum, value) => sum + value, 0);
-        const topLine = leaderboard[0] ? `${leaderboard[0].name} (${leaderboard[0].score.toFixed(1)}%)` : "N/A";
-        const report = [
-            "Theraflow Monthly Progress Summary",
-            "Generated: March 2026",
-            "",
-            `Total Weekly Sessions Recorded: ${totalSessions}`,
-            `Top Recovering Patient: ${topLine}`,
-            "",
-            "Leaderboard:",
-            ...leaderboard.map((entry, index) => `${index + 1}. ${entry.name} - ${entry.score.toFixed(1)}%`),
-            "",
-            "Daily Sessions:",
-            ...dayLabels.map((day, index) => `${day}: ${weeklySessions[index]}`)
-        ].join("\n");
-
-        const blob = new Blob([report], { type: "text/plain;charset=utf-8" });
-        const downloadUrl = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = downloadUrl;
-        anchor.download = "theraflow-monthly-report-march-2026.txt";
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-        URL.revokeObjectURL(downloadUrl);
-    });
-}
-
 function initializeMessagesPage() {
     const pageRoot = document.getElementById("messagesPageRoot");
     if (!pageRoot) {
@@ -2002,15 +2874,20 @@ function initializeExerciseHubPage() {
     if (!root) return;
 
     // ── Element references ────────────────────────────────────────────────────
-    // Step nav dots and connector bars
+    const stepperViewport = document.getElementById("exerciseStepperViewport");
+    const backStepBtn = document.getElementById("hubStepBackBtn");
+    const retryStepBtn = document.getElementById("hubStepRetryBtn");
+    const nextStepBtn = document.getElementById("hubStepNextBtn");
+
+    // Step nav dots
     const navDots = [1, 2, 3, 4].map(n => document.getElementById(`navDot${n}`));
-    const wizBars = [1, 2, 3].map(n => document.getElementById(`wizBar${n}`));
 
     // Step panels
-    const stepPair     = document.getElementById("stepPair");
+    const stepPair      = document.getElementById("stepPair");
     const stepCalibrate = document.getElementById("stepCalibrate");
     const stepDiagnose  = document.getElementById("stepDiagnose");
     const stepSession   = document.getElementById("stepSession");
+    const stepPanels    = [stepPair, stepCalibrate, stepDiagnose, stepSession];
 
     // Step 1 — Pair
     const pairButton    = document.getElementById("hubPairButton");
@@ -2023,43 +2900,48 @@ function initializeExerciseHubPage() {
     const calibrationStatus = document.getElementById("hubCalibrationStatus");
     const calibrationPrompt = document.getElementById("calibrationPrompt");
 
-    // Step 3 — Mode Selection
-    const diagStatus       = document.getElementById("hubDiagStatus");
-    const therapyStartBtn  = document.getElementById("hubTherapyStartBtn");
-    const testStartBtn     = document.getElementById("hubTestStartBtn");
-    const therapyDurationEl = document.getElementById("hubTherapyDuration");
-    const therapyRepsEl     = document.getElementById("hubTherapyReps");
-    const therapyTypeEl     = document.getElementById("hubTherapyType");
+    // Step 3 — Select Exercise (Therapy Mode)
+    const diagStatus         = document.getElementById("hubDiagStatus");
+    const exerciseChoiceGrid = document.getElementById("exerciseChoiceGrid");
+    const exerciseCards      = Array.from(exerciseChoiceGrid?.querySelectorAll("[data-exercise-type]") || []);
+    const speedWrap          = document.getElementById("exerciseSpeedWrap");
+    const holdWrap           = document.getElementById("exerciseHoldWrap");
+    const speedButtons       = Array.from(document.querySelectorAll("#exerciseSpeedGroup [data-speed]"));
+    const holdButtons        = Array.from(document.querySelectorAll("#exerciseHoldGroup [data-hold-seconds]"));
+    const exerciseStartBtn   = document.getElementById("hubExerciseStartBtn");
+    const therapyDurationEl  = document.getElementById("hubTherapyDuration");
+    const therapyRepsEl      = document.getElementById("hubTherapyReps");
+
+    if (speedWrap) speedWrap.hidden = true;
+    if (holdWrap) holdWrap.hidden = true;
 
     // Step 4 — Session
-    const sessionIntro    = document.getElementById("hubSessionIntro");
-    const targetRepsEl    = document.getElementById("hubTargetReps");
-    const sessionRepsEl   = document.getElementById("hubSessionReps");
-    const sessionForceEl  = document.getElementById("hubSessionForce");
-    const sessionTimeEl   = document.getElementById("hubSessionTime");
-    const startSessionBtn = document.getElementById("hubStartSessionBtn");
-    const endSessionBtn   = document.getElementById("hubEndSessionBtn");
-    const sessionStatus   = document.getElementById("hubSessionStatus");
-    const therapySessionPane = document.getElementById("therapySessionPane");
-    const testSessionPane    = document.getElementById("testSessionPane");
-    const testPromptEl       = document.getElementById("hubTestPrompt");
-    const testActionBtn      = document.getElementById("hubTestActionBtn");
-    const testGripAvgEl      = document.getElementById("hubTestGripAvg");
-    const testFlexAvgEl      = document.getElementById("hubTestFlexAvg");
-    const testExtAvgEl       = document.getElementById("hubTestExtAvg");
-    const testTrialCountEl   = document.getElementById("hubTestTrialCount");
+    const sessionIntro      = document.getElementById("hubSessionIntro");
+    const targetRepsEl      = document.getElementById("hubTargetReps");
+    const sessionExerciseEl = document.getElementById("hubSessionExercise");
+    const sessionRepsEl     = document.getElementById("hubSessionReps");
+    const sessionMovementEl = document.getElementById("hubSessionMovement");
+    const sessionForceEl    = document.getElementById("hubSessionForce");
+    const sessionTimeEl     = document.getElementById("hubSessionTime");
+    const repsRingProgressEl = document.getElementById("hubRepsRingProgress");
+    const startSessionBtn   = document.getElementById("hubStartSessionBtn");
+    const endSessionBtn     = document.getElementById("hubEndSessionBtn");
+    const sessionStatus     = document.getElementById("hubSessionStatus");
 
     // ── State ─────────────────────────────────────────────────────────────────
     let gloveConnected = false;
     const fingerNames = ["Thumb", "Index", "Middle", "Ring", "Little"];
-    const calibrationState = fingerNames.map(name => ({ name, zero: null, max: null }));
+    const calibrationState = fingerNames.map(name => ({ name, zero: null, max: null, current: 0 }));
     const diagResults = { maxExtension: 0, maxFlexion: 0, peakForce: 0 };
     let planTargetReps = 120;
     let planDurationMin = 15;
-    let planExerciseType = "Active Grip";
     let calibrationPhase = "zero";
     let calibrationComplete = false;
-    let selectedMode = "";
+    let sessionPrepared = false;
+    let selectedExercise = "";
+    let selectedSpeed = "normal";
+    let selectedHoldSeconds = 5;
+    let currentStep = 1;
 
     const sessionState = {
         isRunning: false,
@@ -2068,8 +2950,20 @@ function initializeExerciseHubPage() {
         totalForce: 0,
         sampleCount: 0,
         startTime: null,
-        intervalId: null
+        intervalId: null,
+        holdProgressSeconds: 0,
+        motionPhase: ""
     };
+
+    const exerciseLabelMap = {
+        open_close_hand: "Open-Close Hand",
+        full_grip_hold: "Full Grip (Hold)",
+        full_extension_hold: "Full Extension (Hold)"
+    };
+
+    function isHoldExercise(type) {
+        return type === "full_grip_hold" || type === "full_extension_hold";
+    }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     function setMsg(el, text) {
@@ -2085,28 +2979,101 @@ function initializeExerciseHubPage() {
     }
 
     // ── Step navigation ───────────────────────────────────────────────────────
-    function goToStep(stepNumber) {
-        // Reveal the panel for this step (keep earlier panels visible as history)
-        const panels = [stepPair, stepCalibrate, stepDiagnose, stepSession];
-        panels.forEach((panel, i) => {
-            if (panel && i + 1 === stepNumber) panel.hidden = false;
+    function updateSessionProgressRing(reps) {
+        if (!repsRingProgressEl) return;
+        const target = Math.max(1, Number(sessionState.targetRepetitions || planTargetReps || 1));
+        const progress = Math.max(0, Math.min(1, reps / target));
+        const radius = Number(repsRingProgressEl.getAttribute("r") || 46);
+        const circumference = 2 * Math.PI * radius;
+        repsRingProgressEl.style.strokeDasharray = `${circumference.toFixed(2)} ${circumference.toFixed(2)}`;
+        repsRingProgressEl.style.strokeDashoffset = `${(circumference * (1 - progress)).toFixed(2)}`;
+    }
+
+    function canAccessStep(stepNumber) {
+        if (stepNumber <= 1) return true;
+        if (stepNumber === 2) return gloveConnected;
+        if (stepNumber === 3) return gloveConnected && calibrationComplete;
+        if (stepNumber === 4) return gloveConnected && calibrationComplete && sessionPrepared;
+        return false;
+    }
+
+    function updateStepNavigationState() {
+        navDots.forEach((dot, index) => {
+            if (!dot) return;
+            const step = index + 1;
+            const accessible = canAccessStep(step);
+            dot.disabled = !accessible;
+            dot.classList.toggle("is-disabled", !accessible);
         });
+
+        if (backStepBtn) {
+            backStepBtn.disabled = currentStep <= 1;
+        }
+        if (nextStepBtn) {
+            nextStepBtn.disabled = !canAccessStep(currentStep + 1);
+        }
+
+        if (backStepBtn) {
+            backStepBtn.hidden = currentStep === 1 || currentStep === 2;
+        }
+
+        if (nextStepBtn) {
+            nextStepBtn.hidden = true;
+        }
+
+        if (retryStepBtn) {
+            retryStepBtn.hidden = !(currentStep === 2 && calibrationComplete);
+            retryStepBtn.disabled = false;
+        }
+    }
+
+    function attemptStep(stepNumber) {
+        if (!canAccessStep(stepNumber)) {
+            if (stepNumber === 2) {
+                setMsg(pairStatus, "Connect your glove first to continue.");
+            } else if (stepNumber === 3) {
+                setMsg(calibrationStatus, "Complete calibration first to continue.");
+            } else if (stepNumber === 4) {
+                setMsg(diagStatus, "Confirm the selected exercise in Step 3 to continue.");
+            }
+            return;
+        }
+        goToStep(stepNumber);
+    }
+
+    function goToStep(stepNumber) {
+        currentStep = stepNumber;
+
+        if (stepperViewport) {
+            stepperViewport.classList.add("is-switching");
+            setTimeout(() => stepperViewport?.classList.remove("is-switching"), 300);
+        }
+
+        stepPanels.forEach((panel, i) => {
+            if (!panel) return;
+            panel.hidden = i + 1 !== stepNumber;
+            panel.classList.toggle("is-active", i + 1 === stepNumber);
+            panel.classList.toggle("is-done", i + 1 < stepNumber);
+            panel.classList.toggle("is-locked", i + 1 > stepNumber);
+        });
+
+        root.classList.toggle("is-focus-mode", stepNumber === 4);
+
         // Update nav dots
         navDots.forEach((dot, i) => {
             if (!dot) return;
             dot.classList.toggle("is-active", i + 1 === stepNumber);
             dot.classList.toggle("is-done", i + 1 < stepNumber);
         });
-        // Fill connector bars for completed steps
-        wizBars.forEach((bar, i) => {
-            if (bar) bar.classList.toggle("is-done", i + 1 < stepNumber);
-        });
+
+        updateStepNavigationState();
     }
 
     // ── STEP 1: Connect ───────────────────────────────────────────────────────
     pairButton?.addEventListener("click", async () => {
         pairButton.disabled = true;
         if (searchingAnim) searchingAnim.hidden = false;
+        if (searchingAnim) searchingAnim.classList.add("is-searching");
         setMsg(pairStatus, "Searching for glove on Wi-Fi…");
 
         await new Promise(r => setTimeout(r, 1600));
@@ -2114,16 +3081,19 @@ function initializeExerciseHubPage() {
         const found = Math.random() > 0.15;
         if (!found) {
             if (searchingAnim) searchingAnim.hidden = true;
+            if (searchingAnim) searchingAnim.classList.remove("is-searching");
             pairButton.disabled = false;
             setMsg(pairStatus, "Glove not found. Confirm both devices are on the same 2.4GHz network and try again.");
             return;
         }
 
         if (searchingAnim) searchingAnim.hidden = true;
+        if (searchingAnim) searchingAnim.classList.remove("is-searching");
         const gloveName = "Theraflow Glove";
         setMsg(pairStatus, `Connected to ${gloveName} over Wi-Fi.`);
         gloveConnected = true;
         announceGlovePaired(gloveName);
+        updateStepNavigationState();
         goToStep(2);
     });
 
@@ -2147,8 +3117,15 @@ function initializeExerciseHubPage() {
         calibrationGrid.innerHTML = calibrationState.map(finger => {
             const zeroLocked = finger.zero !== null;
             const maxLocked = finger.max !== null;
+            const effectiveMax = finger.max !== null ? Math.max(finger.max, 1) : 180;
+            const currentDeg = Number(finger.current || 0);
+            const fillPercent = Math.max(0, Math.min(100, (currentDeg / effectiveMax) * 100));
             return `<div class="calibration-finger ${zeroLocked && maxLocked ? "is-locked" : ""}">
                 <strong>${finger.name}</strong>
+                <div class="calibration-meter" aria-hidden="true">
+                    <div class="calibration-meter-fill" style="height:${fillPercent.toFixed(1)}%"></div>
+                </div>
+                <span>Current: ${currentDeg.toFixed(1)}&deg;</span>
                 <span>0&deg;: ${finger.zero === null ? "&mdash;" : `${finger.zero.toFixed(1)}&deg;`}</span>
                 <span>Max: ${finger.max === null ? "&mdash;" : `${finger.max.toFixed(1)}&deg;`}</span>
             </div>`;
@@ -2168,6 +3145,31 @@ function initializeExerciseHubPage() {
         if (calibrateBtn) calibrateBtn.innerHTML = '<i class="fa-solid fa-hand-fist"></i> Capture Max Flex';
     }
 
+    function resetCalibrationFlow() {
+        calibrationState.forEach(finger => {
+            finger.zero = null;
+            finger.max = null;
+            finger.current = 0;
+        });
+
+        calibrationPhase = "zero";
+        calibrationComplete = false;
+        sessionPrepared = false;
+        diagResults.maxFlexion = 0;
+        diagResults.maxExtension = 0;
+
+        if (calibrateBtn) {
+            calibrateBtn.disabled = false;
+        }
+
+        renderCalibrationGrid();
+        updateCalibrationPrompt();
+        setMsg(calibrationStatus, "0/5 fingers calibrated. Values cleared.");
+        setMsg(diagStatus, "Calibration reset. Complete Step 2 again to continue.");
+        goToStep(2);
+        updateStepNavigationState();
+    }
+
     calibrateBtn?.addEventListener("click", async () => {
         calibrateBtn.disabled = true;
         updateCalibrationPrompt();
@@ -2175,6 +3177,7 @@ function initializeExerciseHubPage() {
         if (calibrationPhase === "zero") {
             for (let i = 0; i < calibrationState.length; i++) {
                 calibrationState[i].zero = await readGloveValue(0, 12);
+                calibrationState[i].current = calibrationState[i].zero;
                 renderCalibrationGrid();
                 await new Promise(r => setTimeout(r, 300));
             }
@@ -2187,6 +3190,7 @@ function initializeExerciseHubPage() {
 
         for (let i = 0; i < calibrationState.length; i++) {
             calibrationState[i].max = await readGloveValue(120, 180);
+            calibrationState[i].current = calibrationState[i].max;
             renderCalibrationGrid();
             await new Promise(r => setTimeout(r, 300));
         }
@@ -2197,31 +3201,63 @@ function initializeExerciseHubPage() {
         diagResults.maxFlexion = avgMax;
         diagResults.maxExtension = avgMax;
         setMsg(calibrationStatus, `${count}/5 fingers calibrated. Calibration complete.`);
+        updateStepNavigationState();
         goToStep(3);
         loadTherapyPlan();
     });
 
+    retryStepBtn?.addEventListener("click", () => {
+        resetCalibrationFlow();
+    });
+
     renderCalibrationGrid();
 
-    // ── STEP 3: Mode Selection ───────────────────────────────────────────────
-    const testState = {
-        trial: 0,
-        grip: [],
-        flex: [],
-        ext: []
-    };
+    // ── STEP 3: Select Exercise (Therapy Mode) ──────────────────────────────
+    function updateExerciseOptionsVisibility() {
+        if (!selectedExercise) {
+            if (speedWrap) speedWrap.hidden = true;
+            if (holdWrap) holdWrap.hidden = true;
+            return;
+        }
+
+        const hold = isHoldExercise(selectedExercise);
+        if (speedWrap) speedWrap.hidden = hold;
+        if (holdWrap) holdWrap.hidden = !hold;
+    }
+
+    function renderExerciseSelection() {
+        exerciseCards.forEach(card => {
+            const type = String(card.getAttribute("data-exercise-type") || "");
+            card.classList.toggle("is-selected", type === selectedExercise);
+            card.setAttribute("aria-checked", String(type === selectedExercise));
+        });
+
+        speedButtons.forEach(btn => {
+            const speed = String(btn.getAttribute("data-speed") || "");
+            btn.classList.toggle("is-selected", speed === selectedSpeed);
+            btn.setAttribute("aria-pressed", String(speed === selectedSpeed));
+        });
+
+        holdButtons.forEach(btn => {
+            const seconds = Number(btn.getAttribute("data-hold-seconds") || 0);
+            const selected = seconds === selectedHoldSeconds;
+            btn.classList.toggle("is-selected", selected);
+            btn.setAttribute("aria-pressed", String(selected));
+        });
+
+        updateExerciseOptionsVisibility();
+    }
 
     function applyTherapyPlan(plan) {
         planDurationMin = Number(plan.duration_min || plan.durationMin || 15);
         planTargetReps = Number(plan.target_repetitions || plan.targetRepetitions || 120);
-        planExerciseType = String(plan.exercise_type || plan.exerciseType || "Active Grip");
 
         if (therapyDurationEl) therapyDurationEl.textContent = `${planDurationMin} min`;
         if (therapyRepsEl) therapyRepsEl.textContent = `${planTargetReps} reps`;
-        if (therapyTypeEl) therapyTypeEl.textContent = planExerciseType;
         if (targetRepsEl) targetRepsEl.textContent = String(planTargetReps);
 
         sessionState.targetRepetitions = planTargetReps;
+        updateSessionProgressRing(sessionState.reps);
     }
 
     function loadTherapyPlan() {
@@ -2233,146 +3269,161 @@ function initializeExerciseHubPage() {
                     throw new Error(payload?.error || "Unable to load plan.");
                 }
                 applyTherapyPlan(payload.plan);
-                setMsg(diagStatus, "Plan ready. Choose a mode to continue.");
+                setMsg(diagStatus, "Plan ready. Select an exercise to continue.");
             })
             .catch(() => {
-                applyTherapyPlan({ duration_min: 15, target_repetitions: 120, exercise_type: "Active Grip" });
+                applyTherapyPlan({ duration_min: 15, target_repetitions: 120 });
                 setMsg(diagStatus, "Plan unavailable. Using default targets.");
             });
     }
 
-    function showSessionPane(mode) {
-        if (therapySessionPane) therapySessionPane.classList.toggle("is-hidden", mode !== "therapy");
-        if (testSessionPane) testSessionPane.classList.toggle("is-hidden", mode !== "test");
+    function describeSelection() {
+        const exerciseLabel = exerciseLabelMap[selectedExercise] || "Exercise";
+        if (isHoldExercise(selectedExercise)) {
+            return `${exerciseLabel} selected. Hold for ${selectedHoldSeconds}s per repetition.`;
+        }
+        return `${exerciseLabel} selected at ${selectedSpeed} speed.`;
+    }
+
+    function refreshSessionSummary() {
+        const exerciseLabel = exerciseLabelMap[selectedExercise] || "—";
+        if (sessionExerciseEl) sessionExerciseEl.textContent = exerciseLabel;
+        if (targetRepsEl) targetRepsEl.textContent = String(planTargetReps);
+
         if (sessionIntro) {
-            sessionIntro.textContent = mode === "therapy"
-                ? "Therapy mode selected. Press Start Session to begin your prescribed movements."
-                : "Test mode selected. Complete 3 trials for each movement to record your assessment.";
-        }
-    }
-
-    function resetTestState() {
-        testState.trial = 0;
-        testState.grip = [];
-        testState.flex = [];
-        testState.ext = [];
-        if (testTrialCountEl) testTrialCountEl.textContent = "0/3";
-        if (testGripAvgEl) testGripAvgEl.textContent = "—";
-        if (testFlexAvgEl) testFlexAvgEl.textContent = "—";
-        if (testExtAvgEl) testExtAvgEl.textContent = "—";
-        if (testPromptEl) testPromptEl.textContent = "Complete 3 trials for each movement to log your assessment.";
-        if (testActionBtn) testActionBtn.textContent = "Begin Trial 1";
-    }
-
-    async function saveRecoveryProgress(payload) {
-        try {
-            const res = await fetch("api/patient/recovery_progress.php", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok || !data?.ok) throw new Error(data?.error || "Save failed");
-            setMsg(sessionStatus, "Assessment saved. Your doctor can review the averages.");
-        } catch (err) {
-            setMsg(sessionStatus, err instanceof Error ? err.message : "Failed to save assessment.");
-        }
-    }
-
-    async function recordTestTrial() {
-        if (testState.trial >= 3) return;
-        if (testActionBtn) testActionBtn.disabled = true;
-
-        const grip = await readGloveValue(20, 80);
-        const flex = await readGloveValue(120, 180);
-        const ext = await readGloveValue(140, 185);
-
-        testState.trial += 1;
-        testState.grip.push(grip);
-        testState.flex.push(flex);
-        testState.ext.push(ext);
-
-        const avgGrip = testState.grip.reduce((sum, val) => sum + val, 0) / testState.grip.length;
-        const avgFlex = testState.flex.reduce((sum, val) => sum + val, 0) / testState.flex.length;
-        const avgExt = testState.ext.reduce((sum, val) => sum + val, 0) / testState.ext.length;
-
-        if (testGripAvgEl) testGripAvgEl.textContent = `${avgGrip.toFixed(1)} N`;
-        if (testFlexAvgEl) testFlexAvgEl.textContent = `${avgFlex.toFixed(1)}°`;
-        if (testExtAvgEl) testExtAvgEl.textContent = `${avgExt.toFixed(1)}°`;
-        if (testTrialCountEl) testTrialCountEl.textContent = `${testState.trial}/3`;
-
-        if (testState.trial < 3) {
-            if (testPromptEl) testPromptEl.textContent = `Trial ${testState.trial} captured. Prepare for trial ${testState.trial + 1}.`;
-            if (testActionBtn) {
-                testActionBtn.textContent = `Begin Trial ${testState.trial + 1}`;
-                testActionBtn.disabled = false;
+            if (isHoldExercise(selectedExercise)) {
+                sessionIntro.textContent = `${exerciseLabel} selected. Hold each repetition for ${selectedHoldSeconds} seconds, then count the rep.`;
+            } else {
+                sessionIntro.textContent = `${exerciseLabel} selected at ${selectedSpeed} speed. Perform correct movements to count repetitions.`;
             }
-            return;
         }
 
-        diagResults.peakForce = avgGrip;
-        diagResults.maxFlexion = avgFlex;
-        diagResults.maxExtension = avgExt;
-
-        if (testPromptEl) testPromptEl.textContent = "Assessment complete. Saving averages…";
-        if (testActionBtn) {
-            testActionBtn.textContent = "Assessment Complete";
-            testActionBtn.disabled = true;
+        if (sessionTimeEl) {
+            sessionTimeEl.textContent = isHoldExercise(selectedExercise)
+                ? `0s / ${selectedHoldSeconds}s`
+                : "0:00";
         }
-
-        await saveRecoveryProgress({
-            avgGripStrength: avgGrip,
-            avgFlexion: avgFlex,
-            avgExtension: avgExt
-        });
+        updateSessionProgressRing(sessionState.reps);
     }
 
-    therapyStartBtn?.addEventListener("click", () => {
+    exerciseCards.forEach(card => {
+        card.addEventListener("click", () => {
+            selectedExercise = String(card.getAttribute("data-exercise-type") || "");
+            renderExerciseSelection();
+            setMsg(diagStatus, describeSelection());
+        });
+    });
+
+    speedButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            selectedSpeed = String(btn.getAttribute("data-speed") || "normal");
+            renderExerciseSelection();
+            if (selectedExercise && !isHoldExercise(selectedExercise)) {
+                setMsg(diagStatus, describeSelection());
+            }
+        });
+    });
+
+    holdButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            selectedHoldSeconds = Math.max(1, Number(btn.getAttribute("data-hold-seconds") || 5));
+            renderExerciseSelection();
+            if (selectedExercise && isHoldExercise(selectedExercise)) {
+                setMsg(diagStatus, describeSelection());
+            }
+        });
+    });
+
+    exerciseStartBtn?.addEventListener("click", () => {
         if (!calibrationComplete) {
-            setMsg(diagStatus, "Complete calibration before choosing a mode.");
+            setMsg(diagStatus, "Complete calibration before selecting an exercise.");
             return;
         }
-        selectedMode = "therapy";
-        showSessionPane("therapy");
+        if (!selectedExercise) {
+            setMsg(diagStatus, "Select an exercise type to continue.");
+            return;
+        }
+        refreshSessionSummary();
+        sessionPrepared = true;
+        updateStepNavigationState();
         goToStep(4);
         setMsg(sessionStatus, "");
     });
 
-    testStartBtn?.addEventListener("click", () => {
-        if (!calibrationComplete) {
-            setMsg(diagStatus, "Complete calibration before choosing a mode.");
-            return;
-        }
-        selectedMode = "test";
-        resetTestState();
-        showSessionPane("test");
-        goToStep(4);
-        setMsg(sessionStatus, "");
+    navDots.forEach((dot, index) => {
+        dot?.addEventListener("click", () => {
+            attemptStep(index + 1);
+        });
     });
 
-    testActionBtn?.addEventListener("click", () => {
-        void recordTestTrial();
+    backStepBtn?.addEventListener("click", () => {
+        attemptStep(Math.max(1, currentStep - 1));
+    });
+
+    nextStepBtn?.addEventListener("click", () => {
+        attemptStep(Math.min(4, currentStep + 1));
     });
 
     // ── STEP 4: Session ───────────────────────────────────────────────────────
     startSessionBtn?.addEventListener("click", () => {
-        if (selectedMode && selectedMode !== "therapy") {
+        if (!selectedExercise) {
+            setMsg(sessionStatus, "Select an exercise first in Step 3.");
             return;
         }
         if (sessionState.isRunning) return;
+
         sessionState.isRunning = true;
         sessionState.startTime = Date.now();
         sessionState.reps = 0;
         sessionState.totalForce = 0;
         sessionState.sampleCount = 0;
+        sessionState.holdProgressSeconds = 0;
+        sessionState.motionPhase = "";
+
+        if (sessionRepsEl) sessionRepsEl.textContent = "0";
+        if (sessionMovementEl) sessionMovementEl.textContent = "0.0°";
+        if (sessionForceEl) sessionForceEl.textContent = "0.0 N";
+        updateSessionProgressRing(0);
+
         startSessionBtn.disabled = true;
         if (endSessionBtn) endSessionBtn.disabled = false;
-    setMsg(sessionStatus, "Session running — glove is streaming live data…");
+        setMsg(sessionStatus, "Session running — glove is streaming live data…");
+
+        const speedChance = selectedSpeed === "slow" ? 0.45 : selectedSpeed === "fast" ? 0.75 : 0.6;
 
         sessionState.intervalId = setInterval(async () => {
             const force   = await readGloveValue(15, 60);
-            const newReps = Math.floor(pseudoRandom(1, 5));
-            sessionState.reps        += newReps;
+            const movement = await readGloveValue(0, 180);
+
+            if (sessionMovementEl) {
+                sessionMovementEl.textContent = `${movement.toFixed(1)}°`;
+            }
+
+            if (isHoldExercise(selectedExercise)) {
+                const maintained = selectedExercise === "full_grip_hold"
+                    ? movement >= 145
+                    : movement <= 35;
+
+                if (maintained) {
+                    sessionState.holdProgressSeconds += 1;
+                    if (sessionState.holdProgressSeconds >= selectedHoldSeconds) {
+                        sessionState.reps += 1;
+                        sessionState.holdProgressSeconds = 0;
+                        setMsg(sessionStatus, "Hold repetition validated and counted.");
+                    }
+                } else {
+                    sessionState.holdProgressSeconds = 0;
+                }
+            } else {
+                const nextPhase = movement <= 50 ? "open" : movement >= 130 ? "close" : "";
+                if (nextPhase && nextPhase !== sessionState.motionPhase && Math.random() < speedChance) {
+                    if (sessionState.motionPhase) {
+                        sessionState.reps += 1;
+                    }
+                    sessionState.motionPhase = nextPhase;
+                }
+            }
+
             sessionState.totalForce  += force;
             sessionState.sampleCount += 1;
 
@@ -2383,7 +3434,12 @@ function initializeExerciseHubPage() {
 
             if (sessionRepsEl)  sessionRepsEl.textContent  = String(sessionState.reps);
             if (sessionForceEl) sessionForceEl.textContent = `${avgForce.toFixed(1)} N`;
-            if (sessionTimeEl)  sessionTimeEl.textContent  = `${mm}:${ss}`;
+            updateSessionProgressRing(sessionState.reps);
+            if (sessionTimeEl) {
+                sessionTimeEl.textContent = isHoldExercise(selectedExercise)
+                    ? `${sessionState.holdProgressSeconds}s / ${selectedHoldSeconds}s`
+                    : `${mm}:${ss}`;
+            }
 
             // Broadcast live metrics to Home dashboard via localStorage
             try {
@@ -2392,15 +3448,13 @@ function initializeExerciseHubPage() {
                 gloveData.sessionForce  = avgForce.toFixed(1);
                 gloveData.sessionActive = true;
                 gloveData.targetRepetitions = sessionState.targetRepetitions;
+                gloveData.exerciseType = selectedExercise;
                 localStorage.setItem("theraflow_glove", JSON.stringify(gloveData));
             } catch { /* storage may be blocked */ }
-        }, 2000);
+        }, 1000);
     });
 
     endSessionBtn?.addEventListener("click", async () => {
-        if (selectedMode && selectedMode !== "therapy") {
-            return;
-        }
         if (!sessionState.isRunning) return;
         clearInterval(sessionState.intervalId);
         sessionState.isRunning = false;
@@ -2421,7 +3475,10 @@ function initializeExerciseHubPage() {
                     maxFlexion: diagResults.maxFlexion,
                     maxExtension: diagResults.maxExtension,
                     repetitions: sessionState.reps,
-                    status: sessionResult
+                    status: sessionResult,
+                    exerciseType: selectedExercise,
+                    speed: isHoldExercise(selectedExercise) ? null : selectedSpeed,
+                    holdDurationSec: isHoldExercise(selectedExercise) ? selectedHoldSeconds : null
                 })
             });
             const payload = await res.json().catch(() => ({}));
@@ -2431,6 +3488,7 @@ function initializeExerciseHubPage() {
                 const gloveData = JSON.parse(localStorage.getItem("theraflow_glove") || "{}");
                 gloveData.sessionActive = false;
                 gloveData.targetRepetitions = sessionState.targetRepetitions;
+                gloveData.exerciseType = selectedExercise;
                 localStorage.setItem("theraflow_glove", JSON.stringify(gloveData));
             } catch { /* storage may be blocked */ }
             startSessionBtn.disabled = false;
@@ -2442,6 +3500,8 @@ function initializeExerciseHubPage() {
 
     // Prefetch plan target from server
     loadTherapyPlan();
+    renderExerciseSelection();
+    updateStepNavigationState();
 
     goToStep(1);
 }
@@ -2452,14 +3512,55 @@ function initializeRecoveryPage() {
         return;
     }
 
-    const logsBody = document.getElementById("recoveryLogsBody");
+    const recentList = document.getElementById("recoveryRecentList");
+    const allSessionsList = document.getElementById("recoveryAllSessionsList");
+    const viewAllBtn = document.getElementById("recoveryViewAllBtn");
+    const sessionsModal = document.getElementById("recoverySessionsModal");
+    const sessionsBackdrop = document.getElementById("recoverySessionsBackdrop");
+    const sessionsCloseBtn = document.getElementById("recoverySessionsClose");
+    const bestSessionsListEl = document.getElementById("recoveryBestSessionsList");
     const forceCanvas = document.getElementById("recoveryForceChart");
     const romCanvas = document.getElementById("recoveryRomChart");
-    const bestForceEl = document.getElementById("recoveryBestForce");
-    const maxFlexionEl = document.getElementById("recoveryMaxFlexion");
+    const forceChartWrap = document.getElementById("recoveryForceChartWrap");
+    const romChartWrap = document.getElementById("recoveryRomChartWrap");
+    const forceEmptyEl = document.getElementById("recoveryForceChartEmpty");
+    const romEmptyEl = document.getElementById("recoveryRomChartEmpty");
+    const forceBestOutsideEl = document.getElementById("recoveryForceBestOutside");
+    const romBestOutsideEl = document.getElementById("recoveryRomBestOutside");
+
+    const forceToggleButtons = Array.from(document.querySelectorAll("#recoveryForceViewToggle [data-view]"));
+    const forceShowValuesToggle = document.getElementById("recoveryForceShowValues");
+    const forceNav = document.getElementById("recoveryForceNav");
+    const forcePrevBtn = document.getElementById("recoveryForcePrev");
+    const forceNextBtn = document.getElementById("recoveryForceNext");
+    const forceRangeLabel = document.getElementById("recoveryForceRangeLabel");
+
+    const romToggleButtons = Array.from(document.querySelectorAll("#recoveryRomViewToggle [data-view]"));
+    const romShowValuesToggle = document.getElementById("recoveryRomShowValues");
+    const romNav = document.getElementById("recoveryRomNav");
+    const romPrevBtn = document.getElementById("recoveryRomPrev");
+    const romNextBtn = document.getElementById("recoveryRomNext");
+    const romRangeLabel = document.getElementById("recoveryRomRangeLabel");
+
     const totalSessionsEl = document.getElementById("recoveryTotalSessions");
+
     let forceChart = null;
     let romChart = null;
+    const forceViewState = {
+        view: "recent",
+        weekOffset: 0,
+        monthOffset: 0,
+        showValues: forceShowValuesToggle ? Boolean(forceShowValuesToggle.checked) : false
+    };
+    const romViewState = {
+        view: "recent",
+        weekOffset: 0,
+        monthOffset: 0,
+        showValues: romShowValuesToggle ? Boolean(romShowValuesToggle.checked) : false
+    };
+    let recoveryDataReady = false;
+
+    let logs = [];
 
     function formatLogDate(rawDate) {
         const parsed = new Date(String(rawDate || ""));
@@ -2478,81 +3579,192 @@ function initializeRecoveryPage() {
 
     function normalizeRecoveryStatus(status) {
         const rawStatus = String(status || "");
-        if (/success|stable|improv/i.test(rawStatus)) {
-            return { label: "Stable", className: "is-stable" };
+        if (/great|success/i.test(rawStatus)) {
+            return { label: "Great Job", className: "is-great" };
+        }
+        if (/improv|stable/i.test(rawStatus)) {
+            return { label: "Improving", className: "is-stable" };
         }
         return { label: "Needs Work", className: "is-needs-work" };
     }
 
-    function renderTrendChart(canvas, chartRef, label, labels, data, color, options = {}) {
+    function formatShortMonthDay(value) {
+        return value.toLocaleDateString([], { month: "short", day: "2-digit" });
+    }
+
+    function formatMonthYear(value) {
+        return value.toLocaleDateString([], { month: "short", year: "numeric" });
+    }
+
+    function getLogsAscending() {
+        return [...logs]
+            .map(log => ({
+                ...log,
+                __time: new Date(String(log.timestamp || ""))
+            }))
+            .filter(log => !Number.isNaN(log.__time.getTime()))
+            .sort((a, b) => a.__time.getTime() - b.__time.getTime());
+    }
+
+    function getMetricValue(log, metricKey) {
+        if (metricKey === "force") {
+            return Number(log.grip_strength || 0);
+        }
+        return Number(log.finger_movement || log.flexion_angle || 0);
+    }
+
+    function applyRecoveryChartDefaults() {
+        if (typeof Chart === "undefined" || window.__theraflowRecoveryChartDefaultsApplied) {
+            return;
+        }
+
+        Chart.defaults.font.family = '"Poppins", "Segoe UI", sans-serif';
+        Chart.defaults.font.size = 12;
+        Chart.defaults.color = "#5e7681";
+        window.__theraflowRecoveryChartDefaultsApplied = true;
+    }
+
+    function getPeakIndex(data) {
+        if (!Array.isArray(data) || !data.length) {
+            return -1;
+        }
+
+        let peakIndex = 0;
+        let peakValue = Number(data[0] || 0);
+        for (let i = 1; i < data.length; i += 1) {
+            const value = Number(data[i] || 0);
+            if (value > peakValue) {
+                peakValue = value;
+                peakIndex = i;
+            }
+        }
+
+        return peakIndex;
+    }
+
+    function renderTrendChart(canvas, chartRef, label, labels, data, options = {}) {
         if (!canvas || typeof Chart === "undefined") {
             return chartRef;
         }
+
+        applyRecoveryChartDefaults();
 
         if (chartRef) {
             chartRef.destroy();
         }
 
-        const lastValueLabelPlugin = {
-            id: "lastValueLabelPlugin",
-            afterDatasetsDraw(chart, _args, pluginOptions) {
+        const chartType = String(options.chartType || "line");
+        const themeColor = String(options.lineColor || "#4d869c");
+        const drawArea = options.fillArea !== false;
+        const lineTension = Number.isFinite(Number(options.tension)) ? Number(options.tension) : 0.35;
+        const pointRadius = Number.isFinite(Number(options.pointRadius)) ? Number(options.pointRadius) : 4;
+        const pointHoverRadius = Number.isFinite(Number(options.pointHoverRadius)) ? Number(options.pointHoverRadius) : 6;
+        const pointBackgroundColor = String(options.pointBackgroundColor || themeColor);
+        const pointBorderColor = String(options.pointBorderColor || "#ffffff");
+        const pointBorderWidth = Number.isFinite(Number(options.pointBorderWidth)) ? Number(options.pointBorderWidth) : 2;
+        const unit = String(options.unit || "");
+        const isCompact = window.matchMedia("(max-width: 880px)").matches;
+        const maxRotation = chartType === "bar" && isCompact ? 45 : 0;
+        const pointLabelFont = '700 13px "Poppins", "Segoe UI", sans-serif';
+
+        const peakIndex = getPeakIndex(data);
+        const peakValue = peakIndex >= 0 ? Number(data[peakIndex] || 0) : 0;
+
+        const peakMarkerPlugin = {
+            id: `${canvas.id}-peakMarker`,
+            afterDatasetsDraw(chart) {
+                if (peakIndex < 0 || !options.peakLabelPrefix || options.showPeakLabel === false) {
+                    return;
+                }
+
                 const ctx = chart.ctx;
-                const unit = String(pluginOptions?.unit || "");
+                const points = chart.getDatasetMeta(0)?.data || [];
+                const peakPoint = points[peakIndex];
+                if (!peakPoint) {
+                    return;
+                }
 
-                chart.data.datasets.forEach((dataset, datasetIndex) => {
-                    if (datasetIndex > 0 && options.goalLineValue !== undefined) {
-                        return;
-                    }
+                const labelText = `${options.peakLabelPrefix}: ${peakValue.toFixed(1)}${unit}`;
 
-                    const points = chart.getDatasetMeta(datasetIndex)?.data || [];
-                    if (!points.length) {
-                        return;
-                    }
-
-                    const lastPoint = points[points.length - 1];
-                    const rawValue = dataset.data[dataset.data.length - 1];
-                    const numericValue = Number(rawValue || 0);
-                    const displayValue = Number.isFinite(numericValue)
-                        ? `${numericValue.toFixed(1)}${unit}`
-                        : `${rawValue}${unit}`;
-
-                    ctx.save();
-                    ctx.fillStyle = color;
-                    ctx.font = "600 12px Segoe UI";
-                    ctx.textAlign = "left";
-                    ctx.textBaseline = "middle";
-                    ctx.fillText(displayValue, lastPoint.x + 8, lastPoint.y - 10);
-                    ctx.restore();
-                });
+                ctx.save();
+                ctx.fillStyle = "#1f5668";
+                ctx.font = "700 12px Poppins";
+                ctx.textAlign = "left";
+                ctx.textBaseline = "bottom";
+                ctx.fillText(labelText, peakPoint.x + 10, peakPoint.y - 8);
+                ctx.restore();
             }
         };
 
-        const datasets = [{
-            label,
-            data,
-            borderColor: color,
-            backgroundColor: "transparent",
-            borderWidth: 2.4,
-            tension: 0.45,
-            pointRadius: context => (context.dataIndex === data.length - 1 ? 4 : 3),
-            pointHoverRadius: 5
-        }];
+        const valueLabelPlugin = {
+            id: `${canvas.id}-valueLabel`,
+            afterDatasetsDraw(chart) {
+                if (options.showPointLabels === false) {
+                    return;
+                }
 
-        if (typeof options.goalLineValue === "number") {
-            datasets.push({
-                label: `Goal Line (${options.goalLineValue}\u00b0)`,
-                data: labels.map(() => options.goalLineValue),
-                borderColor: "#f0b94b",
-                backgroundColor: "transparent",
-                borderWidth: 1.8,
-                borderDash: [7, 6],
-                pointRadius: 0,
-                tension: 0
-            });
-        }
+                const ctx = chart.ctx;
+                const points = chart.getDatasetMeta(0)?.data || [];
+                if (!points.length) {
+                    return;
+                }
+
+                ctx.save();
+                ctx.fillStyle = "#4b5563";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "bottom";
+                ctx.font = pointLabelFont;
+
+                points.forEach((point, index) => {
+                    const raw = Number(data[index] || 0);
+                    const text = `${Number.isInteger(raw) ? raw : raw.toFixed(1)}`;
+                    ctx.fillText(text, point.x, point.y - 10);
+                });
+
+                ctx.restore();
+            }
+        };
+
+        const areaFill = context => {
+            const chart = context.chart;
+            const chartArea = chart.chartArea;
+            if (!chartArea) {
+                return "rgba(77, 134, 156, 0.2)";
+            }
+
+            const gradient = chart.ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+            gradient.addColorStop(0, "rgba(77, 134, 156, 0.38)");
+            gradient.addColorStop(1, "rgba(77, 134, 156, 0.0)");
+            return gradient;
+        };
+
+        const datasets = chartType === "bar"
+            ? [{
+                label,
+                data,
+                backgroundColor: "rgba(77, 134, 156, 0.9)",
+                borderColor: themeColor,
+                borderWidth: 1.2,
+                borderRadius: 8,
+                maxBarThickness: 26
+            }]
+            : [{
+                label,
+                data,
+                borderColor: themeColor,
+                backgroundColor: drawArea ? areaFill : "transparent",
+                fill: drawArea,
+                borderWidth: 2.4,
+                tension: lineTension,
+                pointRadius: context => (context.dataIndex === peakIndex ? pointRadius + 2 : pointRadius),
+                pointHoverRadius: context => (context.dataIndex === peakIndex ? pointHoverRadius + 2 : pointHoverRadius),
+                pointBackgroundColor,
+                pointBorderColor,
+                pointBorderWidth
+            }];
 
         return new Chart(canvas, {
-            type: "line",
+            type: chartType,
             data: {
                 labels,
                 datasets
@@ -2562,78 +3774,547 @@ function initializeRecoveryPage() {
                 maintainAspectRatio: false,
                 layout: {
                     padding: {
-                        right: 44
+                        right: 48,
+                        top: 10,
+                        bottom: 6
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: "#f0f4f5"
+                        },
+                        ticks: {
+                            color: "#5e7681",
+                            autoSkip: chartType === "bar" && isCompact,
+                            maxRotation,
+                            minRotation: maxRotation,
+                            callback(value, index) {
+                                if (chartType !== "bar" || !isCompact) {
+                                    return this.getLabelForValue(value);
+                                }
+
+                                return index % 3 === 0 ? this.getLabelForValue(value) : "";
+                            },
+                            font: {
+                                size: 13
+                            }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: "#f0f4f5"
+                        },
+                        ticks: {
+                            color: "#5e7681",
+                            font: {
+                                size: 13
+                            }
+                        }
                     }
                 },
                 plugins: {
                     legend: {
-                        display: true,
+                        display: options.showLegend !== false,
                         labels: {
                             boxWidth: 18,
                             boxHeight: 2,
-                            usePointStyle: false
+                            usePointStyle: false,
+                            color: "#4d6a76"
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: "#ffffff",
+                        borderColor: "#4d869c",
+                        borderWidth: 1,
+                        titleColor: "#1f5668",
+                        bodyColor: "#1f5668",
+                        cornerRadius: 12,
+                        titleFont: {
+                            weight: "700"
+                        },
+                        bodyFont: {
+                            weight: "700"
+                        },
+                        callbacks: {
+                            label(context) {
+                                const raw = Number(context.raw || 0);
+                                const value = Number.isInteger(raw) ? String(raw) : raw.toFixed(1);
+                                return `${value}${unit}`;
+                            }
                         }
                     }
                 }
             },
-            plugins: [{
-                ...lastValueLabelPlugin,
-                afterDatasetsDraw(chart, args) {
-                    lastValueLabelPlugin.afterDatasetsDraw(chart, args, { unit: options.unit || "" });
-                }
-            }]
+            plugins: [peakMarkerPlugin, valueLabelPlugin]
         });
     }
 
+    function buildRecentSeries(metricKey) {
+        const source = logs.slice(0, 7).reverse();
+        const labels = source.map((_, index) => `S${index + 1}`);
+        const values = source.map(log => getMetricValue(log, metricKey));
+        return {
+            labels,
+            values,
+            noData: source.length === 0,
+            chartType: "line"
+        };
+    }
+
+    function buildDailySeries(metricKey, weekOffset) {
+        const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const today = new Date();
+        const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay() - (weekOffset * 7));
+        weekStart.setHours(0, 0, 0, 0);
+
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 7);
+
+        const sums = new Array(7).fill(0);
+        const counts = new Array(7).fill(0);
+
+        getLogsAscending().forEach(log => {
+            const time = log.__time;
+            if (time < weekStart || time >= weekEnd) {
+                return;
+            }
+
+            const idx = time.getDay();
+            sums[idx] += getMetricValue(log, metricKey);
+            counts[idx] += 1;
+        });
+
+        const values = dayLabels.map((_, idx) => counts[idx] > 0 ? Number((sums[idx] / counts[idx]).toFixed(2)) : 0);
+
+        return {
+            labels: dayLabels,
+            values,
+            noData: counts.every(count => count === 0),
+            chartType: "line",
+            rangeLabel: `${formatShortMonthDay(weekStart)} - ${formatShortMonthDay(new Date(weekEnd.getTime() - 86400000))}`
+        };
+    }
+
+    function buildMonthlySeries(metricKey, monthOffset) {
+        const today = new Date();
+        const monthStart = new Date(today.getFullYear(), today.getMonth() - monthOffset, 1);
+        const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
+        const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
+
+        const labels = [];
+        const sums = new Array(daysInMonth).fill(0);
+        const counts = new Array(daysInMonth).fill(0);
+
+        for (let day = 1; day <= daysInMonth; day += 1) {
+            labels.push(String(day));
+        }
+
+        getLogsAscending().forEach(log => {
+            const time = log.__time;
+            if (time < monthStart || time >= monthEnd) {
+                return;
+            }
+
+            const index = time.getDate() - 1;
+            sums[index] += getMetricValue(log, metricKey);
+            counts[index] += 1;
+        });
+
+        const values = labels.map((_, idx) => counts[idx] > 0 ? Number((sums[idx] / counts[idx]).toFixed(2)) : 0);
+
+        return {
+            labels,
+            values,
+            noData: counts.every(count => count === 0),
+            chartType: "bar",
+            rangeLabel: formatMonthYear(monthStart)
+        };
+    }
+
+    function buildSeries(metricKey, viewState) {
+        if (viewState.view === "daily") {
+            return buildDailySeries(metricKey, viewState.weekOffset);
+        }
+        if (viewState.view === "monthly") {
+            return buildMonthlySeries(metricKey, viewState.monthOffset);
+        }
+        return buildRecentSeries(metricKey);
+    }
+
+    function setChartEmptyState(chartWrap, emptyEl, isEmpty) {
+        if (!recoveryDataReady) {
+            if (chartWrap) {
+                chartWrap.classList.remove("is-empty");
+            }
+            if (emptyEl) {
+                emptyEl.hidden = true;
+            }
+            return;
+        }
+
+        if (chartWrap) {
+            chartWrap.classList.toggle("is-empty", Boolean(isEmpty));
+        }
+        if (emptyEl) {
+            emptyEl.hidden = !isEmpty;
+        }
+    }
+
+    function setActiveButtons(buttons, activeView) {
+        const activeIndex = Math.max(0, buttons.findIndex(button => String(button.getAttribute("data-view") || "") === activeView));
+        const segmented = buttons[0]?.closest(".recovery-segmented");
+        if (segmented) {
+            segmented.style.setProperty("--active-index", String(activeIndex));
+        }
+
+        buttons.forEach(button => {
+            const isActive = String(button.getAttribute("data-view") || "") === activeView;
+            button.classList.toggle("is-active", isActive);
+            button.setAttribute("aria-selected", String(isActive));
+        });
+    }
+
+    function updateCardControls(viewState, buttons, navEl, labelEl, nextBtn, metricKey) {
+        setActiveButtons(buttons, viewState.view);
+
+        const navVisible = viewState.view === "daily" || viewState.view === "monthly";
+        if (navEl) {
+            navEl.hidden = !navVisible;
+        }
+
+        if (!navVisible) {
+            return;
+        }
+
+        const info = buildSeries(metricKey, viewState);
+        if (labelEl) {
+            labelEl.textContent = String(info.rangeLabel || "");
+        }
+
+        if (nextBtn) {
+            const offset = viewState.view === "daily" ? viewState.weekOffset : viewState.monthOffset;
+            nextBtn.disabled = offset === 0;
+        }
+    }
+
+    function renderForceTrend() {
+        const series = buildSeries("force", forceViewState);
+        const peak = series.values.reduce((maxValue, value) => Math.max(maxValue, Number(value || 0)), 0);
+
+        if (forceBestOutsideEl) {
+            forceBestOutsideEl.textContent = peak > 0 ? `Best: ${peak.toFixed(1)} N` : "Best: -- N";
+        }
+
+        setChartEmptyState(forceChartWrap, forceEmptyEl, series.noData);
+
+        forceChart = renderTrendChart(forceCanvas, forceChart, "Force (N)", series.labels, series.values, {
+            unit: " N",
+            peakLabelPrefix: "Best",
+            showPeakLabel: false,
+            showPointLabels: !series.noData && forceViewState.showValues,
+            chartType: series.chartType,
+            fillArea: true,
+            showLegend: true,
+            lineColor: "#4d869c",
+            pointBackgroundColor: "#4d869c",
+            pointBorderColor: "#ffffff",
+            pointBorderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            tension: 0.35
+        });
+    }
+
+    function renderRomTrend() {
+        const series = buildSeries("rom", romViewState);
+        const peak = series.values.reduce((maxValue, value) => Math.max(maxValue, Number(value || 0)), 0);
+
+        if (romBestOutsideEl) {
+            romBestOutsideEl.textContent = peak > 0 ? `Best: ${peak.toFixed(1)}°` : "Best: --°";
+        }
+
+        setChartEmptyState(romChartWrap, romEmptyEl, series.noData);
+
+        romChart = renderTrendChart(romCanvas, romChart, "Finger Movement (°)", series.labels, series.values, {
+            unit: "°",
+            peakLabelPrefix: "Best",
+            showPeakLabel: false,
+            showPointLabels: !series.noData && romViewState.showValues,
+            chartType: series.chartType,
+            fillArea: true,
+            showLegend: true,
+            lineColor: "#4d869c",
+            pointBackgroundColor: "#4d869c",
+            pointBorderColor: "#ffffff",
+            pointBorderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            tension: 0.35
+        });
+    }
+
+    function renderAnalyticsTrends() {
+        updateCardControls(forceViewState, forceToggleButtons, forceNav, forceRangeLabel, forceNextBtn, "force");
+        updateCardControls(romViewState, romToggleButtons, romNav, romRangeLabel, romNextBtn, "rom");
+        renderForceTrend();
+        renderRomTrend();
+    }
+
+    function renderSessionList() {
+        if (!recentList) {
+            return;
+        }
+
+        const source = logs.slice(0, 5);
+        if (!source.length) {
+            recentList.innerHTML = '<li class="recovery-session-item is-empty">No sessions recorded yet.</li>';
+        } else {
+            recentList.innerHTML = source.map(log => {
+                const statusMeta = normalizeRecoveryStatus(log.status);
+                return `
+                    <li class="recovery-session-item">
+                        <div class="recovery-session-main">
+                            <div class="recovery-session-date">${formatLogDate(log.timestamp)}</div>
+                            <div class="recovery-session-metrics">${Number(log.repetitions || 0)} reps • ${Number(log.grip_strength || 0).toFixed(1)} N</div>
+                        </div>
+                        <span class="recovery-status-badge ${statusMeta.className}">${statusMeta.label}</span>
+                    </li>
+                `;
+            }).join("");
+        }
+
+        if (viewAllBtn) {
+            viewAllBtn.hidden = logs.length <= 5;
+            viewAllBtn.textContent = "View All Sessions";
+        }
+    }
+
+    function renderAllSessionsList() {
+        if (!allSessionsList) {
+            return;
+        }
+
+        if (!logs.length) {
+            allSessionsList.innerHTML = '<li class="recovery-session-item is-empty">No sessions recorded yet.</li>';
+            return;
+        }
+
+        function formatExerciseType(type) {
+            const normalized = String(type || "")
+                .trim()
+                .replace(/[_\s]+/g, " ")
+                .toLowerCase();
+
+            if (normalized === "open close hand") {
+                return "Open-close Hand";
+            }
+
+            return String(type || "")
+                .trim()
+                .replace(/_/g, " ")
+                .replace(/\b\w/g, char => char.toUpperCase());
+        }
+
+        allSessionsList.innerHTML = logs.map(log => {
+            const statusMeta = normalizeRecoveryStatus(log.status);
+            const reps = Number(log.repetitions || 0);
+            const bestForce = Number(log.grip_strength || 0);
+            const fingerMovement = Number(log.finger_movement || log.flexion_angle || 0);
+            const durationSec = Number(log.duration_sec || 0);
+            const exerciseType = String(log.exercise_type || "").trim();
+            const durationLabel = durationSec > 0
+                ? (durationSec >= 60
+                    ? `${Math.floor(durationSec / 60)}m ${String(durationSec % 60).padStart(2, "0")}s`
+                    : `${durationSec}s`)
+                : "";
+
+            return `
+                <li class="recovery-session-item recovery-session-item-detailed">
+                    <div class="recovery-session-main">
+                        <div class="recovery-session-date">${formatLogDate(log.timestamp)}</div>
+                        <div class="recovery-session-metric-chips">
+                            <span class="recovery-metric-chip"><strong>Reps</strong> ${reps}</span>
+                            <span class="recovery-metric-chip"><strong>Best Force</strong> ${bestForce.toFixed(1)} N</span>
+                            <span class="recovery-metric-chip"><strong>Best Finger Movement</strong> ${fingerMovement.toFixed(1)}°</span>
+                            ${durationLabel ? `<span class="recovery-metric-chip"><strong>Duration</strong> ${durationLabel}</span>` : ""}
+                            ${exerciseType ? `<span class="recovery-metric-chip"><strong>Type</strong> ${formatExerciseType(exerciseType)}</span>` : ""}
+                        </div>
+                    </div>
+                    <span class="recovery-status-badge ${statusMeta.className}">${statusMeta.label}</span>
+                </li>
+            `;
+        }).join("");
+    }
+
+    function openAllSessionsModal() {
+        if (!sessionsModal) {
+            return;
+        }
+
+        renderAllSessionsList();
+        sessionsModal.hidden = false;
+        document.body.classList.add("recovery-modal-open");
+    }
+
+    function closeAllSessionsModal() {
+        if (!sessionsModal) {
+            return;
+        }
+
+        sessionsModal.hidden = true;
+        document.body.classList.remove("recovery-modal-open");
+    }
+
+    function renderBestSessions() {
+        if (!bestSessionsListEl) {
+            return;
+        }
+
+        if (!logs.length) {
+            bestSessionsListEl.innerHTML = '<li class="recovery-best-session-item is-empty">No sessions yet</li>';
+            return;
+        }
+
+        const topSessions = [...logs]
+            .sort((a, b) => {
+                const repsDiff = Number(b.repetitions || 0) - Number(a.repetitions || 0);
+                if (repsDiff !== 0) return repsDiff;
+
+                const forceDiff = Number(b.grip_strength || 0) - Number(a.grip_strength || 0);
+                if (forceDiff !== 0) return forceDiff;
+
+                return Number(b.flexion_angle || 0) - Number(a.flexion_angle || 0);
+            })
+            .slice(0, 3);
+
+        bestSessionsListEl.innerHTML = topSessions.map((session, index) => {
+            const statusMeta = normalizeRecoveryStatus(session.status);
+            return `
+                <li class="recovery-best-session-item">
+                    <div class="recovery-best-session-rank">#${index + 1}</div>
+                    <div class="recovery-best-session-main">
+                        <div class="recovery-best-session-date">${formatLogDate(session.timestamp)}</div>
+                        <div class="recovery-best-session-metrics">${Number(session.repetitions || 0)} reps • ${Number(session.grip_strength || 0).toFixed(1)} N • ${Number(session.flexion_angle || 0).toFixed(1)}°</div>
+                    </div>
+                    <span class="recovery-status-badge ${statusMeta.className}">${statusMeta.label}</span>
+                </li>
+            `;
+        }).join("");
+    }
+
+    forceToggleButtons.forEach(button => {
+        button.addEventListener("click", () => {
+            forceViewState.view = String(button.getAttribute("data-view") || "recent");
+            if (forceViewState.view !== "daily") {
+                forceViewState.weekOffset = 0;
+            }
+            if (forceViewState.view !== "monthly") {
+                forceViewState.monthOffset = 0;
+            }
+            renderAnalyticsTrends();
+        });
+    });
+
+    romToggleButtons.forEach(button => {
+        button.addEventListener("click", () => {
+            romViewState.view = String(button.getAttribute("data-view") || "recent");
+            if (romViewState.view !== "daily") {
+                romViewState.weekOffset = 0;
+            }
+            if (romViewState.view !== "monthly") {
+                romViewState.monthOffset = 0;
+            }
+            renderAnalyticsTrends();
+        });
+    });
+
+    forcePrevBtn?.addEventListener("click", () => {
+        if (forceViewState.view === "daily") {
+            forceViewState.weekOffset += 1;
+        } else if (forceViewState.view === "monthly") {
+            forceViewState.monthOffset += 1;
+        }
+        renderAnalyticsTrends();
+    });
+
+    forceShowValuesToggle?.addEventListener("change", () => {
+        forceViewState.showValues = Boolean(forceShowValuesToggle.checked);
+        renderForceTrend();
+    });
+
+    forceNextBtn?.addEventListener("click", () => {
+        if (forceViewState.view === "daily") {
+            forceViewState.weekOffset = Math.max(0, forceViewState.weekOffset - 1);
+        } else if (forceViewState.view === "monthly") {
+            forceViewState.monthOffset = Math.max(0, forceViewState.monthOffset - 1);
+        }
+        renderAnalyticsTrends();
+    });
+
+    romPrevBtn?.addEventListener("click", () => {
+        if (romViewState.view === "daily") {
+            romViewState.weekOffset += 1;
+        } else if (romViewState.view === "monthly") {
+            romViewState.monthOffset += 1;
+        }
+        renderAnalyticsTrends();
+    });
+
+    romShowValuesToggle?.addEventListener("change", () => {
+        romViewState.showValues = Boolean(romShowValuesToggle.checked);
+        renderRomTrend();
+    });
+
+    romNextBtn?.addEventListener("click", () => {
+        if (romViewState.view === "daily") {
+            romViewState.weekOffset = Math.max(0, romViewState.weekOffset - 1);
+        } else if (romViewState.view === "monthly") {
+            romViewState.monthOffset = Math.max(0, romViewState.monthOffset - 1);
+        }
+        renderAnalyticsTrends();
+    });
+
+    viewAllBtn?.addEventListener("click", openAllSessionsModal);
+    sessionsBackdrop?.addEventListener("click", closeAllSessionsModal);
+    sessionsCloseBtn?.addEventListener("click", closeAllSessionsModal);
+
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && sessionsModal && !sessionsModal.hidden) {
+            closeAllSessionsModal();
+        }
+    });
+
     fetch("api/patient/recovery.php")
-        .then(response => response.ok ? response.json() : Promise.reject(new Error("Unable to load recovery analytics.")))
+        .then(response => response.ok ? response.json() : Promise.reject(new Error("Unable to load recovery progress.")))
         .then(payload => {
             if (!payload?.ok) {
-                throw new Error(payload?.error || "Unable to load recovery analytics.");
+                throw new Error(payload?.error || "Unable to load recovery progress.");
             }
 
-            const labels = Array.isArray(payload?.trend?.labels) ? payload.trend.labels : ["No Data"];
-            const force = Array.isArray(payload?.trend?.force) ? payload.trend.force : [0];
-            const rom = Array.isArray(payload?.trend?.rom) ? payload.trend.rom : [0];
-
-            const romGoal = Number(payload?.targets?.romGoal || 180);
-
-            forceChart = renderTrendChart(forceCanvas, forceChart, "Force (N)", labels, force, "#0d5f73", { unit: " N" });
-            romChart = renderTrendChart(romCanvas, romChart, "Flexion (\u00b0)", labels, rom, "#2f9b72", {
-                unit: "\u00b0",
-                goalLineValue: romGoal
-            });
+            logs = Array.isArray(payload?.logs) ? payload.logs : [];
+            recoveryDataReady = true;
+            forceViewState.showValues = forceShowValuesToggle ? Boolean(forceShowValuesToggle.checked) : true;
+            romViewState.showValues = romShowValuesToggle ? Boolean(romShowValuesToggle.checked) : true;
 
             const quickStats = payload?.quickStats || {};
-            if (bestForceEl) {
-                bestForceEl.textContent = `${Number(quickStats.bestForce || 0).toFixed(1)} N`;
-            }
-            if (maxFlexionEl) {
-                maxFlexionEl.textContent = `${Number(quickStats.maxFlexion || 0).toFixed(1)}\u00b0`;
-            }
             if (totalSessionsEl) {
                 totalSessionsEl.textContent = String(Number(quickStats.totalSessions || 0));
             }
 
-            if (logsBody) {
-                const logs = Array.isArray(payload.logs) ? payload.logs : [];
-                logsBody.innerHTML = logs.length
-                    ? logs.map(log => `
-                        <tr>
-                            <td>${formatLogDate(log.timestamp)}</td>
-                            <td>${Number(log.grip_strength || 0).toFixed(1)}</td>
-                            <td>${Number(log.flexion_angle || 0).toFixed(1)}</td>
-                            <td>${Number(log.repetitions || 0)}</td>
-                            <td><span class="recovery-status-badge ${normalizeRecoveryStatus(log.status).className}">${normalizeRecoveryStatus(log.status).label}</span></td>
-                        </tr>
-                    `).join("")
-                    : '<tr><td colspan="5">No session logs yet.</td></tr>';
-            }
+            renderBestSessions();
+            renderAnalyticsTrends();
+            renderSessionList();
         })
         .catch(() => {
-            if (logsBody) {
-                logsBody.innerHTML = '<tr><td colspan="5">Unable to load session logs.</td></tr>';
+            recoveryDataReady = true;
+            if (recentList) {
+                recentList.innerHTML = '<li class="recovery-session-item is-empty">Unable to load session history.</li>';
             }
+
+            renderAnalyticsTrends();
         });
 }
 
@@ -2932,24 +4613,16 @@ function initializePatientSettingsPage() {
     const passwordSaveButton = document.getElementById("patientPasswordSaveBtn");
     const feedback = document.getElementById("patientSettingsFeedback");
     const syncStatus = document.getElementById("patientSettingsSyncStatus");
-    const batteryEl = document.getElementById("diagBattery");
-    const signalEl = document.getElementById("diagSignal");
-    const connectionEl = document.getElementById("diagConnection");
-    const ssidEl = document.getElementById("diagSsid");
-    const batteryTile = document.getElementById("diagBatteryTile");
-    const signalTile = document.getElementById("diagSignalTile");
-    const ssidTile = document.getElementById("diagSsidTile");
-    const connectionTile = document.getElementById("diagConnectionTile");
-    const refreshDiagnosticsButton = document.getElementById("diagRefreshBtn");
     const diagnosisInput = document.getElementById("patientDiagnosis");
     const assignedDoctorInput = document.getElementById("patientAssignedDoctor");
     const treatmentGoalInput = document.getElementById("patientTreatmentGoal");
     const ageInput = document.getElementById("patientAge");
-    const profileCard = form?.closest(".user-profile-card") || document.querySelector(".user-profile-card");
+    const profileCard = form?.closest(".account-info-card") || document.querySelector(".account-info-card");
 
     let initialName = "";
     let initialContact = "";
     let isPasswordEditing = false;
+    let doctorDisplayName = "";
 
     function setFeedback(message) {
         if (feedback) {
@@ -2964,8 +4637,12 @@ function initializePatientSettingsPage() {
     }
 
     function setMedicalInfo(data) {
+        const clinicalDoctorName = String(data?.assigned_doctor || "").trim();
+        const assignedDoctorName = clinicalDoctorName && clinicalDoctorName !== "Not assigned"
+            ? clinicalDoctorName
+            : (doctorDisplayName || "Not assigned");
         if (diagnosisInput) diagnosisInput.value = data?.diagnosis || "Pending clinical intake";
-        if (assignedDoctorInput) assignedDoctorInput.value = data?.assigned_doctor || "Not assigned";
+        if (assignedDoctorInput) assignedDoctorInput.value = assignedDoctorName;
         if (treatmentGoalInput) treatmentGoalInput.value = data?.treatment_goal || "Pending provider update";
     }
 
@@ -2977,42 +4654,6 @@ function initializePatientSettingsPage() {
         } else {
             ageInput.value = "Not provided";
         }
-    }
-
-    function markOffline(isOffline) {
-        [batteryTile, signalTile, ssidTile, connectionTile].forEach(tile => {
-            if (!tile) return;
-            tile.classList.toggle("is-offline", isOffline);
-        });
-    }
-
-    function runDiagnostics() {
-        let gloveState = {};
-        try {
-            gloveState = JSON.parse(localStorage.getItem("theraflow_glove") || "{}");
-        } catch {
-            gloveState = {};
-        }
-
-        const isOnline = Boolean(gloveState.connected || gloveState.sessionActive || gloveState.heartbeat === true);
-        if (!isOnline) {
-            markOffline(true);
-            if (batteryEl) batteryEl.textContent = "N/A";
-            if (signalEl) signalEl.textContent = "N/A";
-            if (ssidEl) ssidEl.textContent = "Offline";
-            if (connectionEl) connectionEl.textContent = "Offline";
-            return;
-        }
-
-        markOffline(false);
-        const battery = Number(gloveState.battery || gloveState.batteryPercent || 0);
-        const rssi = Number(gloveState.rssi || gloveState.signal || -55);
-        const ssid = String(gloveState.ssid || gloveState.network || "Unknown");
-
-        if (batteryEl) batteryEl.textContent = battery ? `${battery}%` : `${Math.floor(Math.random() * 30) + 70}%`;
-        if (signalEl) signalEl.textContent = `${rssi || -55} dBm`;
-        if (ssidEl) ssidEl.textContent = ssid;
-        if (connectionEl) connectionEl.textContent = "Online (Cloud)";
     }
 
     function setPasswordEditing(enabled) {
@@ -3120,7 +4761,6 @@ function initializePatientSettingsPage() {
         }
     }
 
-    refreshDiagnosticsButton?.addEventListener("click", runDiagnostics);
     togglePasswordButton?.addEventListener("click", () => setPasswordEditing(true));
     passwordCloseButton?.addEventListener("click", () => setPasswordEditing(false));
     passwordCancelButton?.addEventListener("click", () => setPasswordEditing(false));
@@ -3258,7 +4898,22 @@ function initializePatientSettingsPage() {
             setPatientAge(null);
         });
 
-    runDiagnostics();
+    fetch("api/patient/doctor_profile.php")
+        .then(response => response.ok ? response.json() : Promise.reject(new Error("Unable to load doctor profile.")))
+        .then(payload => {
+            const candidateName = String(payload?.profile?.displayName || "").trim();
+            if (!candidateName) {
+                return;
+            }
+            doctorDisplayName = candidateName;
+            const currentAssignedDoctor = String(assignedDoctorInput?.value || "").trim();
+            if (assignedDoctorInput && (!currentAssignedDoctor || currentAssignedDoctor === "Not assigned")) {
+                assignedDoctorInput.value = doctorDisplayName;
+            }
+        })
+        .catch(() => {
+            // Keep existing clinical payload values if doctor profile is unavailable.
+        });
 }
 
 function initializeSettingsPage() {
@@ -3278,6 +4933,7 @@ function initializeSettingsPage() {
     const bioInput = document.getElementById("settingsBio");
     const emailInput = document.getElementById("settingsEmail");
     const togglePasswordButton = document.getElementById("settingsTogglePasswordBtn");
+    const quickPasswordButton = document.getElementById("settingsQuickPasswordBtn");
     const passwordFields = document.getElementById("settingsPasswordFields");
     const currentPasswordInput = document.getElementById("settingsCurrentPassword");
     const newPasswordInput = document.getElementById("settingsNewPassword");
@@ -3488,6 +5144,12 @@ function initializeSettingsPage() {
         }
     });
 
+    quickPasswordButton?.addEventListener("click", () => {
+        setSettingsMessage("");
+        setPasswordEditing(true);
+        currentPasswordInput?.focus();
+    });
+
     settingsForm?.addEventListener("submit", async event => {
         event.preventDefault();
         if (!(event.currentTarget instanceof HTMLFormElement)) {
@@ -3581,7 +5243,8 @@ function initializeSettingsPage() {
 }
 
 function initializeLogoutFlow() {
-    if (!logoutBtn) {
+    const logoutTriggers = Array.from(document.querySelectorAll('[data-logout-trigger="true"], #logoutBtn'));
+    if (!logoutTriggers.length) {
         return;
     }
 
@@ -3631,7 +5294,9 @@ function initializeLogoutFlow() {
         document.body.style.overflow = "";
     }
 
-    logoutBtn.addEventListener("click", openModal);
+    logoutTriggers.forEach(trigger => {
+        trigger.addEventListener("click", openModal);
+    });
     closeControls.forEach(control => {
         control.addEventListener("click", closeModal);
     });
@@ -3646,7 +5311,7 @@ function initializeLogoutFlow() {
         localStorage.clear();
         sessionStorage.clear();
         clearAllCookies();
-        window.location.href = "login.html";
+        window.location.href = "logout.php";
     });
 }
 
@@ -3763,6 +5428,134 @@ function initializeNavGuard() {
     }
 }
 
+function initializeMobileBottomTabBar() {
+    const isPatientMobileNavPage =
+        document.body.classList.contains("auth-gated-home") ||
+        document.body.classList.contains("patient-portal-page");
+    const isDoctorMobileNavPage =
+        document.body.classList.contains("doctor-dashboard-page") ||
+        document.body.classList.contains("patients-page") ||
+        document.body.classList.contains("therapy-plans-page") ||
+        document.body.classList.contains("settings-page");
+
+    if (!isPatientMobileNavPage && !isDoctorMobileNavPage) {
+        return;
+    }
+
+    const menu = document.querySelector(".menu");
+    if (!menu) {
+        return;
+    }
+
+    const menuItems = Array.from(menu.querySelectorAll("li[data-page]"));
+    if (!menuItems.length) {
+        return;
+    }
+
+    const preferredOrder = isDoctorMobileNavPage
+        ? ["doctor_dashboard.html", "patients.html", "therapy_plans.html", "settings.html"]
+        : ["index.html", "exercise_hub.php", "recovery.php", "patient_settings.php"];
+    const selectedItems = preferredOrder
+        .map(page => menuItems.find(item => String(item.dataset.page || "") === page))
+        .filter(Boolean);
+
+    if (!selectedItems.length) {
+        return;
+    }
+
+    const existingTabBar = document.querySelector(".mobile-tabbar");
+    if (existingTabBar) {
+        existingTabBar.remove();
+    }
+
+    const nav = document.createElement("nav");
+    nav.className = `mobile-tabbar${isDoctorMobileNavPage ? " doctor-tabbar" : ""}`;
+    nav.setAttribute("aria-label", "Primary Navigation");
+
+    const list = document.createElement("ul");
+    list.className = "mobile-tabbar-list";
+
+    selectedItems.forEach(item => {
+        const page = String(item.dataset.page || "");
+        const iconEl = item.querySelector("i");
+        const iconClass = iconEl ? iconEl.className : "fa-solid fa-circle";
+        const originalLabel = String(item.querySelector(".nav-label")?.textContent || "").trim();
+
+        const shortLabelByPage = isDoctorMobileNavPage
+            ? {
+                "doctor_dashboard.html": "Overview",
+                "patients.html": "Patients",
+                "therapy_plans.html": "Reports",
+                "settings.html": "Settings"
+            }
+            : {
+                "index.html": "Home",
+                "exercise_hub.php": "Exercises",
+                "recovery.php": "Progress",
+                "patient_settings.php": "Profile"
+            };
+
+        const itemLabel = shortLabelByPage[page] || originalLabel || "Tab";
+
+        const tabItem = document.createElement("li");
+        tabItem.className = "mobile-tabbar-item";
+
+        const link = document.createElement("a");
+        link.className = "mobile-tabbar-link";
+        link.href = page;
+        link.innerHTML = `<i class="${iconClass}" aria-hidden="true"></i><span>${itemLabel}</span>`;
+
+        const currentPath = window.location.pathname.split("/").pop() || "index.html";
+        const isCurrent = currentPath === page || item.classList.contains("active");
+        if (isCurrent) {
+            link.classList.add("is-active");
+            link.setAttribute("aria-current", "page");
+        }
+
+        tabItem.appendChild(link);
+        list.appendChild(tabItem);
+    });
+
+    nav.appendChild(list);
+    document.body.appendChild(nav);
+}
+
+function initializeDoctorMobileTopBar() {
+    const isDoctorPage =
+        document.body.classList.contains("doctor-dashboard-page") ||
+        document.body.classList.contains("patients-page") ||
+        document.body.classList.contains("therapy-plans-page") ||
+        document.body.classList.contains("settings-page");
+
+    if (!isDoctorPage) {
+        return;
+    }
+
+    const existing = document.querySelector(".doctor-mobile-topbar");
+    if (existing) {
+        existing.remove();
+    }
+
+    let profile = {};
+    try {
+        profile = JSON.parse(localStorage.getItem(STORAGE_KEYS.doctorProfile) || "{}") || {};
+    } catch {
+        profile = {};
+    }
+
+    const doctorName = String(profile.displayName || "Doctor").trim() || "Doctor";
+    const clinicMeta = String(profile.hospital || "Clinic ID: --").trim() || "Clinic ID: --";
+
+    const bar = document.createElement("div");
+    bar.className = "doctor-mobile-topbar";
+    bar.innerHTML = `
+        <div class="doctor-mobile-topbar-name">${doctorName}</div>
+        <div class="doctor-mobile-topbar-meta">${clinicMeta}</div>
+    `;
+
+    document.body.appendChild(bar);
+}
+
 function initializeLoginForm() {
     const loginForm = document.getElementById("loginForm");
     const loginError = document.getElementById("loginFormError");
@@ -3775,12 +5568,12 @@ function initializeLoginForm() {
         event.preventDefault();
 
         const formData = new FormData(loginForm);
-        const identifier = String(formData.get("identifier") || "").trim();
+        const user = String(formData.get("user") || formData.get("identifier") || "").trim();
         const password = String(formData.get("password") || "");
 
-        if (!identifier || !password) {
+        if (!user || !password) {
             if (loginError) {
-                loginError.textContent = "Please enter your username/email and password.";
+                loginError.textContent = "Please enter your user and password.";
             }
             return;
         }
@@ -3795,13 +5588,13 @@ function initializeLoginForm() {
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({ identifier, password })
+                body: JSON.stringify({ user, password })
             });
 
             const payload = await response.json().catch(() => ({}));
 
             if (!response.ok || !payload.ok) {
-                throw new Error(payload.error || "Invalid username/email or password.");
+                throw new Error(payload.error || "Invalid user or password.");
             }
 
             if (loginError) {
@@ -4218,6 +6011,7 @@ if (calendarPrev && calendarNext) {
 
 initializePatientDashboardVisuals();
 initializeCharts();
+initializeMetricGraphModal();
 renderCalendar();
 loadCalendarPlan();
 updateActiveIndicator();
@@ -4230,7 +6024,6 @@ initializeSpecialtyOtherField();
 initializeDoctorDashboard();
 initializePatientsPage();
 initializeTherapyPlansPage();
-initializeGlobalProgressPage();
 initializeMessagesPage();
 initializeExerciseHubPage();
 initializeRecoveryPage();
@@ -4239,5 +6032,7 @@ initializePatientSettingsPage();
 initializeSettingsPage();
 initializeLogoutFlow();
 initializeNavGuard();
+initializeMobileBottomTabBar();
+initializeDoctorMobileTopBar();
 
 window.addEventListener("resize", updateActiveIndicator);

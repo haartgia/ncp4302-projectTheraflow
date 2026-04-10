@@ -14,6 +14,7 @@ if ($patientId <= 0) {
 }
 
 ensureSensorDataTable($pdo);
+ensureSessionsTable($pdo);
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $plan = getPatientPlan($pdo, $patientId);
@@ -56,12 +57,23 @@ $maxFlexion = (float) ($payload['maxFlexion'] ?? 0);
 $repetitions = (int) ($payload['repetitions'] ?? 0);
 $maxExtension = (float) ($payload['maxExtension'] ?? 0);
 $status = trim((string) ($payload['status'] ?? 'Needs Work'));
+$exerciseType = trim((string) ($payload['exerciseType'] ?? ''));
+$durationSec = max(0, (int) ($payload['durationSec'] ?? 0));
 
 $noteParts = [
     'Exercise Hub Session',
     'MaxExtension=' . number_format($maxExtension, 1, '.', ''),
     'Status=' . ($status !== '' ? $status : 'Needs Work')
 ];
+
+if ($exerciseType !== '') {
+    $noteParts[] = 'ExerciseType=' . $exerciseType;
+}
+
+if ($durationSec > 0) {
+    $noteParts[] = 'DurationSec=' . $durationSec;
+}
+
 $note = implode(' | ', $noteParts);
 
 $insert = $pdo->prepare(
@@ -69,6 +81,15 @@ $insert = $pdo->prepare(
      VALUES (?, ?, ?, ?, ?, NOW())'
 );
 $insert->execute([$patientId, $peakForce, $maxFlexion, $repetitions, $note]);
+
+$sessionInsert = $pdo->prepare(
+    'INSERT INTO sessions (patient_id, grip_strength, flexion_angle, repetitions, source, status, note, recorded_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, NOW())'
+);
+$sessionInsert->execute([$patientId, $peakForce, $maxFlexion, $repetitions, 'exercise_hub', $status, $note]);
+
+$updatePatient = $pdo->prepare('UPDATE patients SET last_session = NOW() WHERE id = ?');
+$updatePatient->execute([$patientId]);
 
 $savedAt = $pdo->query('SELECT NOW() AS ts')->fetch();
 

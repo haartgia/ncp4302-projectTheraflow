@@ -60,8 +60,8 @@ function buildDisplayName(array $userRow): string
     return trim((string) ($userRow['username'] ?? $userRow['email'] ?? 'Doctor'));
 }
 
-$usersTable = resolveTableName($pdo, ['users', 'user_db.users', 'theraflow_db.users']);
-$doctorsTable = resolveTableName($pdo, ['doctors', 'theraflow_db.doctors', 'user_db.doctors']);
+$usersTable = resolveTableName($pdo, ['users', 'theraflowusers_db.users', 'theraflow_db.users']);
+$doctorsTable = resolveTableName($pdo, ['doctors', 'theraflow_db.doctors', 'theraflowusers_db.doctors']);
 
 if ($usersTable === null || $doctorsTable === null) {
     http_response_code(500);

@@ -62,6 +62,25 @@ function ensureSensorDataTable(PDO $pdo): void
     );
 }
 
+function ensureSessionsTable(PDO $pdo): void
+{
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS sessions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            patient_id INT NOT NULL,
+            grip_strength DECIMAL(6,2) NULL,
+            flexion_angle DECIMAL(6,2) NULL,
+            repetitions INT NULL,
+            source VARCHAR(40) NOT NULL DEFAULT "manual",
+            status VARCHAR(80) NULL,
+            note VARCHAR(255) NULL,
+            recorded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_sessions_patient_id (patient_id),
+            INDEX idx_sessions_recorded_at (recorded_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+    );
+}
+
 function ensureDefaultTherapyPlanRows(PDO $pdo, array $patients): void
 {
     ensureTherapyPlansTable($pdo);

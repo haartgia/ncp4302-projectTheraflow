@@ -54,8 +54,8 @@ function buildDisplayName(array $doctorRow): string
     return $combined !== '' ? $combined : 'Doctor';
 }
 
-$doctorsTable = resolveTableName($pdo, ['doctors', 'theraflow_db.doctors', 'user_db.doctors']);
-$usersTable = resolveTableName($pdo, ['users', 'theraflow_db.users', 'user_db.users']);
+$doctorsTable = resolveTableName($pdo, ['doctors', 'theraflow_db.doctors', 'theraflowusers_db.doctors']);
+$usersTable = resolveTableName($pdo, ['users', 'theraflow_db.users', 'theraflowusers_db.users']);
 
 if ($doctorsTable === null) {
     http_response_code(500);

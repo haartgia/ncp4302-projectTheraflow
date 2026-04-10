@@ -16,10 +16,7 @@
         <div class="sidebar-top">
 </div>
 
-        <div class="logo">
-            <div class="logo-icon" aria-hidden="true"><i class="fa-solid fa-hand-holding-heart"></i></div>
-            <div class="logo-wordmark">Theraflow</div>
-        </div>
+        <div class="logo"><img src="assets/logo_white.png" alt="Theraflow" class="logo-image"></div>
 
         <div class="active-indicator" aria-hidden="true"></div>
         <ul class="menu">
@@ -34,15 +31,6 @@
             <li data-page="therapy_plans.html">
                 <i class="fa-solid fa-notes-medical"></i>
                 <span class="nav-label">Therapy Plans</span>
-            </li>
-            <li data-page="progress.html">
-                <i class="fa-solid fa-chart-line"></i>
-                <span class="nav-label">Progress</span>
-            </li>
-            <li data-page="messages.html" class="has-unread">
-                <i class="fa-regular fa-message"></i>
-                <span class="nav-label">Messages</span>
-                <span class="nav-alert-dot" aria-hidden="true"></span>
             </li>
             <li class="active" aria-current="page" data-page="settings.html">
                 <i class="fa-solid fa-user-circle"></i>
@@ -145,6 +133,33 @@
                                 <input type="password" id="settingsConfirmPassword" minlength="6">
                             </label>
                         </div>
+                    </div>
+                </section>
+
+                <section class="settings-section session-management-section">
+                    <div class="section-head">
+                        <span class="section-badge"><i class="fa-solid fa-mobile-screen-button"></i></span>
+                        <h2>Session Management</h2>
+                    </div>
+                    <div class="field-grid">
+                        <label class="field-group">
+                            <span>Notification Preferences</span>
+                            <select id="settingsNotificationPreference">
+                                <option value="important">Important Alerts Only</option>
+                                <option value="all">All Activity Notifications</option>
+                                <option value="off">Disable Notifications</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="session-management-actions">
+                        <button type="button" class="doctor-btn" id="settingsQuickPasswordBtn">
+                            <i class="fa-solid fa-key" aria-hidden="true"></i>
+                            <span>Change Password</span>
+                        </button>
+                        <button type="button" class="session-logout-btn" data-logout-trigger="true" aria-label="Logout from current session">
+                            <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+                            <span>Logout</span>
+                        </button>
                     </div>
                 </section>
 

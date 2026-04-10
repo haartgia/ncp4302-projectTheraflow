@@ -1,0 +1,4 @@
+RewriteEngine On
+
+# Redirect removed doctor Progress routes to dashboard
+RewriteRule ^(progress|global-progress)(\.html)?/?$ doctor_dashboard.html [R=302,L,NC]

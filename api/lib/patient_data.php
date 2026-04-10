@@ -8,8 +8,9 @@ function requirePatientSessionOrExit(): int
 
     $role = strtolower(trim((string) ($_SESSION['role'] ?? '')));
     $userId = (int) ($_SESSION['user_id'] ?? 0);
+    $patientId = (int) ($_SESSION['patient_id'] ?? 0);
 
-    if ($role !== 'patient' || $userId <= 0) {
+    if ($role !== 'patient' || ($userId <= 0 && $patientId <= 0)) {
         http_response_code(401);
         echo json_encode(['ok' => false, 'error' => 'Unauthorized']);
         exit;
@@ -47,6 +48,25 @@ function ensureSensorDataTable(PDO $pdo): void
     );
 }
 
+function ensureSessionsTable(PDO $pdo): void
+{
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS sessions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            patient_id INT NOT NULL,
+            grip_strength DECIMAL(6,2) NULL,
+            flexion_angle DECIMAL(6,2) NULL,
+            repetitions INT NULL,
+            source VARCHAR(40) NOT NULL DEFAULT "manual",
+            status VARCHAR(80) NULL,
+            note VARCHAR(255) NULL,
+            recorded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_sessions_patient_id (patient_id),
+            INDEX idx_sessions_recorded_at (recorded_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+    );
+}
+
 function ensurePatientRecoveryDateColumn(PDO $pdo): void
 {
     $columns = patientTableColumns($pdo);
@@ -58,6 +78,7 @@ function ensurePatientRecoveryDateColumn(PDO $pdo): void
 function getCurrentPatient(PDO $pdo): array
 {
     $userId = requirePatientSessionOrExit();
+    $patientSessionId = (int) ($_SESSION['patient_id'] ?? 0);
     $username = trim((string) ($_SESSION['username'] ?? ''));
 
     $columns = patientTableColumns($pdo);
@@ -66,7 +87,13 @@ function getCurrentPatient(PDO $pdo): array
 
     $patient = null;
 
-    if ($hasUserId) {
+    if ($patientSessionId > 0) {
+        $stmt = $pdo->prepare('SELECT * FROM patients WHERE id = ? LIMIT 1');
+        $stmt->execute([$patientSessionId]);
+        $patient = $stmt->fetch();
+    }
+
+    if (!$patient && $hasUserId && $userId > 0) {
         $stmt = $pdo->prepare('SELECT * FROM patients WHERE user_id = ? LIMIT 1');
         $stmt->execute([$userId]);
         $patient = $stmt->fetch();

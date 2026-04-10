@@ -18,13 +18,12 @@ if (!isset($_SESSION['role']) || strtolower((string) $_SESSION['role']) !== 'pat
 <div class="container">
     <aside class="sidebar is-collapsed" id="sidebar">
         <div class="sidebar-top"></div>
-        <div class="logo"><div class="logo-icon" aria-hidden="true"><i class="fa-solid fa-hand-holding-heart"></i></div><div class="logo-wordmark">Theraflow</div></div>
+        <div class="logo"><img src="assets/logo_white.png" alt="Theraflow" class="logo-image"></div>
         <div class="active-indicator" aria-hidden="true"></div>
         <ul class="menu">
             <li data-page="index.html"><i class="fa-solid fa-house"></i><span class="nav-label">Home</span></li>
             <li data-page="exercise_hub.php"><i class="fa-solid fa-dumbbell"></i><span class="nav-label">Exercises</span></li>
             <li data-page="recovery.php"><i class="fa-solid fa-chart-line"></i><span class="nav-label">Recovery Progress</span></li>
-            <li data-page="tele_message.php"><i class="fa-regular fa-message"></i><span class="nav-label">Messages</span></li>
             <li class="active" aria-current="page" data-page="patient_settings.php"><i class="fa-solid fa-user-circle"></i><span class="nav-label patient-account-label">Account &amp; Settings</span></li>
         </ul>
         <div class="sidebar-footer">
@@ -33,20 +32,8 @@ if (!isset($_SESSION['role']) || strtolower((string) $_SESSION['role']) !== 'pat
     </aside>
     <main class="content">
         <section class="patient-shell" id="patientSettingsRoot" aria-labelledby="patientSettingsTitle">
-            <div class="patient-header-row"><div><h1 id="patientSettingsTitle">Glove & Account Settings</h1><p class="subheader">Review glove diagnostics and update your recovery profile.</p></div></div>
+            <div class="patient-header-row"><div><h1 id="patientSettingsTitle">Account Settings</h1><p class="subheader">Keep your account details current and review provider-managed clinical information.</p></div></div>
             <div class="patient-hub-grid">
-                <article class="widget widget-blue">
-                    <h2 class="widget-title">Hardware Diagnostics</h2>
-                    <div class="hub-metrics-grid">
-                        <div class="sensor-metric-tile" id="diagBatteryTile"><div class="doctor-stat-label">Battery</div><div class="doctor-stat-value" id="diagBattery">--%</div></div>
-                        <div class="sensor-metric-tile" id="diagSignalTile"><div class="doctor-stat-label">Wi-Fi Strength (RSSI)</div><div class="doctor-stat-value" id="diagSignal">-- dBm</div></div>
-                        <div class="sensor-metric-tile" id="diagSsidTile"><div class="doctor-stat-label">SSID</div><div class="doctor-stat-value" id="diagSsid">--</div></div>
-                        <div class="sensor-metric-tile" id="diagConnectionTile"><div class="doctor-stat-label">Connection</div><div class="doctor-stat-value" id="diagConnection">Offline</div></div>
-                    </div>
-                    <button type="button" class="doctor-btn" id="diagRefreshBtn">Run Troubleshoot</button>
-                    <p class="widget-label">Guide: 1) Ensure glove is within range of the 2.4GHz router, 2) Power cycle device, 3) Use "Reconfigure Wi-Fi" if the network credentials have changed.</p>
-                </article>
-
                 <article class="widget widget-green account-info-card">
                     <h2 class="widget-title">Account Information</h2>
                     <div class="account-info-grid">
@@ -99,15 +86,15 @@ if (!isset($_SESSION['role']) || strtolower((string) $_SESSION['role']) !== 'pat
                         </div>
                         <div class="account-info-column account-info-column--medical">
                             <div class="field-grid">
-                                <label class="field-group field-group-span-2">
+                                <label class="field-group field-group-span-2 account-locked-field">
                                     <span>Diagnosis</span>
                                     <input type="text" id="patientDiagnosis" readonly>
                                 </label>
-                                <label class="field-group field-group-span-2">
+                                <label class="field-group field-group-span-2 account-locked-field">
                                     <span>Assigned Doctor</span>
                                     <input type="text" id="patientAssignedDoctor" readonly>
                                 </label>
-                                <label class="field-group field-group-span-2">
+                                <label class="field-group field-group-span-2 account-locked-field">
                                     <span>Treatment Goal</span>
                                     <input type="text" id="patientTreatmentGoal" readonly>
                                 </label>
@@ -116,6 +103,13 @@ if (!isset($_SESSION['role']) || strtolower((string) $_SESSION['role']) !== 'pat
                     </div>
                     <p class="medical-note">Note: These details are managed by your healthcare provider. Contact your doctor to update medical records.</p>
                 </article>
+            </div>
+
+            <div class="profile-mobile-logout-wrap">
+                <button type="button" class="profile-mobile-logout-btn" data-logout-trigger="true" aria-label="Log out of your account">
+                    <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+                    <span>Logout</span>
+                </button>
             </div>
         </section>
     </main>
