@@ -365,10 +365,12 @@ function initializeStreak(daysCompleted) {
         const isPastOrToday = index <= todayMondayIndex;
         const isCompleted = isPastOrToday && Boolean(weekCompletedMondayFirst[index]);
         const isToday = index === todayMondayIndex;
+        const isTodayCompleted = isToday && isCompleted;
 
         dot.classList.toggle("is-completed", isCompleted);
-        dot.classList.toggle("active", isToday);
-        dot.classList.toggle("is-today", index === todayMondayIndex);
+        // Only light/glow today's node when therapy data for today is recorded.
+        dot.classList.toggle("active", isTodayCompleted);
+        dot.classList.toggle("is-today", isTodayCompleted);
 
         if (isCompleted) {
             completedTodayOrEarlierIndexes.push(index);
@@ -510,16 +512,12 @@ function initializePatientDashboardVisuals() {
         const sessionMinutes = Math.max(0, Number(gloveState.sessionMinutes || gloveState.durationMin || 0));
         const targetRepetitions = Math.max(1, Number(gloveState.targetRepetitions || 120));
         const completionPercent = Math.round((sessionReps / targetRepetitions) * 100);
-        const todayMondayIndex = (new Date().getDay() + 6) % 7;
         const weekCompleted = Array.isArray(streakState.weekCompletedMondayFirst)
             ? streakState.weekCompletedMondayFirst.slice(0, streakDots.length).map(Boolean)
             : new Array(streakDots.length).fill(false);
 
-        if (sessionReps > 0) {
-            weekCompleted[todayMondayIndex] = true;
-        }
-
-        const streakDays = Math.max(Number(streakState.consecutiveDays || 0), sessionReps > 0 ? 1 : 0);
+        // Keep streak strictly based on backend-recorded sessions.
+        const streakDays = Math.max(0, Number(streakState.consecutiveDays || 0));
 
         initializeStreak({
             consecutiveDays: streakDays,
