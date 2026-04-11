@@ -1,11 +1,110 @@
 <?php
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
+    exit;
+}
+
+require_once __DIR__ . '/db.php';
+
+function resolveTableName(PDO $pdo, array $candidates): ?string
+{
+    foreach ($candidates as $tableName) {
+        try {
+            $probe = $pdo->query('SELECT 1 FROM ' . $tableName . ' LIMIT 1');
+            if ($probe !== false) {
+                return $tableName;
+            }
+        } catch (Throwable $e) {
+            // Try next candidate table.
+        }
+    }
+
+    return null;
+}
+
+function getTableColumns(PDO $pdo, string $tableName): array
+{
+    $columns = [];
+    $stmt = $pdo->query('DESCRIBE ' . $tableName);
+    foreach ($stmt->fetchAll() as $row) {
+        if (isset($row['Field'])) {
+            $columns[] = strtolower((string) $row['Field']);
+        }
+    }
+    return $columns;
+}
+
+$usersTable = resolveTableName($pdo, ['users', 'theraflowusers_db.users', 'theraflow_db.users']);
+$doctorsTable = resolveTableName($pdo, ['doctors', 'theraflow_db.doctors', 'theraflowusers_db.doctors']);
+
+if ($usersTable === null || $doctorsTable === null) {
+    http_response_code(500);
+    echo json_encode([
+        'ok' => false,
+        'error' => 'Required users/doctors tables were not found. Please verify your DB schema.'
+    ]);
+    exit;
+}
+
+$usersColumns = getTableColumns($pdo, $usersTable);
+$doctorsColumns = getTableColumns($pdo, $doctorsTable);
+$usersIdColumn = in_array('user_id', $usersColumns, true) ? 'user_id' : (in_array('id', $usersColumns, true) ? 'id' : null);
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $check = trim((string) ($_GET['check'] ?? ''));
+    $value = trim((string) ($_GET['value'] ?? ''));
+
+    if ($check === '' || $value === '') {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Missing check parameters']);
+        exit;
+    }
+
+    if ($check === 'email') {
+        $exists = false;
+        if ($usersIdColumn && in_array('email', $usersColumns, true)) {
+            $dupEmail = $pdo->prepare('SELECT ' . $usersIdColumn . ' FROM ' . $usersTable . ' WHERE email = ? LIMIT 1');
+            $dupEmail->execute([$value]);
+            $exists = (bool) $dupEmail->fetch();
+        }
+
+        if (!$exists && in_array('email', $doctorsColumns, true)) {
+            $dupDoctorEmail = $pdo->prepare('SELECT id FROM ' . $doctorsTable . ' WHERE email = ? LIMIT 1');
+            $dupDoctorEmail->execute([$value]);
+            $exists = (bool) $dupDoctorEmail->fetch();
+        }
+
+        echo json_encode(['ok' => true, 'check' => 'email', 'available' => !$exists]);
+        exit;
+    }
+
+    if ($check === 'contactNumber') {
+        $normalizedContact = preg_replace('/\D+/', '', $value) ?? '';
+        $exists = false;
+
+        if ($usersIdColumn && in_array('mobile', $usersColumns, true)) {
+            $dupMobile = $pdo->prepare('SELECT ' . $usersIdColumn . ' FROM ' . $usersTable . ' WHERE mobile = ? LIMIT 1');
+            $dupMobile->execute([$normalizedContact]);
+            $exists = (bool) $dupMobile->fetch();
+        }
+
+        if (!$exists && in_array('contact_number', $doctorsColumns, true)) {
+            $dupDoctorContact = $pdo->prepare('SELECT id FROM ' . $doctorsTable . ' WHERE contact_number = ? LIMIT 1');
+            $dupDoctorContact->execute([$normalizedContact]);
+            $exists = (bool) $dupDoctorContact->fetch();
+        }
+
+        echo json_encode(['ok' => true, 'check' => 'contactNumber', 'available' => !$exists]);
+        exit;
+    }
+
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Unsupported check type']);
     exit;
 }
 
@@ -42,6 +141,12 @@ $username = trim((string) ($data['username'] ?? ''));
 $passwordPlain = (string) $data['password'];
 $bio = trim((string) ($data['bio'] ?? ''));
 
+if (strlen($passwordPlain) < 6 || !preg_match('/[A-Z]/', $passwordPlain) || !preg_match('/\d/', $passwordPlain) || !preg_match('/[^A-Za-z0-9]/', $passwordPlain)) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Password must be at least 6 characters and include 1 uppercase letter, 1 number, and 1 special character.']);
+    exit;
+}
+
 $contactDigits = preg_replace('/\D+/', '', $contactNumber) ?? '';
 if (!preg_match('/^09\d{9}$/', $contactDigits)) {
     http_response_code(400);
@@ -56,36 +161,6 @@ if ($specialty === 'other' && $specialtyOther !== '') {
 }
 
 $passwordHash = password_hash($passwordPlain, PASSWORD_DEFAULT);
-
-require_once __DIR__ . '/db.php';
-
-function resolveTableName(PDO $pdo, array $candidates): ?string
-{
-    foreach ($candidates as $tableName) {
-        try {
-            $probe = $pdo->query('SELECT 1 FROM ' . $tableName . ' LIMIT 1');
-            if ($probe !== false) {
-                return $tableName;
-            }
-        } catch (Throwable $e) {
-            // Try next candidate table.
-        }
-    }
-
-    return null;
-}
-
-function getTableColumns(PDO $pdo, string $tableName): array
-{
-    $columns = [];
-    $stmt = $pdo->query('DESCRIBE ' . $tableName);
-    foreach ($stmt->fetchAll() as $row) {
-        if (isset($row['Field'])) {
-            $columns[] = strtolower((string) $row['Field']);
-        }
-    }
-    return $columns;
-}
 
 function splitFullName(string $fullName): array
 {
@@ -116,22 +191,6 @@ function ensureUsersUsernameColumn(PDO $pdo, string $usersTable, array $usersCol
     return getTableColumns($pdo, $usersTable);
 }
 
-$usersTable = resolveTableName($pdo, ['users', 'theraflowusers_db.users', 'theraflow_db.users']);
-$doctorsTable = resolveTableName($pdo, ['doctors', 'theraflow_db.doctors', 'theraflowusers_db.doctors']);
-
-if ($usersTable === null || $doctorsTable === null) {
-    http_response_code(500);
-    echo json_encode([
-        'ok' => false,
-        'error' => 'Required users/doctors tables were not found. Please verify your DB schema.'
-    ]);
-    exit;
-}
-
-$usersColumns = getTableColumns($pdo, $usersTable);
-$doctorsColumns = getTableColumns($pdo, $doctorsTable);
-
-$usersIdColumn = in_array('user_id', $usersColumns, true) ? 'user_id' : (in_array('id', $usersColumns, true) ? 'id' : null);
 $usersPasswordColumn = in_array('password', $usersColumns, true) ? 'password' : (in_array('password_hash', $usersColumns, true) ? 'password_hash' : null);
 
 if ($usersIdColumn === null || $usersPasswordColumn === null || !in_array('email', $usersColumns, true)) {
@@ -180,6 +239,22 @@ try {
         $dupDoctorEmail->execute([$email]);
         if ($dupDoctorEmail->fetch()) {
             throw new RuntimeException('Doctor profile email already exists');
+        }
+    }
+
+    if (in_array('mobile', $usersColumns, true)) {
+        $dupMobile = $pdo->prepare('SELECT ' . $usersIdColumn . ' FROM ' . $usersTable . ' WHERE mobile = ? LIMIT 1');
+        $dupMobile->execute([$contactNumber]);
+        if ($dupMobile->fetch()) {
+            throw new RuntimeException('Contact number already exists');
+        }
+    }
+
+    if (in_array('contact_number', $doctorsColumns, true)) {
+        $dupDoctorContact = $pdo->prepare('SELECT id FROM ' . $doctorsTable . ' WHERE contact_number = ? LIMIT 1');
+        $dupDoctorContact->execute([$contactNumber]);
+        if ($dupDoctorContact->fetch()) {
+            throw new RuntimeException('Contact number already exists');
         }
     }
 

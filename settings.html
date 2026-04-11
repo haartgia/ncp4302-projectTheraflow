@@ -126,11 +126,11 @@
                             </label>
                             <label class="field-group">
                                 <span>New Password</span>
-                                <input type="password" id="settingsNewPassword" minlength="6">
+                                <input type="password" id="settingsNewPassword" minlength="6" pattern="(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}" title="Password must be at least 6 characters and include 1 uppercase letter, 1 number, and 1 special character.">
                             </label>
                             <label class="field-group field-group-span-2">
                                 <span>Confirm New Password</span>
-                                <input type="password" id="settingsConfirmPassword" minlength="6">
+                                <input type="password" id="settingsConfirmPassword" minlength="6" pattern="(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}" title="Password must be at least 6 characters and include 1 uppercase letter, 1 number, and 1 special character.">
                             </label>
                         </div>
                     </div>

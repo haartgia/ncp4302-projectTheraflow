@@ -259,12 +259,12 @@
                         </select>
                     </label>
                     <label class="field-group required-field">
-                        <span>Phone</span>
-                        <input type="tel" name="phone" placeholder="Phone Number" required>
+                        <span>Email</span>
+                        <input type="email" name="email" placeholder="Email Address" required>
                     </label>
                     <label class="field-group field-group-span-2">
-                        <span>Backup Contact (Email, Optional)</span>
-                        <input type="email" name="backupEmail" placeholder="backup@email.com">
+                        <span>Backup Contact (Phone or Email, Optional)</span>
+                        <input type="text" name="backupContact" placeholder="09123456789 or backup@email.com">
                     </label>
                 </div>
             </div>
@@ -289,7 +289,21 @@
                     </label>
                     <label class="field-group required-field">
                         <span>Password</span>
-                        <input type="password" name="password" minlength="6" required>
+                        <div class="registration-password-wrap">
+                            <input type="password" id="addPatientPassword" name="password" minlength="6" pattern="(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}" title="Password must be at least 6 characters and include 1 uppercase letter, 1 number, and 1 special character." required>
+                            <button type="button" class="registration-password-toggle" data-password-target="addPatientPassword" aria-label="Show password" aria-pressed="false">
+                                <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </label>
+                    <label class="field-group required-field field-group-span-2">
+                        <span>Confirm Password</span>
+                        <div class="registration-password-wrap">
+                            <input type="password" id="addPatientConfirmPassword" name="confirmPassword" minlength="6" required>
+                            <button type="button" class="registration-password-toggle" data-password-target="addPatientConfirmPassword" aria-label="Show confirm password" aria-pressed="false">
+                                <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                            </button>
+                        </div>
                     </label>
                 </div>
             </div>

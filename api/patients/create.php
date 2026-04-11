@@ -28,7 +28,7 @@ if (!is_array($body)) {
     $body = $_POST;
 }
 
-$required = ['firstName', 'lastName', 'age', 'dateOfBirth', 'gender', 'strokeType', 'affectedHand', 'phone', 'username', 'password'];
+$required = ['firstName', 'lastName', 'age', 'dateOfBirth', 'gender', 'strokeType', 'affectedHand', 'email', 'username', 'password'];
 foreach ($required as $field) {
     if (!isset($body[$field]) || trim((string) $body[$field]) === '') {
         http_response_code(400);
@@ -46,10 +46,17 @@ $dateOfBirth = trim((string) ($body['dateOfBirth'] ?? ''));
 $gender = trim((string) $body['gender']);
 $strokeType = trim((string) $body['strokeType']);
 $affectedHand = trim((string) $body['affectedHand']);
-$phone = trim((string) $body['phone']);
-$backupEmail = trim((string) ($body['backupEmail'] ?? ''));
+$email = strtolower(trim((string) ($body['email'] ?? $body['phone'] ?? '')));
+$backupContact = trim((string) ($body['backupContact'] ?? $body['backupEmail'] ?? ''));
 $username = trim((string) $body['username']);
 $passwordPlain = (string) $body['password'];
+
+if (strlen($passwordPlain) < 6 || !preg_match('/[A-Z]/', $passwordPlain) || !preg_match('/\d/', $passwordPlain) || !preg_match('/[^A-Za-z0-9]/', $passwordPlain)) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Password must be at least 6 characters and include 1 uppercase letter, 1 number, and 1 special character']);
+    exit;
+}
+
 $passwordHash = password_hash($passwordPlain, PASSWORD_DEFAULT);
 
 if ($age < 0) {
@@ -58,9 +65,9 @@ if ($age < 0) {
     exit;
 }
 
-if (!preg_match('/^\+?\d{7,15}$/', str_replace(' ', '', $phone))) {
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Phone must be 7 to 15 digits']);
+    echo json_encode(['ok' => false, 'error' => 'Email address must be valid']);
     exit;
 }
 
@@ -72,9 +79,26 @@ if (!$isDobValid) {
     exit;
 }
 
-if ($backupEmail !== '' && !filter_var($backupEmail, FILTER_VALIDATE_EMAIL)) {
+if ($backupContact !== '') {
+    $compactBackup = str_replace(' ', '', $backupContact);
+    $backupIsEmail = filter_var($backupContact, FILTER_VALIDATE_EMAIL) !== false;
+    $backupIsPhone = preg_match('/^\+?\d{7,15}$/', $compactBackup) === 1;
+    if (!$backupIsEmail && !$backupIsPhone) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Backup contact must be a valid phone number or email']);
+        exit;
+    }
+}
+
+$backupContactForStorage = $backupContact !== '' ? $backupContact : null;
+$backupPhoneForUsers = null;
+if ($backupContact !== '' && preg_match('/^\+?\d{7,15}$/', str_replace(' ', '', $backupContact)) === 1) {
+    $backupPhoneForUsers = str_replace(' ', '', $backupContact);
+}
+
+if ($backupContact !== '' && strlen($backupContact) > 255) {
     http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Backup contact must be a valid email']);
+    echo json_encode(['ok' => false, 'error' => 'Backup contact must be 255 characters or fewer']);
     exit;
 }
 
@@ -189,10 +213,8 @@ try {
         exit;
     }
 
-    // theraflowusers_db.users has no username column; username remains in patients.
-    // Use backup email for user auth if provided, otherwise a synthetic email.
-    $syntheticEmail = strtolower($username) . '@patient.local';
-    $accountEmail = $backupEmail !== '' ? strtolower($backupEmail) : $syntheticEmail;
+    // User auth email is the required patient email from intake.
+    $accountEmail = $email;
     $usersTable = resolveUsersTable($pdo);
     $usersColumns = $usersTable ? describeColumns($pdo, $usersTable) : [];
 
@@ -226,7 +248,7 @@ try {
             }
             if (in_array('mobile', $usersColumns, true)) {
                 $insertColumns[] = 'mobile';
-                $insertValues[] = $phone;
+                $insertValues[] = $backupPhoneForUsers;
             }
             if (in_array('role', $usersColumns, true)) {
                 $insertColumns[] = 'role';
@@ -258,8 +280,8 @@ try {
         $gender,
         $strokeType,
         $affectedHand,
-        $phone,
-        $backupEmail !== '' ? $backupEmail : null,
+        $accountEmail,
+        $backupContactForStorage,
         $username,
         $passwordHash,
         'Stable',

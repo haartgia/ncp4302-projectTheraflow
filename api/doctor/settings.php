@@ -181,9 +181,9 @@ if ($changingPassword) {
         exit;
     }
 
-    if (strlen($newPassword) < 6) {
+    if (strlen($newPassword) < 6 || !preg_match('/[A-Z]/', $newPassword) || !preg_match('/\d/', $newPassword) || !preg_match('/[^A-Za-z0-9]/', $newPassword)) {
         http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'New password must be at least 6 characters']);
+        echo json_encode(['ok' => false, 'error' => 'New password must be at least 6 characters and include 1 uppercase letter, 1 number, and 1 special character']);
         exit;
     }
 

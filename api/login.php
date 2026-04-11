@@ -83,6 +83,47 @@ function getTableColumns(PDO $pdo, string $tableName): array
     return $columns;
 }
 
+function hasPatientRows(PDO $pdo, string $tableName, int $patientId): bool
+{
+    if ($patientId <= 0) {
+        return false;
+    }
+
+    try {
+        $stmt = $pdo->prepare('SELECT 1 FROM ' . $tableName . ' WHERE patient_id = ? LIMIT 1');
+        $stmt->execute([$patientId]);
+        return (bool) $stmt->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+function patientHasTherapyData(PDO $pdo, int $patientId): bool
+{
+    if ($patientId <= 0) {
+        return false;
+    }
+
+    // If any session/progress record exists, treat as returning patient.
+    foreach (['sessions', 'sensor_data', 'recovery_progress'] as $tableName) {
+        if (hasPatientRows($pdo, $tableName, $patientId)) {
+            return true;
+        }
+    }
+
+    try {
+        $stmt = $pdo->prepare('SELECT 1 FROM patients WHERE id = ? AND last_session IS NOT NULL LIMIT 1');
+        $stmt->execute([$patientId]);
+        if ($stmt->fetchColumn()) {
+            return true;
+        }
+    } catch (Throwable $e) {
+        // Ignore optional column checks.
+    }
+
+    return false;
+}
+
 $usersTable = resolveTableName($pdo, ['users', 'theraflowusers_db.users', 'theraflow_db.users']);
 if ($usersTable === null) {
     http_response_code(500);
@@ -124,8 +165,34 @@ if (!$user && $emailColumn !== null) {
 // Fallback path: allow patient username login from theraflow_db.patients.username.
 if (!$user) {
     try {
-        $patientStmt = $pdo->prepare('SELECT id, user_id, username, password_hash FROM patients WHERE username = ? LIMIT 1');
-        $patientStmt->execute([$identifier]);
+        $patientColumns = getTableColumns($pdo, 'patients');
+        $patientWhere = [];
+        $patientParams = [];
+
+        if (in_array('username', $patientColumns, true)) {
+            $patientWhere[] = 'username = ?';
+            $patientParams[] = $identifier;
+        }
+
+        // Support login by doctor-set patient email (stored in contact) and legacy backup_email.
+        if (in_array('contact', $patientColumns, true)) {
+            $patientWhere[] = 'contact = ?';
+            $patientParams[] = $identifier;
+        }
+
+        if (in_array('backup_email', $patientColumns, true)) {
+            $patientWhere[] = 'backup_email = ?';
+            $patientParams[] = $identifier;
+        }
+
+        if (!$patientWhere) {
+            $patientWhere[] = 'username = ?';
+            $patientParams[] = $identifier;
+        }
+
+        $patientSql = 'SELECT id, user_id, username, password_hash FROM patients WHERE ' . implode(' OR ', $patientWhere) . ' LIMIT 1';
+        $patientStmt = $pdo->prepare($patientSql);
+        $patientStmt->execute($patientParams);
         $patient = $patientStmt->fetch();
 
         if ($patient) {
@@ -244,7 +311,19 @@ $redirect = 'index.html';
 if ($role === 'doctor') {
     $redirect = 'doctor_dashboard.php';
 } elseif ($role === 'patient') {
-    $redirect = 'index.html';
+    $patientIdForRedirect = $sessionPatientId;
+    if ($patientIdForRedirect <= 0 && $userId > 0) {
+        try {
+            $patientRedirectStmt = $pdo->prepare('SELECT id FROM patients WHERE user_id = ? LIMIT 1');
+            $patientRedirectStmt->execute([$userId]);
+            $patientIdForRedirect = (int) ($patientRedirectStmt->fetchColumn() ?: 0);
+        } catch (Throwable $e) {
+            // Keep default redirect if patient lookup fails.
+        }
+    }
+
+    // First login goes to exercise page. Returning patients go to dashboard.
+    $redirect = patientHasTherapyData($pdo, $patientIdForRedirect) ? 'index.html' : 'exercise_hub.php';
 }
 
 echo json_encode([

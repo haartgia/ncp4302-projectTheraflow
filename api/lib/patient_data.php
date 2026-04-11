@@ -67,14 +67,6 @@ function ensureSessionsTable(PDO $pdo): void
     );
 }
 
-function ensurePatientRecoveryDateColumn(PDO $pdo): void
-{
-    $columns = patientTableColumns($pdo);
-    if (!in_array('recovery_start_date', $columns, true)) {
-        $pdo->exec('ALTER TABLE patients ADD COLUMN recovery_start_date DATE NULL AFTER contact');
-    }
-}
-
 function getCurrentPatient(PDO $pdo): array
 {
     $userId = requirePatientSessionOrExit();

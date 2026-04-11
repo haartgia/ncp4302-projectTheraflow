@@ -35,7 +35,7 @@
             <article class="registration-card">
                 <div class="registration-progress" aria-label="Registration steps">
                     <div class="progress-meta">
-                        <span class="progress-kicker">Doctor onboarding</span>
+                        <span class="progress-kicker">Doctor sign-up</span>
                         <span class="progress-counter" id="registrationStepCounter">Step 1 of 3</span>
                     </div>
                     <div class="progress-track"><span class="progress-fill"></span></div>
@@ -60,7 +60,7 @@
                                 <div class="field-grid field-grid-two">
                                     <label class="field-group field-group-span-2 required-field">
                                         <span>Full Name</span>
-                                        <input type="text" name="fullName" placeholder="Full Name" autocomplete="name" required>
+                                        <input type="text" name="fullName" placeholder="Full Name" autocomplete="name" pattern="[A-Za-z][A-Za-z .']*" title="Use letters only. Spaces, period (.), and apostrophe (') are allowed." required>
                                     </label>
                                     <label class="field-group required-field">
                                         <span>Email Address</span>
@@ -73,8 +73,19 @@
                                     </label>
                                 </div>
                                 <div class="wizard-actions">
-                                    <a class="doctor-btn wizard-login-back" href="login.html">Back</a>
-                                    <button type="button" class="sign-in-btn wizard-next">Next</button>
+                                    <div class="wizard-nav" role="navigation" aria-label="Registration step navigation">
+                                        <a class="wizard-nav-icon wizard-login-back" href="login.html" aria-label="Go back to sign in">
+                                            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                                        </a>
+                                        <div class="wizard-pagination" role="tablist" aria-label="Jump to registration section">
+                                            <button type="button" class="wizard-dot is-active" data-go-step="0" aria-label="Go to Personal"></button>
+                                            <button type="button" class="wizard-dot" data-go-step="1" aria-label="Go to Professional"></button>
+                                            <button type="button" class="wizard-dot" data-go-step="2" aria-label="Go to Account Setup"></button>
+                                        </div>
+                                        <button type="button" class="wizard-nav-icon wizard-next" aria-label="Next step">
+                                            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </section>
@@ -114,8 +125,19 @@
                                     </label>
                                 </div>
                                 <div class="wizard-actions">
-                                    <button type="button" class="doctor-btn wizard-back">Back</button>
-                                    <button type="button" class="sign-in-btn wizard-next">Next</button>
+                                    <div class="wizard-nav" role="navigation" aria-label="Registration step navigation">
+                                        <button type="button" class="wizard-nav-icon wizard-back" aria-label="Previous step">
+                                            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                                        </button>
+                                        <div class="wizard-pagination" role="tablist" aria-label="Jump to registration section">
+                                            <button type="button" class="wizard-dot is-active" data-go-step="0" aria-label="Go to Personal"></button>
+                                            <button type="button" class="wizard-dot" data-go-step="1" aria-label="Go to Professional"></button>
+                                            <button type="button" class="wizard-dot" data-go-step="2" aria-label="Go to Account Setup"></button>
+                                        </div>
+                                        <button type="button" class="wizard-nav-icon wizard-next" aria-label="Next step">
+                                            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </section>
@@ -133,24 +155,35 @@
                                     </label>
                                     <label class="field-group field-group-span-2 required-field">
                                         <span>Password</span>
-                                        <input type="password" name="password" placeholder="Password" autocomplete="new-password" required>
-                                    </label>
-                                    <label class="field-group field-group-span-2 upload-group optional-field">
-                                        <span>Profile Picture</span>
-                                        <div class="upload-box">
-                                            <i class="fa-regular fa-image" aria-hidden="true"></i>
-                                            <span>Upload a profile picture</span>
-                                            <input type="file" name="profilePicture" accept="image/*">
+                                        <div class="registration-password-wrap">
+                                            <input type="password" id="registrationPassword" name="password" placeholder="Password" autocomplete="new-password" minlength="6" pattern="(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}" title="Password must be at least 6 characters and include 1 uppercase letter, 1 number, and 1 special character." required>
+                                            <button type="button" class="registration-password-toggle" data-password-target="registrationPassword" aria-label="Show password" aria-pressed="false">
+                                                <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                                            </button>
                                         </div>
                                     </label>
-                                    <label class="field-group field-group-span-2 optional-field">
-                                        <span>Short Bio / Notes</span>
-                                        <textarea name="bio" placeholder="Short Bio / Notes" rows="4"></textarea>
+                                    <label class="field-group field-group-span-2 required-field">
+                                        <span>Confirm Password</span>
+                                        <div class="registration-password-wrap">
+                                            <input type="password" id="registrationConfirmPassword" name="confirmPassword" placeholder="Confirm Password" autocomplete="new-password" required>
+                                            <button type="button" class="registration-password-toggle" data-password-target="registrationConfirmPassword" aria-label="Show confirm password" aria-pressed="false">
+                                                <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                                            </button>
+                                        </div>
                                     </label>
                                 </div>
                                 <div class="wizard-actions">
-                                    <button type="button" class="doctor-btn wizard-back">Back</button>
-                                    <button type="submit" class="sign-in-btn registration-submit">Complete Registration</button>
+                                    <div class="wizard-nav" role="navigation" aria-label="Registration step navigation">
+                                        <button type="button" class="wizard-nav-icon wizard-back" aria-label="Previous step">
+                                            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                                        </button>
+                                        <div class="wizard-pagination" role="tablist" aria-label="Jump to registration section">
+                                            <button type="button" class="wizard-dot is-active" data-go-step="0" aria-label="Go to Personal"></button>
+                                            <button type="button" class="wizard-dot" data-go-step="1" aria-label="Go to Professional"></button>
+                                            <button type="button" class="wizard-dot" data-go-step="2" aria-label="Go to Account Setup"></button>
+                                        </div>
+                                        <button type="submit" class="wizard-create-account-btn registration-submit" aria-label="Create account">Create Account</button>
+                                    </div>
                                 </div>
                             </div>
                         </section>

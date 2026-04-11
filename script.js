@@ -1559,6 +1559,7 @@ function initializePatientsPage() {
     const addPatientSaveButton = document.getElementById("addPatientSaveBtn");
     const addPatientAgeInput = addPatientForm?.querySelector('input[name="age"]') || null;
     const addPatientDobInput = addPatientForm?.querySelector('input[name="dateOfBirth"]') || null;
+    const addPatientPasswordToggles = addPatientForm ? Array.from(addPatientForm.querySelectorAll('.registration-password-toggle[data-password-target]')) : [];
     const saveNotesButton = document.getElementById("saveDoctorNotes");
     const notesInput = document.getElementById("doctorNotesInput");
     const notesFeedback = document.getElementById("notesSaveFeedback");
@@ -2091,6 +2092,23 @@ function initializePatientsPage() {
         document.body.style.overflow = "";
         if (addPatientForm) {
             addPatientForm.reset();
+            addPatientPasswordToggles.forEach(toggleButton => {
+                const targetId = String(toggleButton.getAttribute("data-password-target") || "").trim();
+                if (!targetId) {
+                    return;
+                }
+
+                const targetInput = addPatientForm.querySelector(`#${targetId}`);
+                if (targetInput instanceof HTMLInputElement) {
+                    targetInput.type = "password";
+                }
+
+                toggleButton.setAttribute("aria-pressed", "false");
+                const icon = toggleButton.querySelector("i");
+                if (icon) {
+                    icon.className = "fa-regular fa-eye";
+                }
+            });
         }
         if (addPatientAgeInput) {
             addPatientAgeInput.value = "";
@@ -2243,19 +2261,38 @@ function initializePatientsPage() {
         const gender      = String(formData.get("gender") || "").trim();
         const strokeType  = String(formData.get("strokeType") || "").trim();
         const affectedHand = String(formData.get("affectedHand") || "").trim();
-        const phone       = String(formData.get("phone") || "").trim();
-        const backupEmail = String(formData.get("backupEmail") || "").trim();
+        const email       = String(formData.get("email") || "").trim();
+        const backupContact = String(formData.get("backupContact") || "").trim();
         const username    = String(formData.get("username") || "").trim();
         const password    = String(formData.get("password") || "");
+        const confirmPassword = String(formData.get("confirmPassword") || "");
 
-        const normalizedPhone = phone.replace(/\s+/g, "");
-        if (!/^\+?\d{7,15}$/.test(normalizedPhone)) {
-            alert("Phone must be 7 to 15 digits (optional leading +).");
+        if (!confirmPassword) {
+            alert("Confirm password is required.");
             return;
         }
 
-        if (backupEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(backupEmail)) {
-            alert("Backup contact must be a valid email address.");
+        if (password !== confirmPassword) {
+            alert("Password and confirm password must match.");
+            return;
+        }
+
+        if (!(password.length >= 6 && /[A-Z]/.test(password) && /\d/.test(password) && /[^A-Za-z0-9]/.test(password))) {
+            alert("Password must be at least 6 characters with 1 uppercase letter, 1 number, and 1 special character.");
+            return;
+        }
+
+        const normalizedEmail = email.toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+            alert("Email address is required and must be valid.");
+            return;
+        }
+
+        const normalizedBackup = backupContact.replace(/\s+/g, "");
+        const isBackupEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(backupContact);
+        const isBackupPhone = /^\+?\d{7,15}$/.test(normalizedBackup);
+        if (backupContact && !isBackupEmail && !isBackupPhone) {
+            alert("Backup contact must be a valid phone number or email address.");
             return;
         }
 
@@ -2280,8 +2317,8 @@ function initializePatientsPage() {
                     gender,
                     strokeType,
                     affectedHand,
-                    phone: normalizedPhone,
-                    backupEmail,
+                    email: normalizedEmail,
+                    backupContact: isBackupPhone ? normalizedBackup : backupContact,
                     username,
                     password
                 })
@@ -2357,6 +2394,29 @@ function initializePatientsPage() {
         }
 
         void addPatientFromForm(event.currentTarget);
+    });
+
+    addPatientPasswordToggles.forEach(toggleButton => {
+        toggleButton.addEventListener("click", () => {
+            const targetId = String(toggleButton.getAttribute("data-password-target") || "").trim();
+            if (!targetId || !addPatientForm) {
+                return;
+            }
+
+            const targetInput = addPatientForm.querySelector(`#${targetId}`);
+            if (!(targetInput instanceof HTMLInputElement)) {
+                return;
+            }
+
+            const show = targetInput.type === "password";
+            targetInput.type = show ? "text" : "password";
+            toggleButton.setAttribute("aria-pressed", show ? "true" : "false");
+
+            const icon = toggleButton.querySelector("i");
+            if (icon) {
+                icon.className = show ? "fa-regular fa-eye-slash" : "fa-regular fa-eye";
+            }
+        });
     });
 
     addPatientDobInput?.addEventListener("input", () => {
@@ -4597,16 +4657,20 @@ function initializePatientSettingsPage() {
     }
 
     const form = document.getElementById("patientSettingsForm");
-    const nameInput = document.getElementById("patientSettingsName");
-    const emailInput = document.getElementById("patientSettingsEmail");
+    const fullNameInput = document.getElementById("patientFullName");
+    const dateOfBirthInput = document.getElementById("patientDateOfBirth");
+    const genderInput = document.getElementById("patientGender");
+    const phoneInput = document.getElementById("patientPhone");
+    const backupContactInput = document.getElementById("patientBackupContact");
+    const usernameInput = document.getElementById("patientUsername");
     const togglePasswordButton = document.getElementById("patientPasswordModalBtn");
     const passwordFields = document.getElementById("patientPasswordFields");
     const passwordModal = document.getElementById("patientPasswordModal");
     const passwordBackdrop = document.getElementById("patientPasswordBackdrop");
     const passwordCloseButton = document.getElementById("patientPasswordClose");
     const passwordCancelButton = document.getElementById("patientPasswordCancel");
-    const nameEditButton = document.getElementById("patientNameEditBtn");
-    const contactEditButton = document.getElementById("patientContactEditBtn");
+    const phoneEditButton = document.getElementById("patientPhoneEditBtn");
+    const backupEditButton = document.getElementById("patientBackupEditBtn");
     const currentPasswordInput = document.getElementById("patientCurrentPassword");
     const newPasswordInput = document.getElementById("patientNewPassword");
     const confirmPasswordInput = document.getElementById("patientConfirmPassword");
@@ -4616,13 +4680,15 @@ function initializePatientSettingsPage() {
     const diagnosisInput = document.getElementById("patientDiagnosis");
     const assignedDoctorInput = document.getElementById("patientAssignedDoctor");
     const treatmentGoalInput = document.getElementById("patientTreatmentGoal");
+    const strokeTypeInput = document.getElementById("patientStrokeType");
+    const affectedHandInput = document.getElementById("patientAffectedHand");
     const ageInput = document.getElementById("patientAge");
     const profileCard = form?.closest(".account-info-card") || document.querySelector(".account-info-card");
 
-    let initialName = "";
-    let initialContact = "";
+    let initialPhone = "";
+    let initialBackupContact = "";
+    let initialUsername = "";
     let isPasswordEditing = false;
-    let doctorDisplayName = "";
 
     function setFeedback(message) {
         if (feedback) {
@@ -4636,14 +4702,50 @@ function initializePatientSettingsPage() {
         }
     }
 
+    function setReadonlyValue(input, value, fallback = "Not Provided") {
+        if (!input) {
+            return;
+        }
+        const normalized = String(value || "").trim();
+        const finalValue = normalized !== "" ? normalized : fallback;
+        if (typeof input.value !== "undefined") {
+            input.value = finalValue;
+        } else {
+            input.textContent = finalValue;
+        }
+    }
+
+    function setEditableDisplay(input, rawValue, emptyLabel = "Not Provided") {
+        if (!input) {
+            return;
+        }
+        const normalized = String(rawValue || "").trim();
+        input.dataset.rawValue = normalized;
+        input.dataset.emptyLabel = emptyLabel;
+        input.value = normalized !== "" ? normalized : emptyLabel;
+    }
+
+    function getEditableRaw(input) {
+        if (!input) {
+            return "";
+        }
+        const typed = String(input.value || "").trim();
+        const emptyLabel = String(input.dataset.emptyLabel || "").trim();
+        if (typed === emptyLabel && String(input.dataset.rawValue || "").trim() === "") {
+            return "";
+        }
+        return typed;
+    }
+
     function setMedicalInfo(data) {
-        const clinicalDoctorName = String(data?.assigned_doctor || "").trim();
-        const assignedDoctorName = clinicalDoctorName && clinicalDoctorName !== "Not assigned"
-            ? clinicalDoctorName
-            : (doctorDisplayName || "Not assigned");
-        if (diagnosisInput) diagnosisInput.value = data?.diagnosis || "Pending clinical intake";
-        if (assignedDoctorInput) assignedDoctorInput.value = assignedDoctorName;
-        if (treatmentGoalInput) treatmentGoalInput.value = data?.treatment_goal || "Pending provider update";
+        const diagnosis = String(data?.diagnosis || "").trim();
+        const treatmentGoal = String(data?.treatment_goal || "").trim();
+
+        setReadonlyValue(strokeTypeInput, data?.stroke_type, "Pending Update");
+        setReadonlyValue(affectedHandInput, data?.affected_hand, "Pending Update");
+        setReadonlyValue(diagnosisInput, diagnosis, "Pending clinical intake");
+        setReadonlyValue(assignedDoctorInput, data?.assigned_doctor, "Not assigned");
+        setReadonlyValue(treatmentGoalInput, treatmentGoal, "Pending provider update");
     }
 
     function setPatientAge(ageValue) {
@@ -4652,7 +4754,7 @@ function initializePatientSettingsPage() {
         if (Number.isFinite(parsedAge) && parsedAge > 0) {
             ageInput.value = String(parsedAge);
         } else {
-            ageInput.value = "Not provided";
+            ageInput.value = "Not Provided";
         }
     }
 
@@ -4680,12 +4782,23 @@ function initializePatientSettingsPage() {
         }
     }
 
-    function isValidContact(value) {
+    function isValidEmail(value) {
         const trimmed = value.trim();
         if (!trimmed) return false;
-        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
-        const isPhone = /^[+]?\d{7,15}$/.test(trimmed.replace(/\s+/g, ""));
-        return isEmail || isPhone;
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+    }
+
+    function isValidBackupContact(value) {
+        const trimmed = value.trim();
+        if (!trimmed) return true;
+        const compact = trimmed.replace(/\s+/g, "");
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) || /^[+]?\d{7,15}$/.test(compact);
+    }
+
+    function isValidUsername(value) {
+        const trimmed = value.trim();
+        if (!trimmed) return false;
+        return /^[A-Za-z0-9_.-]{3,50}$/.test(trimmed);
     }
 
     function setFieldEditing(fieldGroup, input, button, enabled) {
@@ -4695,7 +4808,14 @@ function initializePatientSettingsPage() {
         if (input) {
             input.readOnly = !enabled;
             if (enabled) {
+                const rawValue = String(input.dataset.rawValue || "").trim();
+                input.value = rawValue;
                 input.focus();
+                input.select();
+            } else {
+                const rawValue = String(input.dataset.rawValue || "").trim();
+                const emptyLabel = String(input.dataset.emptyLabel || "Not Provided").trim();
+                input.value = rawValue !== "" ? rawValue : emptyLabel;
             }
         }
         if (button) {
@@ -4721,35 +4841,97 @@ function initializePatientSettingsPage() {
         }
     }
 
-    async function syncProfileUpdate({ name, contact, currentPassword, newPassword }, button) {
+    async function fetchSettingsSnapshot() {
+        try {
+            const response = await fetch("api/patient/settings.php", {
+                method: "GET",
+                headers: { "Accept": "application/json" },
+                cache: "no-store"
+            });
+            const rawText = await response.text();
+            let payload = {};
+            try {
+                payload = rawText ? JSON.parse(rawText) : {};
+            } catch {
+                payload = {};
+            }
+
+            if (!response.ok || !payload?.ok || !payload?.profile) {
+                return null;
+            }
+
+            return {
+                phone: String(payload.profile.phone || "").trim(),
+                backup_contact: String(payload.profile.backup_contact || "").trim(),
+                username: String(payload.profile.username || "").trim(),
+                syncStatus: String(payload.syncStatus || "").trim()
+            };
+        } catch {
+            return null;
+        }
+    }
+
+    async function syncProfileUpdate({ phone, backupContact, username, currentPassword, newPassword }, button) {
         if (button) {
             button.classList.add("is-saving");
         }
-        setFeedback("Syncing updates...");
+        setFeedback("Saving changes...");
         setSyncStatus("");
 
         try {
             const response = await fetch("api/patient/settings.php", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name, email: contact, currentPassword, newPassword })
+                body: JSON.stringify({
+                    phone,
+                    backupContact,
+                    username,
+                    currentPassword,
+                    newPassword
+                })
             });
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok || !payload?.ok) {
-                throw new Error(payload?.error || "Unable to sync updates.");
+            const responseText = await response.text();
+            let payload = {};
+            try {
+                payload = responseText ? JSON.parse(responseText) : {};
+            } catch {
+                payload = {};
             }
 
-            initialName = String(payload.profile?.name || name || "").trim();
-            initialContact = String(payload.profile?.email || contact || "").trim();
-            if (nameInput) nameInput.value = initialName;
-            if (emailInput) emailInput.value = initialContact;
+            if (!response.ok || !payload?.ok) {
+                const expectedPhone = String(phone || "").trim();
+                const expectedBackup = String(backupContact || "").trim();
+                const expectedUsername = String(username || "").trim();
+                const latestProfile = await fetchSettingsSnapshot();
+
+                if (
+                    latestProfile &&
+                    latestProfile.phone === expectedPhone &&
+                    latestProfile.backup_contact === expectedBackup &&
+                    latestProfile.username === expectedUsername
+                ) {
+                    payload = {
+                        ok: true,
+                        profile: latestProfile,
+                        syncStatus: latestProfile.syncStatus || ""
+                    };
+                } else {
+                    throw new Error(payload?.error || "Unable to sync updates.");
+                }
+            }
+
+            initialPhone = String(payload.profile?.phone || phone || "").trim();
+            initialBackupContact = String(payload.profile?.backup_contact || backupContact || "").trim();
+            initialUsername = String(payload.profile?.username || username || "").trim();
+            setEditableDisplay(phoneInput, initialPhone, "Not Provided");
+            setEditableDisplay(backupContactInput, initialBackupContact, "Not Provided");
+            setEditableDisplay(usernameInput, initialUsername, "Not Provided");
 
             setFeedback("");
-            setSyncStatus(payload.syncStatus || "Saved changes.");
+            setSyncStatus("Changes saved.");
         } catch (error) {
-            const message = error instanceof Error ? error.message : "Unable to sync updates.";
-            setFeedback(message);
-            setSyncStatus("Sync pending. Please try again.");
+            setFeedback("Changes failed. Please try again.");
+            setSyncStatus("");
         } finally {
             if (button) {
                 button.classList.remove("is-saving");
@@ -4771,48 +4953,65 @@ function initializePatientSettingsPage() {
         }
     });
 
-    nameEditButton?.addEventListener("click", () => {
-        const group = nameEditButton.closest(".has-inline-edit");
+    phoneEditButton?.addEventListener("click", () => {
+        const group = phoneEditButton.closest(".has-inline-edit");
         const editing = group?.classList.contains("is-editing");
         if (!editing) {
-            setFieldEditing(group, nameInput, nameEditButton, true);
+            setFieldEditing(group, phoneInput, phoneEditButton, true);
             return;
         }
 
-        const nextName = String(nameInput?.value || "").trim();
-        if (!nextName) {
-            setFeedback("Name is required.");
+        const nextPhone = getEditableRaw(phoneInput);
+        if (!isValidEmail(nextPhone)) {
+            setFeedback("Email address must be valid.");
             return;
         }
 
-        setFieldSaving(group, nameInput, nameEditButton);
-        void syncProfileUpdate({ name: nextName, contact: String(emailInput?.value || "").trim() }, nameEditButton);
+        setEditableDisplay(phoneInput, nextPhone, "Not Provided");
+        setFieldSaving(group, phoneInput, phoneEditButton);
+        void syncProfileUpdate({
+            phone: nextPhone,
+            backupContact: String(backupContactInput?.dataset.rawValue || ""),
+            username: String(usernameInput?.dataset.rawValue || "")
+        }, phoneEditButton);
     });
 
-    contactEditButton?.addEventListener("click", () => {
-        const group = contactEditButton.closest(".has-inline-edit");
+    backupEditButton?.addEventListener("click", () => {
+        const group = backupEditButton.closest(".has-inline-edit");
         const editing = group?.classList.contains("is-editing");
         if (!editing) {
-            setFieldEditing(group, emailInput, contactEditButton, true);
+            setFieldEditing(group, backupContactInput, backupEditButton, true);
             return;
         }
 
-        const nextContact = String(emailInput?.value || "").trim();
-        if (!isValidContact(nextContact)) {
-            setFeedback("Contact must be a valid email or phone number.");
+        const nextBackup = getEditableRaw(backupContactInput);
+        if (nextBackup.length > 255) {
+            setFeedback("Backup contact must be 255 characters or fewer.");
             return;
         }
 
-        setFieldSaving(group, emailInput, contactEditButton);
-        void syncProfileUpdate({ name: String(nameInput?.value || "").trim(), contact: nextContact }, contactEditButton);
+        if (!isValidBackupContact(nextBackup)) {
+            setFeedback("Backup contact must be a valid phone number or email address.");
+            return;
+        }
+
+        setEditableDisplay(backupContactInput, nextBackup, "Not Provided");
+        setFieldSaving(group, backupContactInput, backupEditButton);
+        void syncProfileUpdate({
+            phone: String(phoneInput?.dataset.rawValue || ""),
+            backupContact: nextBackup,
+            username: String(usernameInput?.dataset.rawValue || "")
+        }, backupEditButton);
     });
+
 
     function updatePasswordSaveState() {
         if (!passwordSaveButton || !isPasswordEditing) return;
         const currentPassword = String(currentPasswordInput?.value || "");
         const newPassword = String(newPasswordInput?.value || "");
         const confirmPassword = String(confirmPasswordInput?.value || "");
-        passwordSaveButton.disabled = !(currentPassword && newPassword && confirmPassword && newPassword === confirmPassword);
+        const strongPassword = newPassword.length >= 6 && /[A-Z]/.test(newPassword) && /\d/.test(newPassword) && /[^A-Za-z0-9]/.test(newPassword);
+        passwordSaveButton.disabled = !(currentPassword && newPassword && confirmPassword && newPassword === confirmPassword && strongPassword);
     }
 
     currentPasswordInput?.addEventListener("input", updatePasswordSaveState);
@@ -4839,6 +5038,11 @@ function initializePatientSettingsPage() {
             return;
         }
 
+        if (!(newPassword.length >= 6 && /[A-Z]/.test(newPassword) && /\d/.test(newPassword) && /[^A-Za-z0-9]/.test(newPassword))) {
+            setFeedback("Password must be at least 6 characters with 1 uppercase letter, 1 number, and 1 special character.");
+            return;
+        }
+
         if (passwordSaveButton) {
             passwordSaveButton.classList.add("is-loading");
             passwordSaveButton.disabled = true;
@@ -4846,8 +5050,9 @@ function initializePatientSettingsPage() {
 
         void syncProfileUpdate(
             {
-                name: String(nameInput?.value || "").trim(),
-                contact: String(emailInput?.value || "").trim(),
+                phone: String(phoneInput?.dataset.rawValue || ""),
+                backupContact: String(backupContactInput?.dataset.rawValue || ""),
+                username: String(usernameInput?.dataset.rawValue || ""),
                 currentPassword,
                 newPassword
             },
@@ -4860,59 +5065,45 @@ function initializePatientSettingsPage() {
         });
     });
 
-    fetch("api/patient/settings.php")
-        .then(response => response.ok ? response.json() : Promise.reject(new Error("Unable to load settings.")))
+    fetch("api/patient/profile.php")
+        .then(response => response.ok ? response.json() : Promise.reject(new Error("Unable to load patient profile.")))
         .then(payload => {
             if (!payload?.ok || !payload?.profile) {
-                throw new Error(payload?.error || "Unable to load settings.");
+                throw new Error(payload?.error || "Unable to load patient profile.");
             }
 
-            if (nameInput) {
-                nameInput.value = payload.profile.name || "";
-            }
-            if (emailInput) {
-                emailInput.value = payload.profile.email || "";
-            }
-            initialName = String(payload.profile.name || "").trim();
-            initialContact = String(payload.profile.email || "").trim();
-            setFieldEditing(nameInput?.closest(".has-inline-edit"), nameInput, nameEditButton, false);
-            setFieldEditing(emailInput?.closest(".has-inline-edit"), emailInput, contactEditButton, false);
+            const profile = payload.profile || {};
+            setReadonlyValue(fullNameInput, profile.full_name, "Not Provided");
+            setReadonlyValue(dateOfBirthInput, profile.date_of_birth_display, "Not Provided");
+            setPatientAge(profile.age);
+            setReadonlyValue(genderInput, profile.gender, "Not Provided");
+            setMedicalInfo(profile);
+
+            initialPhone = String(profile.phone || "").trim();
+            initialBackupContact = String(profile.backup_contact || "").trim();
+            initialUsername = String(profile.username || "").trim();
+
+            setEditableDisplay(phoneInput, initialPhone, "Not Provided");
+            setEditableDisplay(backupContactInput, initialBackupContact, "Not Provided");
+            setEditableDisplay(usernameInput, initialUsername, "Not Provided");
+
+            setFieldEditing(phoneInput?.closest(".has-inline-edit"), phoneInput, phoneEditButton, false);
+            setFieldEditing(backupContactInput?.closest(".has-inline-edit"), backupContactInput, backupEditButton, false);
+            usernameInput.readOnly = true;
+
             setFeedback("");
             setSyncStatus(payload.syncStatus || "");
         })
         .catch(() => {
             setFeedback("Unable to load profile settings.");
-        });
-
-    fetch("api/patient/profile_details.php")
-        .then(response => response.ok ? response.json() : Promise.reject(new Error("Unable to load medical profile.")))
-        .then(payload => {
-            if (!payload?.ok) {
-                throw new Error(payload?.error || "Unable to load medical profile.");
-            }
-            setMedicalInfo(payload.clinical || {});
-            setPatientAge(payload?.patient?.age ?? null);
-        })
-        .catch(() => {
             setMedicalInfo({});
             setPatientAge(null);
-        });
-
-    fetch("api/patient/doctor_profile.php")
-        .then(response => response.ok ? response.json() : Promise.reject(new Error("Unable to load doctor profile.")))
-        .then(payload => {
-            const candidateName = String(payload?.profile?.displayName || "").trim();
-            if (!candidateName) {
-                return;
-            }
-            doctorDisplayName = candidateName;
-            const currentAssignedDoctor = String(assignedDoctorInput?.value || "").trim();
-            if (assignedDoctorInput && (!currentAssignedDoctor || currentAssignedDoctor === "Not assigned")) {
-                assignedDoctorInput.value = doctorDisplayName;
-            }
-        })
-        .catch(() => {
-            // Keep existing clinical payload values if doctor profile is unavailable.
+            setReadonlyValue(fullNameInput, "", "Not Provided");
+            setReadonlyValue(dateOfBirthInput, "", "Not Provided");
+            setReadonlyValue(genderInput, "", "Not Provided");
+            setEditableDisplay(phoneInput, "", "Not Provided");
+            setEditableDisplay(backupContactInput, "", "Not Provided");
+            setEditableDisplay(usernameInput, "", "Not Provided");
         });
 }
 
@@ -5183,6 +5374,11 @@ function initializeSettingsPage() {
                 confirmPasswordInput.setCustomValidity("New password and confirm password must match.");
                 confirmPasswordInput.reportValidity();
             }
+            return;
+        }
+
+        if (hasPasswordInput && !(nextNew.length >= 6 && /[A-Z]/.test(nextNew) && /\d/.test(nextNew) && /[^A-Za-z0-9]/.test(nextNew))) {
+            setSettingsMessage("New password must be at least 6 characters with 1 uppercase letter, 1 number, and 1 special character.");
             return;
         }
 
@@ -5635,6 +5831,8 @@ function initializeRegistrationWizard() {
     const progressCounter = document.getElementById("registrationStepCounter");
     const progressFill = document.querySelector(".registration-progress .progress-fill");
     const progressSteps = document.querySelectorAll(".registration-progress [data-progress-step]");
+    const wizardDots = wizardForm ? wizardForm.querySelectorAll(".wizard-dot[data-go-step]") : [];
+    const passwordToggleButtons = wizardForm ? wizardForm.querySelectorAll(".registration-password-toggle[data-password-target]") : [];
     const stepPanels = wizardForm ? Array.from(wizardForm.querySelectorAll(".form-step")) : [];
 
     if (!wizardForm || !wizardStage || !stepPanels.length) {
@@ -5642,9 +5840,18 @@ function initializeRegistrationWizard() {
     }
 
     let currentStepIndex = 0;
+    let emailCheckTimer = null;
+    let contactCheckTimer = null;
+    let emailCheckToken = 0;
+    let contactCheckToken = 0;
 
     function normalizeContactNumber(value) {
         return String(value || "").replace(/\D/g, "").slice(0, 11);
+    }
+
+    function isStrongPassword(value) {
+        const password = String(value || "");
+        return password.length >= 6 && /[A-Z]/.test(password) && /\d/.test(password) && /[^A-Za-z0-9]/.test(password);
     }
 
     function getFieldGroup(field) {
@@ -5653,11 +5860,31 @@ function initializeRegistrationWizard() {
 
     function getFieldErrorNode(field) {
         const fieldGroup = getFieldGroup(field);
-        return fieldGroup ? fieldGroup.querySelector(".field-error") : null;
+        if (!fieldGroup) {
+            return null;
+        }
+
+        let errorNode = fieldGroup.querySelector(".field-error");
+        if (!errorNode) {
+            errorNode = document.createElement("small");
+            errorNode.className = "field-error";
+            errorNode.setAttribute("aria-live", "polite");
+            if (field.name) {
+                errorNode.setAttribute("data-field-error", field.name);
+            }
+            fieldGroup.appendChild(errorNode);
+        }
+
+        return errorNode;
     }
 
     function getFieldValidationMessage(field) {
         const value = field.value.trim();
+
+        const remoteError = String(field.dataset.remoteError || "").trim();
+        if (remoteError !== "") {
+            return remoteError;
+        }
 
         if (field.type === "file") {
             return "";
@@ -5677,6 +5904,46 @@ function initializeRegistrationWizard() {
             return "";
         }
 
+        if (field.name === "fullName") {
+            if (value === "") {
+                return "Full name is required.";
+            }
+
+            if (!/^[A-Za-z][A-Za-z .']*$/.test(value)) {
+                return "Full name can only contain letters, spaces, periods, and apostrophes.";
+            }
+
+            return "";
+        }
+
+        if (field.name === "password") {
+            if (value === "") {
+                return "Password is required.";
+            }
+
+            if (!isStrongPassword(value)) {
+                return "Password must be at least 6 characters with 1 uppercase letter, 1 number, and 1 special character.";
+            }
+
+            return "";
+        }
+
+        if (field.name === "confirmPassword") {
+            if (value === "") {
+                return "Confirm password is required.";
+            }
+
+            const stepPanel = field.closest(".form-step");
+            const passwordField = stepPanel ? stepPanel.querySelector('input[name="password"]') : null;
+            const passwordValue = String(passwordField?.value || "");
+
+            if (value !== passwordValue) {
+                return "Confirm password must match password.";
+            }
+
+            return "";
+        }
+
         if (field.required && value === "") {
             return "This field is required.";
         }
@@ -5686,6 +5953,27 @@ function initializeRegistrationWizard() {
         }
 
         return "";
+    }
+
+    async function checkRegistrationAvailability(kind, value) {
+        const query = new URLSearchParams({
+            check: kind,
+            value
+        });
+
+        const response = await fetch(`api/registration.php?${query.toString()}`, {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload?.ok !== true) {
+            throw new Error(payload?.error || "Unable to validate field right now.");
+        }
+
+        return payload;
     }
 
     function setFieldValidationState(field) {
@@ -5703,6 +5991,8 @@ function initializeRegistrationWizard() {
         if (fieldError) {
             fieldError.textContent = validationMessage;
         }
+
+        requestAnimationFrame(updateStageHeight);
 
         return !isInvalid;
     }
@@ -5777,6 +6067,13 @@ function initializeRegistrationWizard() {
         progressSteps.forEach((step, index) => {
             step.classList.toggle("is-active", index <= currentStepIndex);
         });
+
+        wizardDots.forEach(dot => {
+            const stepIndex = Number(dot.getAttribute("data-go-step"));
+            const isActive = stepIndex === currentStepIndex;
+            dot.classList.toggle("is-active", isActive);
+            dot.setAttribute("aria-current", isActive ? "step" : "false");
+        });
     }
 
     function renderStep(nextIndex) {
@@ -5813,16 +6110,15 @@ function initializeRegistrationWizard() {
             if (wizardError) {
                 wizardError.textContent = "";
             }
+            requestAnimationFrame(updateStageHeight);
             return true;
         }
 
         if (wizardError) {
-            const validationMessage = getFieldValidationMessage(firstInvalidField);
-            wizardError.textContent = validationMessage
-                ? `${validationMessage} Please correct the highlighted field before continuing.`
-                : "Please complete all required fields before continuing.";
+            wizardError.textContent = "Please correct the highlighted field before continuing.";
         }
 
+        requestAnimationFrame(updateStageHeight);
         firstInvalidField.focus();
         return false;
     }
@@ -5833,14 +6129,83 @@ function initializeRegistrationWizard() {
         const watchedFields = panel.querySelectorAll("input, select, textarea");
 
         watchedFields.forEach(field => {
+            if (field.name === "email") {
+                field.addEventListener("input", () => {
+                    field.dataset.remoteError = "";
+                    const emailValue = String(field.value || "").trim();
+                    setFieldValidationState(field);
+                    updateStepButtons();
+
+                    if (wizardError && currentStepIndex === index) {
+                        wizardError.textContent = "";
+                    }
+
+                    if (emailCheckTimer) {
+                        clearTimeout(emailCheckTimer);
+                    }
+
+                    if (emailValue === "" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
+                        return;
+                    }
+
+                    const token = ++emailCheckToken;
+                    emailCheckTimer = window.setTimeout(async () => {
+                        try {
+                            const result = await checkRegistrationAvailability("email", emailValue);
+                            if (token !== emailCheckToken) {
+                                return;
+                            }
+
+                            field.dataset.remoteError = result.available ? "" : "Email already exists.";
+                            setFieldValidationState(field);
+                            updateStepButtons();
+                        } catch {
+                            // Keep typing experience smooth when network validation fails.
+                        }
+                    }, 320);
+                });
+
+                field.addEventListener("blur", () => {
+                    setFieldValidationState(field);
+                });
+
+                return;
+            }
+
             if (field.name === "contactNumber") {
                 field.addEventListener("input", () => {
                     field.value = normalizeContactNumber(field.value);
+                    field.dataset.remoteError = "";
                     setFieldValidationState(field);
                     if (wizardError && currentStepIndex === index) {
                         wizardError.textContent = "";
                     }
                     updateStepButtons();
+
+                    if (contactCheckTimer) {
+                        clearTimeout(contactCheckTimer);
+                    }
+
+                    const contactValue = String(field.value || "").trim();
+                    if (!/^09\d{9}$/.test(contactValue)) {
+                        return;
+                    }
+
+                    const token = ++contactCheckToken;
+                    contactCheckTimer = window.setTimeout(async () => {
+                        try {
+                            const result = await checkRegistrationAvailability("contactNumber", contactValue);
+                            if (token !== contactCheckToken) {
+                                return;
+                            }
+
+                            field.dataset.remoteError = result.available ? "" : "Contact number already exists.";
+                            setFieldValidationState(field);
+                            updateStepButtons();
+                        } catch {
+                            // Ignore transient availability-check errors.
+                        }
+                    }, 320);
                 });
 
                 field.addEventListener("blur", () => {
@@ -5878,6 +6243,92 @@ function initializeRegistrationWizard() {
             backButton.addEventListener("click", () => {
                 renderStep(Math.max(index - 1, 0));
             });
+        }
+    });
+
+    passwordToggleButtons.forEach(toggleButton => {
+        toggleButton.addEventListener("click", () => {
+            const targetId = String(toggleButton.getAttribute("data-password-target") || "").trim();
+            if (!targetId) {
+                return;
+            }
+
+            const targetInput = wizardForm.querySelector(`#${targetId}`);
+            if (!(targetInput instanceof HTMLInputElement)) {
+                return;
+            }
+
+            const shouldShowPassword = targetInput.type === "password";
+            targetInput.type = shouldShowPassword ? "text" : "password";
+
+            toggleButton.setAttribute("aria-pressed", shouldShowPassword ? "true" : "false");
+            toggleButton.setAttribute("aria-label", shouldShowPassword ? "Hide password" : "Show password");
+
+            const icon = toggleButton.querySelector("i");
+            if (icon) {
+                icon.className = shouldShowPassword ? "fa-regular fa-eye-slash" : "fa-regular fa-eye";
+            }
+        });
+    });
+
+    wizardDots.forEach(dot => {
+        dot.addEventListener("click", () => {
+            const targetStep = Number(dot.getAttribute("data-go-step"));
+            if (!Number.isInteger(targetStep) || targetStep < 0 || targetStep >= stepPanels.length) {
+                return;
+            }
+
+            if (targetStep === currentStepIndex) {
+                return;
+            }
+
+            if (targetStep > currentStepIndex && !validateCurrentStep()) {
+                updateStepButtons();
+                return;
+            }
+
+            renderStep(targetStep);
+        });
+    });
+
+    wizardForm.addEventListener("keydown", event => {
+        if (event.key !== "Enter") {
+            return;
+        }
+
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
+
+        const tagName = target.tagName;
+        if (tagName === "TEXTAREA") {
+            return;
+        }
+
+        if (target.closest("button, a")) {
+            return;
+        }
+
+        event.preventDefault();
+
+        if (currentStepIndex < stepPanels.length - 1) {
+            if (!validateCurrentStep()) {
+                updateStepButtons();
+                return;
+            }
+
+            renderStep(Math.min(currentStepIndex + 1, stepPanels.length - 1));
+            return;
+        }
+
+        const submitButton = wizardForm.querySelector(".registration-submit");
+        if (submitButton instanceof HTMLButtonElement) {
+            if (typeof wizardForm.requestSubmit === "function") {
+                wizardForm.requestSubmit(submitButton);
+            } else {
+                submitButton.click();
+            }
         }
     });
 

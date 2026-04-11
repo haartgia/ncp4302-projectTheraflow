@@ -541,8 +541,24 @@ body.dark-mode .root-login-sub {
   background: var(--content-bg);
 }
 
+.patient-settings-page {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.patient-settings-page .container {
+  height: 100vh;
+  overflow: hidden;
+}
+
 .patient-settings-page .content {
-  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  max-height: 100vh;
+  height: auto;
+  padding: 14px 10px;
+  overflow: hidden;
 }
 
 .header-row {
@@ -2102,7 +2118,7 @@ body.dark-mode .calendar-widget-card {
   max-width: 420px;
   background: #ffffff;
   border-radius: 20px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 22px 52px rgba(12, 46, 58, 0.16);
   padding: 34px 30px;
 }
 
@@ -2127,12 +2143,27 @@ body.dark-mode .calendar-widget-card {
   background: #f5f7f8;
   color: #425863;
   min-height: 56px;
-  padding: 16px 18px 16px 20px;
+  padding: 16px 18px 16px 50px;
   font-size: 1rem;
   font-weight: 500;
   outline: none;
   box-shadow: inset 0 0 0 1.5px transparent;
   transition: box-shadow 0.2s ease;
+}
+
+.login-input-wrap,
+.password-field {
+  position: relative;
+}
+
+.login-prefix-icon {
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  transform: translateY(-50%);
+  color: rgba(77, 134, 156, 0.88);
+  font-size: 0.95rem;
+  pointer-events: none;
 }
 
 .password-field {
@@ -2272,6 +2303,13 @@ body.dark-mode .calendar-widget-card {
 
 .registration-page {
   background: #ffffff;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.registration-page .container {
+  height: 100vh;
+  overflow: hidden;
 }
 
 .registration-content {
@@ -2280,7 +2318,9 @@ body.dark-mode .calendar-widget-card {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  max-height: 100vh;
   padding: 24px;
+  overflow: hidden;
 }
 
 .registration-shell {
@@ -2294,7 +2334,7 @@ body.dark-mode .calendar-widget-card {
   width: min(100%, 760px);
   background: #ffffff;
   border-radius: 24px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 24px 58px rgba(12, 46, 58, 0.16);
   padding: 28px 30px 32px;
 }
 
@@ -2412,36 +2452,28 @@ body.dark-mode .calendar-widget-card {
 
 .wizard-stage {
   position: relative;
-  min-height: 360px;
-  transition: height 0.24s ease;
+  min-height: 0;
+  height: auto;
 }
 
 .form-step {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateX(48px);
-  transition: opacity 0.26s ease, transform 0.26s ease, visibility 0.26s ease;
+  display: none;
+  position: relative;
+  opacity: 1;
+  visibility: visible;
+  transform: none;
 }
 
 .form-step.is-active {
-  opacity: 1;
-  visibility: visible;
-  transform: translateX(0);
-  z-index: 2;
+  display: block;
 }
 
 .form-step.is-before {
-  opacity: 0;
-  visibility: hidden;
-  transform: translateX(-48px);
+  display: none;
 }
 
 .form-step.is-after {
-  opacity: 0;
-  visibility: hidden;
-  transform: translateX(48px);
+  display: none;
 }
 
 .form-section {
@@ -2563,6 +2595,38 @@ body.dark-mode .calendar-widget-card {
   transition: box-shadow 0.2s ease;
 }
 
+.registration-password-wrap {
+  position: relative;
+}
+
+.registration-password-wrap input {
+  padding-right: 48px;
+}
+
+.registration-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: #5f7a86;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 999px;
+}
+
+.registration-password-toggle:hover,
+.registration-password-toggle:focus-visible {
+  color: #4d869c;
+  background: rgba(77, 134, 156, 0.1);
+  outline: none;
+}
+
 .field-group input::placeholder,
 .field-group textarea::placeholder {
   color: #6f858f;
@@ -2618,6 +2682,7 @@ body.dark-mode .calendar-widget-card {
   gap: 14px;
   font-family: "Poppins", "Segoe UI", sans-serif;
   margin-top: 18px;
+}
 
 .field-group select,
 .field-group option {
@@ -2638,19 +2703,16 @@ body.dark-mode .calendar-widget-card {
 
 .patients-modal .field-group input[name="dateOfBirth"] {
   border-radius: 12px;
-  background: #ffffff;
-  border: 1px solid rgba(77, 134, 156, 0.24);
-  box-shadow: none;
+  background: #f5f7f8;
+  border: none;
+  box-shadow: inset 0 0 0 2px transparent;
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
   font-family: "Poppins", "Segoe UI", sans-serif;
 }
 .patients-modal .field-group input[name="dateOfBirth"]:focus {
-  border-color: #4d869c;
-  box-shadow: 0 0 0 2px rgba(77, 134, 156, 0.15);
-}
-  padding-top: 0;
+  box-shadow: inset 0 0 0 2px #4d869c;
 }
 
 .wizard-actions-end {
@@ -2667,6 +2729,113 @@ body.dark-mode .calendar-widget-card {
   flex: 1 1 0;
   width: auto;
   margin-top: 0;
+}
+
+.registration-page .wizard-actions .doctor-btn,
+.registration-page .wizard-actions .sign-in-btn {
+  gap: 8px;
+}
+
+.registration-page .wizard-actions .doctor-btn i,
+.registration-page .wizard-actions .sign-in-btn i {
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.registration-page .wizard-actions {
+  justify-content: center;
+}
+
+.registration-page .wizard-nav {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+
+.registration-page .wizard-nav-icon {
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  color: rgba(77, 134, 156, 0.75);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.registration-page .wizard-nav-icon i {
+  font-size: 0.92rem;
+  line-height: 1;
+}
+
+.registration-page .wizard-nav-icon:hover,
+.registration-page .wizard-nav-icon:focus-visible {
+  color: #4d869c;
+  border: none;
+  background: transparent;
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.registration-page .wizard-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.registration-page .wizard-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 2px solid rgba(77, 134, 156, 0.4);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.registration-page .wizard-dot:hover,
+.registration-page .wizard-dot:focus-visible {
+  border-color: #4d869c;
+  transform: scale(1.08);
+  outline: none;
+}
+
+.registration-page .wizard-dot.is-active {
+  width: 12px;
+  height: 12px;
+  border-color: #4d869c;
+  background: #4d869c;
+}
+
+.registration-page .wizard-create-account-btn {
+  min-height: 44px;
+  height: 44px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 999px;
+  background: #4d869c;
+  color: #ffffff;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.registration-page .wizard-create-account-btn:hover,
+.registration-page .wizard-create-account-btn:focus-visible {
+  background: #3f778d;
+  transform: translateY(-1px);
+  outline: none;
 }
 
 .upload-group input[type="file"] {
@@ -4314,6 +4483,14 @@ body.patients-page {
   gap: 20px;
 }
 
+.patient-settings-page .patient-shell {
+  flex: 1;
+  min-height: 0;
+  width: min(99.5%, 1880px);
+  margin: 0 auto;
+  gap: 8px;
+}
+
 body.exercise-hub-page .patient-shell {
   width: min(1020px, 100%);
   margin: 0 auto;
@@ -4500,11 +4677,24 @@ body.dark-mode.exercise-hub-page .patient-shell {
 .patient-settings-page .patient-hub-grid {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  min-height: 0;
+  gap: 10px;
+  align-items: stretch;
   max-width: 100%;
   margin: 0 auto;
   width: 100%;
+}
+
+.patient-settings-page .account-cards-grid {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 24px;
+  flex: 1;
+  min-height: 0;
+  width: 98%;
+  margin: 0 auto;
 }
 
 .patient-settings-page .widget {
@@ -4528,50 +4718,150 @@ body.dark-mode.exercise-hub-page .patient-shell {
 .patient-settings-page .account-info-card {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  width: min(980px, 100%);
-  margin: 0 auto;
+  justify-content: flex-start;
+  min-height: 0;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 48px;
+  border: 1px solid rgba(77, 134, 156, 0.22);
+  box-shadow: 0 12px 28px rgba(31, 86, 104, 0.09);
 }
 
-.account-info-grid {
+.patient-settings-page .account-info-card--right {
+  overflow: hidden;
+}
+
+.patient-settings-page .account-info-card .widget-title {
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.account-compact-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 40px;
-  row-gap: 18px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px 20px;
   align-items: start;
 }
 
-.account-info-column--medical {
-  border-left: 1px solid rgba(77, 134, 156, 0.2);
-  padding-left: 32px;
+.account-compact-grid .field-group {
+  min-width: 0;
+}
+
+.account-compact-grid .field-group.field-group-span-4 {
+  grid-column: 1 / -1;
+}
+
+.account-section-title {
+  margin: 2px 0 0;
+  font-size: 1.06rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #2d6b81;
+  font-weight: 700;
+}
+
+
+.patient-settings-page .account-info-card--right .account-compact-grid {
+  gap: 22px 20px;
+  flex: 1;
+  min-height: 0;
+}
+
+.patient-settings-page .account-info-card .field-group {
+  gap: 8px;
+  margin: 0;
+}
+
+.patient-settings-page .account-info-card .field-group > span {
+  font-size: 1.05rem;
+  font-weight: 650;
 }
 
 .patient-settings-page .account-info-card .field-group input {
-  min-height: 50px;
+  min-height: 64px;
   border-radius: 12px;
-  border: 1px solid rgba(77, 134, 156, 0.25);
-  background: #ffffff;
-  padding: 12px 14px;
+  border: 1.5px solid rgba(77, 134, 156, 0.3);
+  background: #f7fbfd;
+  padding: 10px 14px;
+  font-size: 1.16rem;
+  font-weight: 500;
+  max-width: none;
 }
 
-.patient-settings-page .account-info-card .field-group.has-inline-edit input {
-  padding-right: 42px;
+.patient-settings-page .account-info-card .field-group .password-pill {
+  max-width: 520px;
+  border-radius: 12px;
+}
+
+.patient-settings-page .account-info-card .account-section-title {
+  margin-top: 0;
+  margin-bottom: 2px;
 }
 
 .patient-settings-page .account-info-card .field-group input[readonly] {
   background: #f7fbfd;
   border-color: rgba(77, 134, 156, 0.22);
+  cursor: default;
 }
 
 .patient-settings-page .account-info-card .account-locked-field input[readonly] {
-  background: linear-gradient(180deg, #f0f7fb 0%, #e8f2f7 100%);
-  border-color: rgba(45, 114, 136, 0.32);
-  color: #1d5265;
+  background: #f7fbfd;
+  border-color: rgba(77, 134, 156, 0.22);
+  color: var(--text);
+}
+
+.treatment-goal-group {
+  margin-top: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.treatment-goal-panel {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  max-height: 100%;
+  flex: 1 1 auto;
+  border-radius: 12px;
+  border: 1.5px solid rgba(77, 134, 156, 0.3);
+  background: #f7fbfd;
+  padding: 24px;
+  font-size: 1.16rem;
+  line-height: 1.45;
+  font-weight: 500;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  overflow-y: auto;
 }
 
 .patient-settings-page .account-info-card .account-locked-field > span {
   color: #2d6b81;
-  font-weight: 700;
+  font-weight: 600;
+}
+
+.patient-settings-page .account-global-note {
+  width: 98%;
+  margin: 24px auto 0;
+  text-align: center;
+  padding-top: 2px;
+}
+
+@media (max-width: 1200px) {
+  .patient-settings-page .account-cards-grid {
+    grid-template-rows: none;
+  }
+
+  .account-compact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .account-compact-grid .field-group.field-group-span-4 {
+    grid-column: 1 / -1;
+  }
 }
 
 .patient-settings-page .widget.user-profile-card.is-password-open {
@@ -4586,29 +4876,35 @@ body.dark-mode.exercise-hub-page .patient-shell {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 50px;
+  min-height: 64px;
   background: #f7fbfd;
-  border: 1px solid rgba(77, 134, 156, 0.22);
+  border: 1.5px solid rgba(77, 134, 156, 0.3);
   border-radius: 12px;
-  padding-right: 8px;
+  padding: 0;
+  overflow: hidden;
   position: relative;
 }
 
 .password-pill input {
   border: none;
   background: transparent;
-  padding: 12px 14px;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 10px 14px;
+  font-size: 1.16rem;
+  font-weight: 500;
   flex: 1;
-  min-height: 50px;
-  padding-right: 42px;
+  min-height: 64px;
+  padding-right: 56px;
+  max-width: none;
 }
 
 .password-pill-btn {
   border: none;
   background: transparent;
   color: var(--text-muted);
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border-radius: 8px;
   cursor: pointer;
@@ -4649,6 +4945,7 @@ body.dark-mode.exercise-hub-page .patient-shell {
 .patient-password-card {
   position: relative;
   background: #ffffff;
+  border: 1px solid rgba(77, 134, 156, 0.22);
   border-radius: 18px;
   padding: 22px;
   width: min(520px, 92vw);
@@ -4682,6 +4979,19 @@ body.dark-mode.exercise-hub-page .patient-shell {
   justify-content: flex-end;
   gap: 12px;
   margin-top: 16px;
+}
+
+.patient-password-actions .doctor-btn,
+.patient-password-actions .sign-in-btn {
+  min-height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0;
+}
+
+.patient-password-card .field-group > span {
+  color: #4b6673;
 }
 
 .patient-settings-page .notes-save-feedback {
@@ -6311,12 +6621,20 @@ body.dark-mode .exercise-plan-meta strong {
 }
 
 .patient-settings-page .inline-edit-btn {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   border-radius: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  top: auto;
+  bottom: calc((64px - 36px) / 2);
+  right: 12px;
+  transform: none;
+}
+
+.patient-settings-page .has-inline-edit input {
+  padding-right: 56px;
 }
 
 .has-inline-edit input[readonly] {
