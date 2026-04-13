@@ -39,10 +39,17 @@ function ensureTherapyPlansTable(PDO $pdo): void
             duration_min INT NOT NULL DEFAULT 0,
             target_repetitions INT NOT NULL DEFAULT 0,
             sessions_per_day INT NOT NULL DEFAULT 0,
+            exercise_bundle_json TEXT NULL,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uniq_therapy_plan_patient (patient_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
     );
+
+    try {
+        $pdo->exec('ALTER TABLE therapy_plans ADD COLUMN exercise_bundle_json TEXT NULL AFTER sessions_per_day');
+    } catch (Throwable $e) {
+        // Column already exists.
+    }
 }
 
 function ensureSensorDataTable(PDO $pdo): void

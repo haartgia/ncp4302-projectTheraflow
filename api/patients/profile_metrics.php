@@ -47,19 +47,19 @@ $summaryStmt = $pdo->prepare(
         AVG(flexion_angle) AS avg_flexion,
         SUM(CASE WHEN DATE(recorded_at) = CURDATE() THEN COALESCE(repetitions, 0) ELSE 0 END) AS repetitions_today
      FROM ' . $sensorTable . '
-     WHERE patient_id = ?'
+    WHERE patient_id = ? AND note LIKE ?'
 );
-$summaryStmt->execute([$patientId]);
+$summaryStmt->execute([$patientId, 'Exercise Hub Session%']);
 $summary = $summaryStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
 $latestStmt = $pdo->prepare(
     'SELECT grip_strength, flexion_angle, repetitions, recorded_at
     FROM ' . $sensorTable . '
-     WHERE patient_id = ?
+    WHERE patient_id = ? AND note LIKE ?
      ORDER BY recorded_at DESC
      LIMIT 1'
 );
-$latestStmt->execute([$patientId]);
+$latestStmt->execute([$patientId, 'Exercise Hub Session%']);
 $latest = $latestStmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
 $weekGrip = [0, 0, 0, 0, 0, 0, 0];
@@ -67,11 +67,11 @@ $weekFlexion = [0, 0, 0, 0, 0, 0, 0];
 $weeklyStmt = $pdo->prepare(
     'SELECT WEEKDAY(recorded_at) AS wd, AVG(grip_strength) AS avg_grip, AVG(flexion_angle) AS avg_flexion
     FROM ' . $sensorTable . '
-     WHERE patient_id = ? AND recorded_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+    WHERE patient_id = ? AND note LIKE ? AND recorded_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
      GROUP BY WEEKDAY(recorded_at)
      ORDER BY WEEKDAY(recorded_at)'
 );
-$weeklyStmt->execute([$patientId]);
+$weeklyStmt->execute([$patientId, 'Exercise Hub Session%']);
 foreach ($weeklyStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     $idx = (int) ($row['wd'] ?? -1);
     if ($idx >= 0 && $idx <= 6) {

@@ -95,6 +95,20 @@ $pdo->exec(
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
 );
 
+$pdo->exec(
+    'CREATE TABLE IF NOT EXISTS patient_metadata (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        patient_id INT NOT NULL,
+        diagnosis VARCHAR(255) NULL,
+        treatment_goal VARCHAR(255) NULL,
+        doctor_notes TEXT NULL,
+        updated_by_doctor_id INT NULL,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_patient_metadata_patient_id (patient_id),
+        INDEX idx_patient_metadata_updated_at (updated_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+);
+
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
     echo json_encode(['ok' => false, 'error' => 'Method not allowed']);
@@ -102,9 +116,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 $profileSql =
-    'SELECT p.*, c.diagnosis, c.treatment_goal, c.reviewed_at AS clinical_reviewed_at, c.doctor_id AS clinical_doctor_id'
+        'SELECT p.*,
+                        COALESCE(pm.diagnosis, c.diagnosis) AS diagnosis,
+                        COALESCE(pm.treatment_goal, c.treatment_goal) AS treatment_goal,
+                        COALESCE(pm.updated_at, c.reviewed_at) AS clinical_reviewed_at,
+                        COALESCE(pm.updated_by_doctor_id, c.doctor_id) AS clinical_doctor_id'
     . ($usersTable && $usersIdColumn && $usersUsernameColumn ? ', u.' . $usersUsernameColumn . ' AS user_username' : '')
     . ' FROM patients p
+             LEFT JOIN patient_metadata pm ON pm.patient_id = p.id
        LEFT JOIN patient_clinical_data c
          ON c.id = (
             SELECT c2.id

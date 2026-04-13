@@ -60,22 +60,34 @@
                 <h2 class="widget-title">Standard Templates</h2>
                 <div class="therapy-template-grid">
                     <div class="therapy-template-card" data-template-id="level1">
-                        <h3>Level 1: Beginner</h3>
-                        <p>Duration: <strong>15 min</strong></p>
-                        <p>Target Repetitions: <strong>30</strong></p>
-                        <p>Sessions per Day: <strong>2</strong></p>
+                        <div class="therapy-template-head">
+                            <h3 id="templateLevel1Title">Level 1: Beginner</h3>
+                            <button type="button" class="therapy-template-customize-btn" data-template-id="level1" aria-label="Customize Level 1 template">
+                                <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <p class="template-plan-label">Plan Details</p>
+                        <div class="template-plan-list" id="templateLevel1Plan"></div>
                     </div>
                     <div class="therapy-template-card" data-template-id="level2">
-                        <h3>Level 2: Intermediate</h3>
-                        <p>Duration: <strong>20 min</strong></p>
-                        <p>Target Repetitions: <strong>40</strong></p>
-                        <p>Sessions per Day: <strong>3</strong></p>
+                        <div class="therapy-template-head">
+                            <h3 id="templateLevel2Title">Level 2: Intermediate</h3>
+                            <button type="button" class="therapy-template-customize-btn" data-template-id="level2" aria-label="Customize Level 2 template">
+                                <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <p class="template-plan-label">Plan Details</p>
+                        <div class="template-plan-list" id="templateLevel2Plan"></div>
                     </div>
                     <div class="therapy-template-card" data-template-id="level3">
-                        <h3>Level 3: Advanced</h3>
-                        <p>Duration: <strong>25 min</strong></p>
-                        <p>Target Repetitions: <strong>55</strong></p>
-                        <p>Sessions per Day: <strong>3</strong></p>
+                        <div class="therapy-template-head">
+                            <h3 id="templateLevel3Title">Level 3: Advanced</h3>
+                            <button type="button" class="therapy-template-customize-btn" data-template-id="level3" aria-label="Customize Level 3 template">
+                                <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <p class="template-plan-label">Plan Details</p>
+                        <div class="template-plan-list" id="templateLevel3Plan"></div>
                     </div>
                 </div>
             </article>
@@ -89,14 +101,22 @@
                                 <tr>
                                     <th scope="col">Patient</th>
                                     <th scope="col">Current Plan</th>
-                                    <th scope="col">Duration</th>
-                                    <th scope="col">Target Repetitions</th>
+                                    <th scope="col">Plan Details</th>
                                     <th scope="col">Sessions / Day</th>
                                     <th scope="col">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="therapyAssignmentsBody"></tbody>
                         </table>
+                    </div>
+                    <div class="therapy-pagination" id="therapyAssignmentsPagination" hidden>
+                        <button type="button" class="doctor-btn therapy-page-btn" id="therapyAssignmentsPrevBtn" aria-label="Previous page">
+                            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                        </button>
+                        <span class="therapy-page-label" id="therapyAssignmentsPageLabel">Page 1 of 1</span>
+                        <button type="button" class="doctor-btn therapy-page-btn" id="therapyAssignmentsNextBtn" aria-label="Next page">
+                            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                        </button>
                     </div>
                 </article>
 
@@ -146,6 +166,81 @@
                 <button type="button" class="doctor-btn" id="cancelEditPlanBtn">Cancel</button>
                 <button type="button" class="sign-in-btn" id="saveEditPlanBtn">Save Changes</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<div class="therapy-edit-popup" id="therapyTemplatePopup" hidden role="dialog" aria-modal="true" aria-labelledby="therapyTemplateTitle">
+    <div class="therapy-edit-popup-backdrop" id="therapyTemplateBackdrop"></div>
+    <div class="therapy-edit-popup-card template-editor-card">
+        <h3 id="therapyTemplateTitle">Customize Standard Template</h3>
+
+        <div class="template-exercise-editor">
+            <div class="template-exercise-row" data-template-row="1">
+                <label class="field-group required-field">
+                    <span>Exercise</span>
+                    <select id="templateExercise1Select">
+                        <option value="open_close">Open-Close Exercise</option>
+                        <option value="full_extension">Full Extension</option>
+                        <option value="full_close">Full Close</option>
+                    </select>
+                </label>
+                <label class="field-group required-field">
+                    <span>No. of Reps</span>
+                    <input type="number" id="templateReps1Input" min="1" value="30">
+                </label>
+                <label class="field-group required-field">
+                    <span>No. of Sessions</span>
+                    <input type="number" id="templateSessions1Input" min="1" value="2">
+                </label>
+            </div>
+
+            <div class="template-exercise-row" data-template-row="2" id="templateExerciseRow2" hidden>
+                <label class="field-group required-field">
+                    <span>Exercise</span>
+                    <select id="templateExercise2Select">
+                        <option value="open_close">Open-Close Exercise</option>
+                        <option value="full_extension">Full Extension</option>
+                        <option value="full_close">Full Close</option>
+                    </select>
+                </label>
+                <label class="field-group required-field">
+                    <span>No. of Reps</span>
+                    <input type="number" id="templateReps2Input" min="1" value="10">
+                </label>
+                <label class="field-group required-field">
+                    <span>No. of Sessions</span>
+                    <input type="number" id="templateSessions2Input" min="1" value="1">
+                </label>
+                <button type="button" class="doctor-btn template-remove-btn" id="removeTemplateExercise2Btn">Remove</button>
+            </div>
+
+            <div class="template-exercise-row" data-template-row="3" id="templateExerciseRow3" hidden>
+                <label class="field-group required-field">
+                    <span>Exercise</span>
+                    <select id="templateExercise3Select">
+                        <option value="open_close">Open-Close Exercise</option>
+                        <option value="full_extension">Full Extension</option>
+                        <option value="full_close">Full Close</option>
+                    </select>
+                </label>
+                <label class="field-group required-field">
+                    <span>No. of Reps</span>
+                    <input type="number" id="templateReps3Input" min="1" value="10">
+                </label>
+                <label class="field-group required-field">
+                    <span>No. of Sessions</span>
+                    <input type="number" id="templateSessions3Input" min="1" value="1">
+                </label>
+                <button type="button" class="doctor-btn template-remove-btn" id="removeTemplateExercise3Btn">Remove</button>
+            </div>
+
+            <button type="button" class="doctor-btn template-add-btn" id="templateAddExerciseBtn">Add Exercise</button>
+        </div>
+
+        <div class="wizard-actions template-editor-actions">
+            <button type="button" class="doctor-btn" id="cancelTemplateBtn">Cancel</button>
+            <button type="button" class="sign-in-btn" id="saveTemplateBtn">Save</button>
         </div>
     </div>
 </div>

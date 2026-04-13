@@ -857,6 +857,20 @@ body.dark-mode .root-login-sub {
   gap: 10px;
   color: var(--text-muted);
 }
+
+.next-exercise-device-offline[hidden],
+.next-exercise-device-online[hidden] {
+  display: none !important;
+}
+
+.next-exercise-device-offline {
+  color: #8a3c45;
+  font-weight: 600;
+}
+
+.next-exercise-device-online {
+  color: #23624a;
+}
 .next-exercise-device-offline i {
   color: #9b5760;
 }
@@ -2564,6 +2578,7 @@ body.dark-mode .calendar-widget-card {
   color: #4b6673;
   font-size: 0.9rem;
   font-weight: 600;
+  font-family: "Poppins", "Segoe UI", sans-serif;
 }
 
 .required-field > span::after {
@@ -2588,6 +2603,7 @@ body.dark-mode .calendar-widget-card {
   background: #f5f7f8;
   color: #425863;
   padding: 15px 16px;
+  font-family: "Poppins", "Segoe UI", sans-serif;
   font-size: 0.98rem;
   font-weight: 500;
   outline: none;
@@ -3478,10 +3494,9 @@ body.patients-page {
 
 
 .patient-profile-header {
-  display: grid;
-  grid-template-columns: minmax(280px, 1.08fr) minmax(340px, 1.28fr) minmax(260px, 0.84fr);
-  align-items: center;
-  gap: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   margin: 0;
 }
 
@@ -3490,7 +3505,8 @@ body.patients-page {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  width: 100%;
+  width: auto;
+  min-width: 220px;
   padding: 10px 16px;
   border: none;
   border-radius: 12px;
@@ -3542,11 +3558,16 @@ body.patients-page {
 }
 
 .patient-profile-heading {
-  grid-column: 2 / 4;
   display: flex;
   flex-direction: column;
   justify-content: center;
   min-width: 0;
+}
+
+.patient-profile-footer-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 4px;
 }
 
 .patient-profile-heading h2 {
@@ -3833,6 +3854,7 @@ body.patients-page {
   background: #f5f7f8;
   color: #425863;
   padding: 14px 16px 30px;
+  font-family: "Poppins", "Segoe UI", sans-serif;
   font-size: 1rem;
   line-height: 1.55;
   font-weight: 500;
@@ -3840,6 +3862,10 @@ body.patients-page {
   outline: none;
   box-shadow: inset 0 0 0 1px transparent;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.doctor-notes-card textarea::placeholder {
+  font-family: "Poppins", "Segoe UI", sans-serif;
 }
 
 .doctor-notes-card {
@@ -3994,6 +4020,95 @@ body.patients-page {
   margin-bottom: 18px;
 }
 
+.hub-session-summary-card {
+  width: min(50vw, 760px);
+  max-width: 800px;
+  height: auto;
+  min-height: 0;
+  max-height: min(90vh, 760px);
+  border-radius: 20px;
+  border: 1px solid #4d869c;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hub-session-summary-card h2 {
+  margin-bottom: 2px;
+  padding-right: 40px;
+}
+
+.hub-session-summary-close {
+  color: #2f6072;
+}
+
+.hub-session-summary-close:hover,
+.hub-session-summary-close:focus-visible {
+  color: #1f5668;
+}
+
+.hub-session-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.hub-session-summary-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #d1dce0;
+  border-radius: 12px;
+  background: #ffffff;
+  min-height: 112px;
+  padding: 14px 16px;
+}
+
+.hub-session-summary-item span {
+  font-size: 0.82rem;
+  color: #5d7480;
+  font-weight: 600;
+}
+
+.hub-session-summary-item strong {
+  font-size: 1.45rem;
+  color: #1f5668;
+}
+
+.hub-session-summary-actions {
+  margin-top: 4px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.hub-session-summary-actions .sign-in-btn {
+  min-width: 180px;
+  min-height: 56px;
+  border-radius: 12px;
+}
+
+@media (max-width: 640px) {
+  .hub-session-summary-card {
+    width: 96vw;
+    max-height: min(92vh, 760px);
+    padding: 18px;
+  }
+
+  .hub-session-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hub-session-summary-item {
+    min-height: 92px;
+  }
+
+  .hub-session-summary-actions .sign-in-btn {
+    width: 100%;
+  }
+}
+
 .patients-modal-step-label {
   margin: -6px 0 16px;
   color: #5d7480;
@@ -4129,6 +4244,21 @@ body.patients-page {
   background: var(--content-bg);
 }
 
+.therapy-plans-page {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.therapy-plans-page .container {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.therapy-plans-page .content.therapy-plans-content {
+  height: 100vh;
+  overflow: hidden;
+}
+
 .therapy-plans-page .widget,
 .messages-page .widget {
   border-radius: 24px;
@@ -4161,6 +4291,36 @@ body.patients-page {
   padding: 14px;
 }
 
+.therapy-template-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.therapy-template-customize-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(77, 134, 156, 0.28);
+  background: rgba(77, 134, 156, 0.08);
+  color: #2f6072;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.therapy-template-customize-btn:hover,
+.therapy-template-customize-btn:focus-visible {
+  background: rgba(77, 134, 156, 0.16);
+  border-color: rgba(77, 134, 156, 0.45);
+  transform: translateY(-1px);
+  outline: none;
+}
+
 .therapy-assign-new-card .field-group select {
   background-color: #ffffff;
 }
@@ -4177,6 +4337,62 @@ body.patients-page {
   margin: 5px 0;
 }
 
+.therapy-template-card .template-plan-label {
+  margin-top: 6px;
+  margin-bottom: 6px;
+  font-weight: 700;
+  color: #4e6774;
+}
+
+.therapy-template-card .template-plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.therapy-template-card .template-plan-item {
+  padding: 8px 0;
+}
+
+.therapy-template-card .template-plan-item + .template-plan-item {
+  border-top: 1px solid rgba(77, 134, 156, 0.22);
+}
+
+.therapy-template-card .template-plan-exercise {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #1f5668;
+  margin-bottom: 6px;
+}
+
+.therapy-template-card .template-plan-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.therapy-template-card .template-stat-chip {
+  background: #ecf5f8;
+  border: 1px solid rgba(77, 134, 156, 0.22);
+  border-radius: 999px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.therapy-template-card .template-stat-chip span {
+  color: #557382;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.therapy-template-card .template-stat-chip strong {
+  color: #1f5668;
+  font-size: 0.95rem;
+}
+
 .therapy-plans-grid {
   display: grid;
   grid-template-columns: 2fr 1fr;
@@ -4186,6 +4402,64 @@ body.patients-page {
 .therapy-assignment-card .doctor-table td,
 .therapy-assignment-card .doctor-table th {
   white-space: nowrap;
+}
+
+.therapy-assignment-card .doctor-table td.assignment-plan-cell {
+  white-space: normal;
+  line-height: 1.4;
+  min-width: 220px;
+}
+
+.therapy-assignment-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.therapy-assignment-card .patients-table-wrap {
+  flex: 1;
+}
+
+.therapy-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.therapy-page-btn {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: #6f93a3;
+}
+
+.therapy-page-btn:hover,
+.therapy-page-btn:focus-visible {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: #4d869c;
+}
+
+.therapy-page-btn[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.therapy-page-label {
+  color: #4f6976;
+  font-weight: 600;
+  min-width: 108px;
+  text-align: center;
 }
 
 .therapy-edit-btn {
@@ -4234,6 +4508,75 @@ body.patients-page {
   color: var(--text);
   font-size: 1.2rem;
   margin-bottom: 12px;
+}
+
+.template-editor-card {
+  width: min(560px, 100%);
+}
+
+.template-exercise-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.template-exercise-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 10px;
+  align-items: end;
+  padding: 10px;
+  border: 1px solid rgba(77, 134, 156, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.template-exercise-row[hidden] {
+  display: none !important;
+}
+
+.template-exercise-row .field-group {
+  margin-bottom: 0;
+}
+
+.template-remove-btn {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.template-add-btn {
+  width: 100%;
+}
+
+.template-add-btn[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.template-add-btn[hidden] {
+  display: none !important;
+}
+
+.wizard-actions.template-editor-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.wizard-actions.template-editor-actions .doctor-btn,
+.wizard-actions.template-editor-actions .sign-in-btn {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  margin-top: 0;
+}
+
+@media (max-width: 768px) {
+  .template-exercise-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .messages-split-layout {
@@ -7655,17 +7998,22 @@ body.dark-mode .exercise-plan-meta strong {
   }
 
   .patient-profile-header {
-    grid-template-columns: 1fr;
+    flex-direction: column;
     gap: 12px;
   }
 
   .patient-profile-heading {
-    grid-column: 1;
+    width: 100%;
   }
 
   .patient-back-link {
-    width: 100%;
-    justify-content: center;
+    width: auto;
+    min-width: 180px;
+    justify-content: flex-start;
+  }
+
+  .patient-profile-footer-actions {
+    justify-content: flex-start;
   }
 
   .patient-main-tri-row,

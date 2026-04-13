@@ -238,6 +238,49 @@ if (!isset($_SESSION['role']) || strtolower((string) $_SESSION['role']) !== 'pat
         </section>
     </main>
 </div>
+
+<div class="patients-modal" id="hubSessionSummaryModal" hidden aria-hidden="true">
+    <div class="patients-modal-backdrop" aria-hidden="true"></div>
+    <div class="patients-modal-card widget widget-green hub-session-summary-card" role="dialog" aria-modal="true" aria-labelledby="hubSessionSummaryTitle">
+        <button type="button" class="patients-modal-close hub-session-summary-close" id="hubSessionSummaryClose" aria-label="Close summary">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+        <h2 id="hubSessionSummaryTitle">Therapy Session Summary</h2>
+        <p class="patients-modal-step-label" id="hubSessionSummaryResult">Session complete.</p>
+
+        <div class="hub-session-summary-grid" aria-live="polite">
+            <div class="hub-session-summary-item">
+                <span>Exercise</span>
+                <strong id="hubSummaryExercise">-</strong>
+            </div>
+            <div class="hub-session-summary-item">
+                <span>Total Repetitions</span>
+                <strong id="hubSummaryReps">0</strong>
+            </div>
+            <div class="hub-session-summary-item">
+                <span>Target Repetitions</span>
+                <strong id="hubSummaryTarget">0</strong>
+            </div>
+            <div class="hub-session-summary-item">
+                <span>Average Force</span>
+                <strong id="hubSummaryForce">0.0 N</strong>
+            </div>
+            <div class="hub-session-summary-item">
+                <span>Max Flexion</span>
+                <strong id="hubSummaryFlexion">0.0°</strong>
+            </div>
+            <div class="hub-session-summary-item">
+                <span>Duration</span>
+                <strong id="hubSummaryDuration">0:00</strong>
+            </div>
+        </div>
+
+        <div class="hub-session-summary-actions">
+            <button type="button" class="sign-in-btn" id="hubSummaryDoneBtn">Done</button>
+        </div>
+    </div>
+</div>
+
 <script src="script.js"></script>
 </body>
 </html>

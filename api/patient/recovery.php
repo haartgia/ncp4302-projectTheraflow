@@ -28,11 +28,41 @@ $romGoal = 180;
 $stmt = $pdo->prepare(
     'SELECT id, grip_strength, flexion_angle, repetitions, note, recorded_at AS timestamp
      FROM sensor_data
-     WHERE patient_id = ?
+    WHERE patient_id = ? AND note LIKE ?
      ORDER BY timestamp DESC'
 );
-$stmt->execute([$patientId]);
+$stmt->execute([$patientId, 'Exercise Hub Session%']);
 $rows = $stmt->fetchAll();
+
+function resolveClientTimezone(string $timezoneId): DateTimeZone
+{
+    $timezoneId = trim($timezoneId);
+    if ($timezoneId !== '') {
+        try {
+            return new DateTimeZone($timezoneId);
+        } catch (Throwable $e) {
+            // Fallback to server timezone if client timezone is invalid.
+        }
+    }
+
+    return new DateTimeZone(date_default_timezone_get());
+}
+
+function toClientDayKey(string $timestamp, DateTimeZone $serverTimezone, DateTimeZone $clientTimezone): ?string
+{
+    $timestamp = trim($timestamp);
+    if ($timestamp === '') {
+        return null;
+    }
+
+    try {
+        $date = new DateTimeImmutable($timestamp, $serverTimezone);
+    } catch (Throwable $e) {
+        return null;
+    }
+
+    return $date->setTimezone($clientTimezone)->format('Y-m-d');
+}
 
 $bestForce = 0.0;
 $maxFlexion = 0.0;
@@ -201,6 +231,9 @@ $trendDaily = buildTrendBuckets($rowsAscending, 'daily');
 $trendWeekly = buildTrendBuckets($rowsAscending, 'weekly');
 $trendYearly = buildTrendBuckets($rowsAscending, 'yearly');
 
+$clientTimezone = resolveClientTimezone((string) ($_GET['tz'] ?? ''));
+$serverTimezone = new DateTimeZone(date_default_timezone_get());
+
 $completedDates = [];
 foreach ($rows as $row) {
     $reps = (int) ($row['repetitions'] ?? 0);
@@ -208,18 +241,22 @@ foreach ($rows as $row) {
         continue;
     }
 
-    $time = strtotime((string) ($row['timestamp'] ?? ''));
-    if ($time <= 0) {
+    $dayKey = toClientDayKey((string) ($row['timestamp'] ?? ''), $serverTimezone, $clientTimezone);
+    if ($dayKey === null) {
         continue;
     }
 
-    $completedDates[date('Y-m-d', $time)] = true;
+    $completedDates[$dayKey] = true;
 }
 
-$today = new DateTimeImmutable('today');
+$today = new DateTimeImmutable('today', $clientTimezone);
 $consecutiveDays = 0;
+$startDay = isset($completedDates[$today->format('Y-m-d')])
+    ? $today
+    : $today->sub(new DateInterval('P1D'));
+
 for ($offset = 0; $offset < 366; $offset += 1) {
-    $dayKey = $today->sub(new DateInterval('P' . $offset . 'D'))->format('Y-m-d');
+    $dayKey = $startDay->sub(new DateInterval('P' . $offset . 'D'))->format('Y-m-d');
     if (!isset($completedDates[$dayKey])) {
         break;
     }

@@ -80,8 +80,10 @@ function initializeRootAuthGuard() {
             const data = raw ? JSON.parse(raw) : null;
             const icon  = badge.querySelector("i");
             const label = badge.querySelector("span");
+            const hasHandshakeFlag = data && Object.prototype.hasOwnProperty.call(data, "handshakeOnline");
+            const isOnline = hasHandshakeFlag ? Boolean(data.handshakeOnline) : Boolean(data && data.connected);
 
-            if (!data || !data.connected) {
+            if (!data || !isOnline) {
                 badge.className = "glove-status-badge is-offline";
                 if (icon)  icon.className   = "fa-solid fa-circle-xmark";
                 if (label) label.textContent = "Glove Offline";
@@ -396,6 +398,7 @@ function initializeStreak(daysCompleted) {
 }
 
 function initializePatientDashboardVisuals() {
+    const homeGreeting = document.getElementById("homeGreeting");
     const completionRing = document.getElementById("patientCompletionRing");
     const completionValue = document.getElementById("patientCompletionValue");
     const completionLabel = document.querySelector(".patient-progress-label");
@@ -407,6 +410,7 @@ function initializePatientDashboardVisuals() {
     const nextExerciseSignalLabel = document.getElementById("nextExerciseSignalLabel");
     const nextExerciseBatteryLevel = document.getElementById("nextExerciseBatteryLevel");
     const nextExerciseBatteryIcon = document.getElementById("nextExerciseBatteryIcon");
+    const gloveStatusBadge = document.getElementById("gloveStatusBadge");
     const actionRings = document.querySelectorAll("[data-progress-ring]");
     const metricCards = {
         grip: document.querySelector('[data-progress-kind="grip"]')?.closest(".metric-strip") || null,
@@ -425,6 +429,42 @@ function initializePatientDashboardVisuals() {
 
     if (!completionRing && !actionRings.length && !daySubheader && !nextExerciseDescription) {
         return;
+    }
+
+    function firstNameFromText(value) {
+        const normalized = String(value || "").trim();
+        if (!normalized || /^not provided$/i.test(normalized)) {
+            return "";
+        }
+
+        const parts = normalized.split(/\s+/).filter(Boolean);
+        return parts.length ? parts[0] : "";
+    }
+
+    function applyGreeting(firstName) {
+        if (!homeGreeting) return;
+        const safeFirstName = firstNameFromText(firstName);
+        homeGreeting.textContent = safeFirstName ? `Hello, ${safeFirstName}!` : "Hello, Patient!";
+    }
+
+    async function refreshHomeGreeting() {
+        if (!homeGreeting) return;
+        try {
+            const response = await fetch("api/patient/profile.php", {
+                method: "GET",
+                headers: { "Accept": "application/json" },
+                cache: "no-store"
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload?.ok) {
+                throw new Error("Unable to load patient profile");
+            }
+
+            const firstName = firstNameFromText(payload?.profile?.full_name);
+            applyGreeting(firstName);
+        } catch {
+            applyGreeting("");
+        }
     }
 
     function readGloveState() {
@@ -476,6 +516,24 @@ function initializePatientDashboardVisuals() {
 
         if (nextExerciseBatteryIcon) {
             nextExerciseBatteryIcon.className = batteryIconForPercent(battery);
+        }
+
+        if (gloveStatusBadge) {
+            const icon = gloveStatusBadge.querySelector("i");
+            const label = gloveStatusBadge.querySelector("span");
+            if (!isHandshakeOnline) {
+                gloveStatusBadge.className = "glove-status-badge is-offline";
+                if (icon) icon.className = "fa-solid fa-circle-xmark";
+                if (label) label.textContent = "Glove Offline";
+            } else if (Boolean(gloveState.sessionActive)) {
+                gloveStatusBadge.className = "glove-status-badge is-active";
+                if (icon) icon.className = "fa-solid fa-circle-dot";
+                if (label) label.textContent = `Session Active - ${Number(gloveState.sessionReps || 0)} reps`;
+            } else {
+                gloveStatusBadge.className = "glove-status-badge is-connected";
+                if (icon) icon.className = "fa-solid fa-circle-check";
+                if (label) label.textContent = "Glove Connected";
+            }
         }
     }
 
@@ -627,6 +685,15 @@ function initializePatientDashboardVisuals() {
             latestHandshakeState = false;
         }
 
+        try {
+            const gloveState = readGloveState();
+            gloveState.handshakeOnline = latestHandshakeState;
+            gloveState.connected = latestHandshakeState;
+            localStorage.setItem("theraflow_glove", JSON.stringify(gloveState));
+        } catch {
+            // Ignore storage failures (private mode or quota restrictions).
+        }
+
         applyDevicePanelState(latestHandshakeState);
     }
 
@@ -637,7 +704,8 @@ function initializePatientDashboardVisuals() {
         }
 
         try {
-            const response = await fetch("api/patient/recovery.php", { credentials: "same-origin", cache: "no-store" });
+            const tz = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone || "");
+            const response = await fetch(`api/patient/recovery.php?tz=${tz}`, { credentials: "same-origin", cache: "no-store" });
             const payload = await response.json().catch(() => ({}));
 
             if (!response.ok || !payload?.ok) {
@@ -663,6 +731,7 @@ function initializePatientDashboardVisuals() {
     }
 
     refreshDashboardVisuals();
+    void refreshHomeGreeting();
     void refreshNextExercise();
     void refreshHandshakeState();
     void refreshStreakFromBackend(true);
@@ -674,7 +743,7 @@ function initializePatientDashboardVisuals() {
     window.addEventListener("storage", () => {
         refreshDashboardVisuals();
         applyDevicePanelState(latestHandshakeState);
-        void refreshStreakFromBackend();
+        void refreshStreakFromBackend(true);
     });
 
     setInterval(refreshDashboardVisuals, 3000);
@@ -2508,6 +2577,10 @@ function initializeTherapyPlansPage() {
     const assignTemplateSelect = document.getElementById("assignTemplateSelect");
     const applyTemplateBtn = document.getElementById("applyTemplateBtn");
     const assignFeedback = document.getElementById("assignTemplateFeedback");
+    const assignmentsPagination = document.getElementById("therapyAssignmentsPagination");
+    const assignmentsPrevBtn = document.getElementById("therapyAssignmentsPrevBtn");
+    const assignmentsNextBtn = document.getElementById("therapyAssignmentsNextBtn");
+    const assignmentsPageLabel = document.getElementById("therapyAssignmentsPageLabel");
     const editPopup = document.getElementById("therapyEditPopup");
     const editBackdrop = document.getElementById("therapyEditBackdrop");
     const editDurationInput = document.getElementById("editDurationInput");
@@ -2515,16 +2588,415 @@ function initializeTherapyPlansPage() {
     const editSessionsInput = document.getElementById("editSessionsInput");
     const cancelEditBtn = document.getElementById("cancelEditPlanBtn");
     const saveEditBtn = document.getElementById("saveEditPlanBtn");
+    const templateCustomizeButtons = Array.from(document.querySelectorAll(".therapy-template-customize-btn"));
+    const templatePopup = document.getElementById("therapyTemplatePopup");
+    const templateBackdrop = document.getElementById("therapyTemplateBackdrop");
+    const templateTitle = document.getElementById("therapyTemplateTitle");
+    const templateAddExerciseBtn = document.getElementById("templateAddExerciseBtn");
+    const cancelTemplateBtn = document.getElementById("cancelTemplateBtn");
+    const saveTemplateBtn = document.getElementById("saveTemplateBtn");
+    const removeTemplateExercise2Btn = document.getElementById("removeTemplateExercise2Btn");
+    const removeTemplateExercise3Btn = document.getElementById("removeTemplateExercise3Btn");
+
+    const TEMPLATE_STORAGE_KEY = "theraflow.therapyTemplateEditor.v1";
+    const EXERCISE_TYPES = ["open_close", "full_extension", "full_close"];
+    const EXERCISE_LABELS = {
+        open_close: "Open-Close Exercise",
+        full_extension: "Full Extension",
+        full_close: "Full Close"
+    };
 
     const templates = {
-        level1: { label: "Level 1: Beginner", duration: 15, repetitions: 30, sessionsPerDay: 2 },
-        level2: { label: "Level 2: Intermediate", duration: 20, repetitions: 40, sessionsPerDay: 3 },
-        level3: { label: "Level 3: Advanced", duration: 25, repetitions: 55, sessionsPerDay: 3 }
+        level1: {
+            label: "Level 1: Beginner",
+            duration: 15,
+            repetitions: 30,
+            sessionsPerDay: 2,
+            exercises: [{ type: "open_close", reps: 30, sessions: 2 }]
+        },
+        level2: {
+            label: "Level 2: Intermediate",
+            duration: 20,
+            repetitions: 40,
+            sessionsPerDay: 3,
+            exercises: [{ type: "open_close", reps: 40, sessions: 3 }]
+        },
+        level3: {
+            label: "Level 3: Advanced",
+            duration: 25,
+            repetitions: 55,
+            sessionsPerDay: 3,
+            exercises: [{ type: "open_close", reps: 55, sessions: 3 }]
+        }
     };
 
     let assignments = [];
-
     let editingAssignmentId = "";
+    let editingTemplateId = "";
+    let editingPopupMode = "template";
+    let templateRowCount = 1;
+    let assignmentsPage = 1;
+
+    const ASSIGNMENTS_PAGE_SIZE = 6;
+
+    const templateRows = [
+        {
+            wrapper: document.querySelector('[data-template-row="1"]'),
+            exercise: document.getElementById("templateExercise1Select"),
+            reps: document.getElementById("templateReps1Input"),
+            sessions: document.getElementById("templateSessions1Input")
+        },
+        {
+            wrapper: document.getElementById("templateExerciseRow2"),
+            exercise: document.getElementById("templateExercise2Select"),
+            reps: document.getElementById("templateReps2Input"),
+            sessions: document.getElementById("templateSessions2Input")
+        },
+        {
+            wrapper: document.getElementById("templateExerciseRow3"),
+            exercise: document.getElementById("templateExercise3Select"),
+            reps: document.getElementById("templateReps3Input"),
+            sessions: document.getElementById("templateSessions3Input")
+        }
+    ];
+
+    function normalizeExerciseType(value) {
+        const normalized = String(value || "").trim().toLowerCase();
+        return EXERCISE_TYPES.includes(normalized) ? normalized : "open_close";
+    }
+
+    function exerciseLabel(type) {
+        return EXERCISE_LABELS[normalizeExerciseType(type)] || EXERCISE_LABELS.open_close;
+    }
+
+    function summarizeExercisePlan(exercises) {
+        if (!Array.isArray(exercises) || !exercises.length) {
+            return `
+                <div class="template-plan-item">
+                    <div class="template-plan-exercise">Open-Close Exercise</div>
+                    <div class="template-plan-stats">
+                        <div class="template-stat-chip"><span>Reps</span><strong>0</strong></div>
+                        <div class="template-stat-chip"><span>Sessions</span><strong>0</strong></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        return exercises
+            .map(item => {
+                const label = exerciseLabel(item.type);
+                const reps = Math.max(0, Number(item.reps || 0));
+                const sessions = Math.max(0, Number(item.sessions || 0));
+                return `
+                    <div class="template-plan-item">
+                        <div class="template-plan-exercise">${label}</div>
+                        <div class="template-plan-stats">
+                            <div class="template-stat-chip"><span>Reps</span><strong>${reps}</strong></div>
+                            <div class="template-stat-chip"><span>Sessions</span><strong>${sessions}</strong></div>
+                        </div>
+                    </div>
+                `;
+            })
+            .join("");
+    }
+
+    function setText(id, value) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.textContent = String(value);
+        }
+    }
+
+    function setHtml(id, html) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.innerHTML = String(html || "");
+        }
+    }
+
+    function summarizeAssignmentPlan(exercises, fallbackRepetitions) {
+        if (!Array.isArray(exercises) || !exercises.length) {
+            return `Open-Close Exercise: ${Math.max(0, Number(fallbackRepetitions || 0))} reps`;
+        }
+
+        return exercises
+            .map(item => `${exerciseLabel(item.type)}: ${Math.max(0, Number(item.reps || 0))} reps`)
+            .join("<br>");
+    }
+
+    function updateTemplateStats(template) {
+        const totalReps = (template.exercises || []).reduce((sum, item) => sum + Math.max(0, Number(item.reps || 0)), 0);
+        const maxSessions = (template.exercises || []).reduce((max, item) => Math.max(max, Math.max(0, Number(item.sessions || 0))), 0);
+        template.repetitions = Math.max(1, totalReps || Number(template.repetitions || 0) || 1);
+        template.sessionsPerDay = Math.max(1, maxSessions || Number(template.sessionsPerDay || 0) || 1);
+    }
+
+    function sanitizeExercises(exercises, fallbackTemplate) {
+        const next = [];
+        const used = new Set();
+        const source = Array.isArray(exercises) ? exercises : [];
+        for (const item of source) {
+            const type = normalizeExerciseType(item?.type);
+            if (used.has(type)) {
+                continue;
+            }
+            used.add(type);
+            next.push({
+                type,
+                reps: Math.max(1, Number(item?.reps || 0)),
+                sessions: Math.max(1, Number(item?.sessions || 0))
+            });
+            if (next.length >= 3) {
+                break;
+            }
+        }
+
+        if (!next.length) {
+            const fallbackReps = Math.max(1, Number(fallbackTemplate?.repetitions || 30));
+            const fallbackSessions = Math.max(1, Number(fallbackTemplate?.sessionsPerDay || 2));
+            next.push({ type: "open_close", reps: fallbackReps, sessions: fallbackSessions });
+        }
+
+        return next;
+    }
+
+    function loadTemplateOverrides() {
+        try {
+            const raw = localStorage.getItem(TEMPLATE_STORAGE_KEY);
+            const data = raw ? JSON.parse(raw) : null;
+            if (!data || typeof data !== "object") {
+                return;
+            }
+
+            ["level1", "level2", "level3"].forEach(templateId => {
+                const source = data?.[templateId];
+                if (!source || typeof source !== "object") {
+                    return;
+                }
+
+                const exercises = sanitizeExercises(source.exercises, templates[templateId]);
+                templates[templateId] = {
+                    ...templates[templateId],
+                    exercises
+                };
+                updateTemplateStats(templates[templateId]);
+            });
+        } catch {
+            // Ignore invalid local template editor cache.
+        }
+    }
+
+    function saveTemplateOverrides() {
+        try {
+            const payload = {
+                level1: { exercises: templates.level1.exercises },
+                level2: { exercises: templates.level2.exercises },
+                level3: { exercises: templates.level3.exercises }
+            };
+            localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(payload));
+        } catch {
+            // Ignore storage errors.
+        }
+    }
+
+    function renderTemplateCards() {
+        setText("templateLevel1Title", templates.level1.label);
+        setText("templateLevel2Title", templates.level2.label);
+        setText("templateLevel3Title", templates.level3.label);
+        setHtml("templateLevel1Plan", summarizeExercisePlan(templates.level1.exercises));
+        setHtml("templateLevel2Plan", summarizeExercisePlan(templates.level2.exercises));
+        setHtml("templateLevel3Plan", summarizeExercisePlan(templates.level3.exercises));
+    }
+
+    function renderTemplateSelectOptions() {
+        if (!assignTemplateSelect) {
+            return;
+        }
+
+        const selectedValue = assignTemplateSelect.value || "level1";
+        const templateOrder = ["level1", "level2", "level3"];
+        assignTemplateSelect.innerHTML = templateOrder
+            .map(templateId => {
+                const template = templates[templateId];
+                return `<option value="${templateId}">${template.label}</option>`;
+            })
+            .join("");
+        assignTemplateSelect.value = templateOrder.includes(selectedValue) ? selectedValue : "level1";
+    }
+
+    function updateTemplateRowVisibility() {
+        templateRows.forEach((row, index) => {
+            if (!row.wrapper) {
+                return;
+            }
+            row.wrapper.hidden = index >= templateRowCount;
+        });
+
+        if (templateAddExerciseBtn) {
+            const maxReached = templateRowCount >= 3;
+            templateAddExerciseBtn.hidden = maxReached;
+            templateAddExerciseBtn.disabled = maxReached;
+        }
+    }
+
+    function updateExerciseOptionAvailability() {
+        const activeRows = templateRows.slice(0, templateRowCount);
+        const selectedTypes = activeRows.map(row => normalizeExerciseType(row.exercise?.value));
+
+        activeRows.forEach((row, rowIndex) => {
+            const select = row.exercise;
+            if (!select) {
+                return;
+            }
+
+            const ownType = selectedTypes[rowIndex];
+            const usedElsewhere = new Set(
+                selectedTypes.filter((selectedType, index) => index !== rowIndex && selectedType)
+            );
+            const allowedTypes = EXERCISE_TYPES.filter(type => type === ownType || !usedElsewhere.has(type));
+            const nextValue = allowedTypes.includes(ownType) ? ownType : (allowedTypes[0] || "open_close");
+
+            select.innerHTML = allowedTypes
+                .map(type => `<option value="${type}">${exerciseLabel(type)}</option>`)
+                .join("");
+            select.value = nextValue;
+
+            selectedTypes[rowIndex] = nextValue;
+        });
+    }
+
+    function openTemplatePopup(templateId) {
+        const template = templates[templateId];
+        if (!template || !templatePopup) {
+            return;
+        }
+
+        editingTemplateId = templateId;
+        editingAssignmentId = "";
+        editingPopupMode = "template";
+        if (templateTitle) {
+            templateTitle.textContent = "Customize Standard Template";
+        }
+        const exercises = sanitizeExercises(template.exercises, template);
+        templateRowCount = Math.min(3, Math.max(1, exercises.length));
+
+        templateRows.forEach((row, index) => {
+            const data = exercises[index];
+            if (data) {
+                if (row.exercise) {
+                    row.exercise.value = normalizeExerciseType(data.type);
+                }
+                if (row.reps) {
+                    row.reps.value = String(Math.max(1, Number(data.reps || 1)));
+                }
+                if (row.sessions) {
+                    row.sessions.value = String(Math.max(1, Number(data.sessions || 1)));
+                }
+                return;
+            }
+
+            const firstAvailable = EXERCISE_TYPES.find(type => !exercises.some(item => normalizeExerciseType(item.type) === type)) || "open_close";
+            if (row.exercise) {
+                row.exercise.value = firstAvailable;
+            }
+            if (row.reps) {
+                row.reps.value = "10";
+            }
+            if (row.sessions) {
+                row.sessions.value = "1";
+            }
+        });
+
+        updateTemplateRowVisibility();
+        updateExerciseOptionAvailability();
+        templatePopup.hidden = false;
+        document.body.style.overflow = "hidden";
+    }
+
+    function closeTemplatePopup() {
+        if (!templatePopup) {
+            return;
+        }
+
+        templatePopup.hidden = true;
+        editingTemplateId = "";
+        editingAssignmentId = "";
+        editingPopupMode = "template";
+        if (templateTitle) {
+            templateTitle.textContent = "Customize Standard Template";
+        }
+        document.body.style.overflow = "";
+    }
+
+    function addTemplateExerciseRow() {
+        if (templateRowCount >= 3) {
+            return;
+        }
+
+        templateRowCount += 1;
+        const activeTypes = templateRows
+            .slice(0, templateRowCount - 1)
+            .map(row => normalizeExerciseType(row.exercise?.value));
+        const nextType = EXERCISE_TYPES.find(type => !activeTypes.includes(type)) || "open_close";
+        const row = templateRows[templateRowCount - 1];
+        if (row.exercise) {
+            row.exercise.value = nextType;
+        }
+
+        updateTemplateRowVisibility();
+        updateExerciseOptionAvailability();
+    }
+
+    function removeTemplateExerciseRow(index) {
+        if (index < 1 || index > 2) {
+            return;
+        }
+
+        if (templateRowCount <= index) {
+            return;
+        }
+
+        for (let i = index; i < templateRowCount - 1; i += 1) {
+            const current = templateRows[i];
+            const next = templateRows[i + 1];
+            if (current.exercise && next.exercise) {
+                current.exercise.value = next.exercise.value;
+            }
+            if (current.reps && next.reps) {
+                current.reps.value = next.reps.value;
+            }
+            if (current.sessions && next.sessions) {
+                current.sessions.value = next.sessions.value;
+            }
+        }
+
+        templateRowCount -= 1;
+        updateTemplateRowVisibility();
+        updateExerciseOptionAvailability();
+    }
+
+    function collectTemplateEditorValues() {
+        const rows = templateRows.slice(0, templateRowCount);
+        const nextExercises = [];
+        const used = new Set();
+
+        for (const row of rows) {
+            const type = normalizeExerciseType(row.exercise?.value);
+            const reps = Math.max(1, Number(row.reps?.value || 0));
+            const sessions = Math.max(1, Number(row.sessions?.value || 0));
+            if (used.has(type)) {
+                return { ok: false, error: "Exercise type must not repeat." };
+            }
+            used.add(type);
+            nextExercises.push({ type, reps, sessions });
+        }
+
+        if (!nextExercises.length) {
+            return { ok: false, error: "At least one exercise is required." };
+        }
+
+        return { ok: true, exercises: nextExercises };
+    }
 
     function templateKeyByLabel(label) {
         const normalized = String(label || "").toLowerCase();
@@ -2555,18 +3027,30 @@ function initializeTherapyPlansPage() {
             return;
         }
 
-        assignmentsBody.innerHTML = assignments.length
-            ? assignments.map(assignment => `
+        const totalPages = Math.max(1, Math.ceil(assignments.length / ASSIGNMENTS_PAGE_SIZE));
+        assignmentsPage = Math.min(totalPages, Math.max(1, assignmentsPage));
+        const startIndex = (assignmentsPage - 1) * ASSIGNMENTS_PAGE_SIZE;
+        const pageItems = assignments.slice(startIndex, startIndex + ASSIGNMENTS_PAGE_SIZE);
+
+        assignmentsBody.innerHTML = pageItems.length
+            ? pageItems.map(assignment => `
                 <tr>
                     <td>${assignment.patientName}</td>
                     <td>${assignment.label || "Default"}</td>
-                    <td>${assignment.duration} min</td>
-                    <td>${assignment.repetitions}</td>
+                    <td class="assignment-plan-cell">${summarizeAssignmentPlan(assignment.exercises, assignment.repetitions)}</td>
                     <td>${assignment.sessionsPerDay}</td>
                     <td><button type="button" class="therapy-edit-btn" data-assignment-id="${assignment.id}">Edit</button></td>
                 </tr>
             `).join("")
-            : '<tr><td colspan="6">No patients added yet.</td></tr>';
+            : '<tr><td colspan="5">No patients added yet.</td></tr>';
+
+        if (assignmentsPagination && assignmentsPrevBtn && assignmentsNextBtn && assignmentsPageLabel) {
+            const hasPagination = assignments.length > ASSIGNMENTS_PAGE_SIZE;
+            assignmentsPagination.hidden = !hasPagination;
+            assignmentsPrevBtn.disabled = assignmentsPage <= 1;
+            assignmentsNextBtn.disabled = assignmentsPage >= totalPages;
+            assignmentsPageLabel.textContent = `Page ${assignmentsPage} of ${totalPages}`;
+        }
     }
 
     function loadAssignments() {
@@ -2577,22 +3061,45 @@ function initializeTherapyPlansPage() {
                     throw new Error(payload?.error || "Unable to load therapy plans.");
                 }
 
-                assignments = (payload.assignments || []).map(row => ({
-                    id: String(row.patient_id),
-                    patientId: Number(row.patient_id),
-                    patientName: String(row.patient_name || "Patient"),
-                    templateId: templateKeyByLabel(row.template_name),
-                    label: row.template_name || "Default",
-                    duration: Number(row.duration_min || 0),
-                    repetitions: Number(row.target_repetitions || 0),
-                    sessionsPerDay: Number(row.sessions_per_day || 0)
-                }));
+                assignments = (payload.assignments || []).map(row => {
+                    let parsedBundle = null;
+                    try {
+                        parsedBundle = typeof row.exercise_bundle_json === "string"
+                            ? JSON.parse(row.exercise_bundle_json || "null")
+                            : row.exercise_bundle_json;
+                    } catch {
+                        parsedBundle = null;
+                    }
 
+                    const sessionsPerDay = Number(row.sessions_per_day || 0);
+                    const exercises = parsedBundle && typeof parsedBundle === "object"
+                        ? [
+                            { type: "open_close", reps: Number(parsedBundle.open_close || 0), sessions: sessionsPerDay },
+                            { type: "full_extension", reps: Number(parsedBundle.full_extension || 0), sessions: sessionsPerDay },
+                            { type: "full_close", reps: Number(parsedBundle.full_close || 0), sessions: sessionsPerDay }
+                        ].filter(item => item.reps > 0)
+                        : [];
+
+                    return {
+                        id: String(row.patient_id),
+                        patientId: Number(row.patient_id),
+                        patientName: String(row.patient_name || "Patient"),
+                        templateId: templateKeyByLabel(row.template_name),
+                        label: row.template_name || "Default",
+                        duration: Number(row.duration_min || 0),
+                        repetitions: Number(row.target_repetitions || 0),
+                        sessionsPerDay,
+                        exercises
+                    };
+                });
+
+                assignmentsPage = 1;
                 populatePatientSelect();
                 renderAssignments();
             })
             .catch(() => {
                 assignments = [];
+                assignmentsPage = 1;
                 populatePatientSelect();
                 renderAssignments();
                 if (assignFeedback) {
@@ -2603,15 +3110,45 @@ function initializeTherapyPlansPage() {
 
     function openEditPopup(assignmentId) {
         const assignment = assignments.find(item => item.id === assignmentId);
-        if (!assignment || !editPopup || !editDurationInput || !editRepetitionsInput || !editSessionsInput) {
+        if (!assignment || !templatePopup) {
             return;
         }
 
         editingAssignmentId = assignment.id;
-        editDurationInput.value = String(assignment.duration);
-        editRepetitionsInput.value = String(assignment.repetitions);
-        editSessionsInput.value = String(assignment.sessionsPerDay);
-        editPopup.hidden = false;
+        editingTemplateId = "";
+        editingPopupMode = "assignment";
+        if (templateTitle) {
+            templateTitle.textContent = `Customize Plan: ${assignment.patientName}`;
+        }
+
+        const fallbackExercises = [{
+            type: "open_close",
+            reps: Math.max(1, Number(assignment.repetitions || 1)),
+            sessions: Math.max(1, Number(assignment.sessionsPerDay || 1))
+        }];
+        const exercises = sanitizeExercises(
+            Array.isArray(assignment.exercises) && assignment.exercises.length ? assignment.exercises : fallbackExercises,
+            assignment
+        );
+
+        templateRowCount = Math.min(3, Math.max(1, exercises.length));
+        templateRows.forEach((row, index) => {
+            const data = exercises[index];
+            if (data) {
+                if (row.exercise) row.exercise.value = normalizeExerciseType(data.type);
+                if (row.reps) row.reps.value = String(Math.max(1, Number(data.reps || 1)));
+                if (row.sessions) row.sessions.value = String(Math.max(1, Number(data.sessions || 1)));
+                return;
+            }
+
+            if (row.exercise) row.exercise.value = "open_close";
+            if (row.reps) row.reps.value = "10";
+            if (row.sessions) row.sessions.value = "1";
+        });
+
+        updateTemplateRowVisibility();
+        updateExerciseOptionAvailability();
+        templatePopup.hidden = false;
         document.body.style.overflow = "hidden";
     }
 
@@ -2664,6 +3201,12 @@ function initializeTherapyPlansPage() {
 
         const active = assignments.find(item => item.id === selectedPatientId);
         if (active) {
+            const exerciseBundle = { open_close: 0, full_extension: 0, full_close: 0 };
+            (selectedTemplate.exercises || []).forEach(item => {
+                const type = normalizeExerciseType(item.type);
+                exerciseBundle[type] += Math.max(0, Number(item.reps || 0));
+            });
+
             void fetch("api/doctor/therapy_plans.php", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -2672,7 +3215,8 @@ function initializeTherapyPlansPage() {
                     templateName: selectedTemplate.label,
                     durationMin: active.duration,
                     targetRepetitions: active.repetitions,
-                    sessionsPerDay: active.sessionsPerDay
+                    sessionsPerDay: active.sessionsPerDay,
+                    exerciseBundle
                 })
             });
         }
@@ -2681,6 +3225,99 @@ function initializeTherapyPlansPage() {
             const name = assignments.find(item => item.id === selectedPatientId)?.patientName || "Patient";
             assignFeedback.textContent = `${selectedTemplate.label} assigned to ${name}.`;
         }
+    });
+
+    templateCustomizeButtons.forEach(button => {
+        button.addEventListener("click", () => {
+            const templateId = String(button.getAttribute("data-template-id") || "").trim();
+            if (!templateId) {
+                return;
+            }
+            openTemplatePopup(templateId);
+        });
+    });
+
+    templateRows.forEach(row => {
+        row.exercise?.addEventListener("change", updateExerciseOptionAvailability);
+    });
+
+    templateAddExerciseBtn?.addEventListener("click", addTemplateExerciseRow);
+    removeTemplateExercise2Btn?.addEventListener("click", () => removeTemplateExerciseRow(1));
+    removeTemplateExercise3Btn?.addEventListener("click", () => removeTemplateExerciseRow(2));
+
+    saveTemplateBtn?.addEventListener("click", () => {
+        const collected = collectTemplateEditorValues();
+        if (!collected.ok) {
+            if (assignFeedback) {
+                assignFeedback.textContent = collected.error || "Invalid exercise settings.";
+            }
+            return;
+        }
+
+        if (editingPopupMode === "assignment") {
+            const nextExercises = collected.exercises;
+            const nextRepetitions = nextExercises.reduce((sum, item) => sum + Math.max(0, Number(item.reps || 0)), 0);
+            const nextSessionsPerDay = nextExercises.reduce((max, item) => Math.max(max, Math.max(1, Number(item.sessions || 1))), 1);
+
+            assignments = assignments.map(assignment => {
+                if (assignment.id !== editingAssignmentId) {
+                    return assignment;
+                }
+
+                return {
+                    ...assignment,
+                    label: "Custom",
+                    exercises: nextExercises,
+                    repetitions: nextRepetitions,
+                    sessionsPerDay: nextSessionsPerDay
+                };
+            });
+
+            renderAssignments();
+
+            const active = assignments.find(item => item.id === editingAssignmentId);
+            if (active) {
+                const exerciseBundle = { open_close: 0, full_extension: 0, full_close: 0 };
+                nextExercises.forEach(item => {
+                    const type = normalizeExerciseType(item.type);
+                    exerciseBundle[type] += Math.max(0, Number(item.reps || 0));
+                });
+
+                void fetch("api/doctor/therapy_plans.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        patientId: active.patientId,
+                        templateName: "Custom",
+                        durationMin: active.duration,
+                        targetRepetitions: active.repetitions,
+                        sessionsPerDay: active.sessionsPerDay,
+                        exerciseBundle
+                    })
+                });
+            }
+
+            if (assignFeedback) {
+                assignFeedback.textContent = "Patient plan updated.";
+            }
+            closeTemplatePopup();
+            return;
+        }
+
+        const template = templates[editingTemplateId];
+        if (!template) {
+            return;
+        }
+
+        template.exercises = collected.exercises;
+        updateTemplateStats(template);
+        saveTemplateOverrides();
+        renderTemplateCards();
+        renderTemplateSelectOptions();
+        if (assignFeedback) {
+            assignFeedback.textContent = `${template.label} updated.`;
+        }
+        closeTemplatePopup();
     });
 
     saveEditBtn?.addEventListener("click", () => {
@@ -2728,13 +3365,30 @@ function initializeTherapyPlansPage() {
 
     cancelEditBtn?.addEventListener("click", closeEditPopup);
     editBackdrop?.addEventListener("click", closeEditPopup);
+    cancelTemplateBtn?.addEventListener("click", closeTemplatePopup);
+    templateBackdrop?.addEventListener("click", closeTemplatePopup);
+    assignmentsPrevBtn?.addEventListener("click", () => {
+        assignmentsPage = Math.max(1, assignmentsPage - 1);
+        renderAssignments();
+    });
+    assignmentsNextBtn?.addEventListener("click", () => {
+        const totalPages = Math.max(1, Math.ceil(assignments.length / ASSIGNMENTS_PAGE_SIZE));
+        assignmentsPage = Math.min(totalPages, assignmentsPage + 1);
+        renderAssignments();
+    });
 
     document.addEventListener("keydown", event => {
         if (event.key === "Escape" && editPopup && !editPopup.hidden) {
             closeEditPopup();
         }
+        if (event.key === "Escape" && templatePopup && !templatePopup.hidden) {
+            closeTemplatePopup();
+        }
     });
 
+    loadTemplateOverrides();
+    renderTemplateCards();
+    renderTemplateSelectOptions();
     loadAssignments();
 }
 
@@ -2999,6 +3653,16 @@ function initializeExerciseHubPage() {
     const startSessionBtn   = document.getElementById("hubStartSessionBtn");
     const endSessionBtn     = document.getElementById("hubEndSessionBtn");
     const sessionStatus     = document.getElementById("hubSessionStatus");
+    const summaryModal      = document.getElementById("hubSessionSummaryModal");
+    const summaryResultEl   = document.getElementById("hubSessionSummaryResult");
+    const summaryExerciseEl = document.getElementById("hubSummaryExercise");
+    const summaryRepsEl     = document.getElementById("hubSummaryReps");
+    const summaryTargetEl   = document.getElementById("hubSummaryTarget");
+    const summaryForceEl    = document.getElementById("hubSummaryForce");
+    const summaryFlexionEl  = document.getElementById("hubSummaryFlexion");
+    const summaryDurationEl = document.getElementById("hubSummaryDuration");
+    const summaryDoneBtn    = document.getElementById("hubSummaryDoneBtn");
+    const summaryCloseBtn   = document.getElementById("hubSessionSummaryClose");
 
     // ── State ─────────────────────────────────────────────────────────────────
     let gloveConnected = false;
@@ -3062,6 +3726,41 @@ function initializeExerciseHubPage() {
     // ── Helpers ───────────────────────────────────────────────────────────────
     function setMsg(el, text) {
         if (el) el.textContent = text;
+    }
+
+    function formatDuration(totalSeconds) {
+        const safeSeconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+        const mm = Math.floor(safeSeconds / 60);
+        const ss = String(safeSeconds % 60).padStart(2, "0");
+        return `${mm}:${ss}`;
+    }
+
+    function openSessionSummaryModal(summary) {
+        if (!summaryModal) return;
+
+        setMsg(summaryResultEl, `Session saved with result: ${summary.result}.`);
+        setMsg(summaryExerciseEl, summary.exerciseLabel || "-");
+        setMsg(summaryRepsEl, String(summary.repetitions || 0));
+        setMsg(summaryTargetEl, String(summary.target || 0));
+        setMsg(summaryForceEl, `${Number(summary.avgForce || 0).toFixed(1)} N`);
+        setMsg(summaryFlexionEl, `${Number(summary.maxFlexion || 0).toFixed(1)}°`);
+        setMsg(summaryDurationEl, formatDuration(summary.durationSeconds));
+
+        summaryModal.hidden = false;
+        summaryModal.setAttribute("aria-hidden", "false");
+        document.body.classList.add("graph-modal-open");
+    }
+
+    function closeSessionSummaryModal() {
+        if (!summaryModal) return;
+        summaryModal.hidden = true;
+        summaryModal.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("graph-modal-open");
+    }
+
+    function finalizeSessionSummaryAndReset() {
+        closeSessionSummaryModal();
+        resetCalibrationFlow();
     }
 
     function setCalibrationProgress(percent) {
@@ -3335,7 +4034,7 @@ function initializeExerciseHubPage() {
 
     function canAccessStep(stepNumber) {
         if (stepNumber <= 1) return true;
-        if (stepNumber === 2) return true;
+        if (stepNumber === 2) return gloveConnected;
         if (stepNumber === 3) return gloveConnected && calibrationComplete;
         if (stepNumber === 4) return gloveConnected && calibrationComplete && testCompleted;
         if (stepNumber === 5) return gloveConnected && calibrationComplete && sessionPrepared;
@@ -3374,7 +4073,7 @@ function initializeExerciseHubPage() {
     function attemptStep(stepNumber) {
         if (!canAccessStep(stepNumber)) {
             if (stepNumber === 2) {
-                setMsg(pairStatus, "Calibration is available. If needed, use Refresh to check glove status.");
+                setMsg(searchingLabel, "Glove not connected. Refresh glove status to continue.");
             } else if (stepNumber === 3) {
                 setMsg(calibrationStatus, "Complete calibration first to continue.");
             } else if (stepNumber === 4) {
@@ -4018,6 +4717,9 @@ function initializeExerciseHubPage() {
             ? sessionState.totalForce / sessionState.sampleCount
             : diagResults.peakForce;
         const sessionResult = sessionState.reps >= sessionState.targetRepetitions ? "Success" : "Needs Work";
+        const durationSeconds = sessionState.startTime
+            ? Math.max(0, Math.floor((Date.now() - sessionState.startTime) / 1000))
+            : 0;
 
         try {
             const res = await fetch("api/patient/exercise_session.php", {
@@ -4045,11 +4747,23 @@ function initializeExerciseHubPage() {
                 localStorage.setItem("theraflow_glove", JSON.stringify(gloveData));
             } catch { /* storage may be blocked */ }
             startSessionBtn.disabled = false;
+            openSessionSummaryModal({
+                result: sessionResult,
+                exerciseLabel: exerciseLabelMap[selectedExercise] || selectedExercise || "-",
+                repetitions: sessionState.reps,
+                target: sessionState.targetRepetitions,
+                avgForce,
+                maxFlexion: diagResults.maxFlexion,
+                durationSeconds
+            });
         } catch (err) {
             setMsg(sessionStatus, err instanceof Error ? err.message : "Failed to save session.");
             if (endSessionBtn) endSessionBtn.disabled = false;
         }
     });
+
+    summaryDoneBtn?.addEventListener("click", finalizeSessionSummaryAndReset);
+    summaryCloseBtn?.addEventListener("click", finalizeSessionSummaryAndReset);
 
     // Prefetch plan target from server
     loadTherapyPlan();
@@ -5558,7 +6272,7 @@ function initializePatientSettingsPage() {
         });
     });
 
-    fetch("api/patient/profile.php")
+    fetch("api/patient/profile.php", { cache: "no-store" })
         .then(response => response.ok ? response.json() : Promise.reject(new Error("Unable to load patient profile.")))
         .then(payload => {
             if (!payload?.ok || !payload?.profile) {

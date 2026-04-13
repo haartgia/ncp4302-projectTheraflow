@@ -12,7 +12,7 @@ ensureDefaultTherapyPlanRows($pdo, $patients);
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $rows = [];
     $stmt = $pdo->prepare(
-        'SELECT p.id AS patient_id, p.name AS patient_name, tp.template_name, tp.duration_min, tp.target_repetitions, tp.sessions_per_day
+        'SELECT p.id AS patient_id, p.name AS patient_name, tp.template_name, tp.duration_min, tp.target_repetitions, tp.sessions_per_day, tp.exercise_bundle_json
          FROM patients p
          LEFT JOIN therapy_plans tp ON tp.patient_id = p.id
          WHERE p.doctor_id = ?
@@ -41,6 +41,16 @@ $templateName = trim((string) ($payload['templateName'] ?? 'Custom'));
 $duration = (int) ($payload['durationMin'] ?? 0);
 $repetitions = (int) ($payload['targetRepetitions'] ?? 0);
 $sessions = (int) ($payload['sessionsPerDay'] ?? 0);
+$exerciseBundle = $payload['exerciseBundle'] ?? null;
+
+$normalizedBundle = null;
+if (is_array($exerciseBundle)) {
+    $normalizedBundle = [
+        'open_close' => max(0, (int) ($exerciseBundle['open_close'] ?? 0)),
+        'full_extension' => max(0, (int) ($exerciseBundle['full_extension'] ?? 0)),
+        'full_close' => max(0, (int) ($exerciseBundle['full_close'] ?? 0))
+    ];
+}
 
 if ($patientId <= 0) {
     http_response_code(400);
@@ -57,14 +67,22 @@ if (!$ownsPatient->fetch()) {
 }
 
 $upsert = $pdo->prepare(
-    'INSERT INTO therapy_plans (patient_id, template_name, duration_min, target_repetitions, sessions_per_day)
-     VALUES (?, ?, ?, ?, ?)
+        'INSERT INTO therapy_plans (patient_id, template_name, duration_min, target_repetitions, sessions_per_day, exercise_bundle_json)
+         VALUES (?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        template_name = VALUES(template_name),
        duration_min = VALUES(duration_min),
        target_repetitions = VALUES(target_repetitions),
-       sessions_per_day = VALUES(sessions_per_day)'
+             sessions_per_day = VALUES(sessions_per_day),
+             exercise_bundle_json = VALUES(exercise_bundle_json)'
 );
-$upsert->execute([$patientId, $templateName, $duration, $repetitions, $sessions]);
+$upsert->execute([
+        $patientId,
+        $templateName,
+        $duration,
+        $repetitions,
+        $sessions,
+        $normalizedBundle ? json_encode($normalizedBundle, JSON_UNESCAPED_SLASHES) : null
+]);
 
 echo json_encode(['ok' => true]);

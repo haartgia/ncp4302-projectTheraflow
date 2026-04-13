@@ -20,13 +20,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $plan = getPatientPlan($pdo, $patientId);
 
     $latestStmt = $pdo->prepare(
-           'SELECT id, grip_strength, flexion_angle, repetitions, note, recorded_at
-         FROM sensor_data
-         WHERE patient_id = ?
+                     'SELECT id, grip_strength, flexion_angle, repetitions, note, recorded_at
+                 FROM sessions
+                 WHERE patient_id = ? AND source IN (?, ?)
             ORDER BY recorded_at DESC, id DESC
          LIMIT 1'
     );
-    $latestStmt->execute([$patientId]);
+        $latestStmt->execute([$patientId, 'esp32_glove', 'rehab_glove']);
     $latest = $latestStmt->fetch();
 
     echo json_encode([

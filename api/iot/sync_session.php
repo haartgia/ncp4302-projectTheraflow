@@ -150,20 +150,11 @@ if ($note === '') {
     $note = 'Rehabilitation glove session';
 }
 
-$insertSensor = $pdo->prepare(
-    'INSERT INTO sensor_data (patient_id, grip_strength, flexion_angle, repetitions, note, recorded_at)
-     VALUES (?, ?, ?, ?, ?, NOW())'
-);
-$insertSensor->execute([$patientId, $gripStrength, $flexionAngle, $repetitions, $note]);
-
 $insertSession = $pdo->prepare(
     'INSERT INTO sessions (patient_id, grip_strength, flexion_angle, repetitions, source, status, note, recorded_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, NOW())'
 );
 $insertSession->execute([$patientId, $gripStrength, $flexionAngle, $repetitions, $source, $status, $note]);
-
-$updatePatient = $pdo->prepare('UPDATE patients SET last_session = NOW() WHERE id = ?');
-$updatePatient->execute([$patientId]);
 
 echo json_encode([
     'ok' => true,
