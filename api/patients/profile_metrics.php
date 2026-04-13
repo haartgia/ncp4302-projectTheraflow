@@ -81,17 +81,54 @@ foreach ($weeklyStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
 }
 
 $planStmt = $pdo->prepare(
-    'SELECT duration_min, target_repetitions, sessions_per_day
+    'SELECT template_name, duration_min, target_repetitions, sessions_per_day, exercise_bundle_json
      FROM therapy_plans
      WHERE patient_id = ?
      LIMIT 1'
 );
 $planStmt->execute([$patientId]);
 $plan = $planStmt->fetch(PDO::FETCH_ASSOC) ?: [
-    'duration_min' => 20,
-    'target_repetitions' => 120,
-    'sessions_per_day' => 2
+    'template_name' => 'Default',
+    'duration_min' => 0,
+    'target_repetitions' => 0,
+    'sessions_per_day' => 0,
+    'exercise_bundle_json' => null
 ];
+
+$exerciseBundle = null;
+try {
+    if (isset($plan['exercise_bundle_json']) && is_string($plan['exercise_bundle_json']) && trim($plan['exercise_bundle_json']) !== '') {
+        $decoded = json_decode($plan['exercise_bundle_json'], true);
+        if (is_array($decoded)) {
+            $exerciseBundle = $decoded;
+        }
+    }
+} catch (Throwable $e) {
+    $exerciseBundle = null;
+}
+
+$sessionsPerDay = (int) ($plan['sessions_per_day'] ?? 0);
+$planExercises = [];
+if (is_array($exerciseBundle)) {
+    foreach (['open_close', 'full_extension', 'full_close'] as $type) {
+        $raw = $exerciseBundle[$type] ?? null;
+        $reps = 0;
+        $perExerciseSessions = $sessionsPerDay;
+        if (is_array($raw)) {
+            $reps = max(0, (int) ($raw['reps'] ?? 0));
+            $perExerciseSessions = max(0, (int) ($raw['sessions'] ?? $sessionsPerDay));
+        } else {
+            $reps = max(0, (int) $raw);
+        }
+        if ($reps > 0) {
+            $planExercises[] = [
+                'type' => $type,
+                'reps' => $reps,
+                'sessions' => $perExerciseSessions
+            ];
+        }
+    }
+}
 
 echo json_encode([
     'ok' => true,
@@ -106,9 +143,11 @@ echo json_encode([
         'flexion' => $weekFlexion
     ],
     'plan' => [
-        'duration_min' => (int) ($plan['duration_min'] ?? 20),
-        'target_repetitions' => (int) ($plan['target_repetitions'] ?? 120),
-        'sessions_per_day' => (int) ($plan['sessions_per_day'] ?? 2)
+        'template_name' => (string) ($plan['template_name'] ?? 'Default'),
+        'duration_min' => (int) ($plan['duration_min'] ?? 0),
+        'target_repetitions' => (int) ($plan['target_repetitions'] ?? 0),
+        'sessions_per_day' => $sessionsPerDay,
+        'exercises' => $planExercises
     ],
     'latest' => $latest
 ]);

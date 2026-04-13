@@ -284,7 +284,7 @@ try {
         $backupContactForStorage,
         $username,
         $passwordHash,
-        'Stable',
+        'Recovering',
         null
     ]);
 

@@ -45,11 +45,31 @@ $exerciseBundle = $payload['exerciseBundle'] ?? null;
 
 $normalizedBundle = null;
 if (is_array($exerciseBundle)) {
-    $normalizedBundle = [
-        'open_close' => max(0, (int) ($exerciseBundle['open_close'] ?? 0)),
-        'full_extension' => max(0, (int) ($exerciseBundle['full_extension'] ?? 0)),
-        'full_close' => max(0, (int) ($exerciseBundle['full_close'] ?? 0))
-    ];
+    $normalizedBundle = [];
+    $maxSessionsFromBundle = 0;
+    foreach (['open_close', 'full_extension', 'full_close'] as $type) {
+        $raw = $exerciseBundle[$type] ?? null;
+        if (is_array($raw)) {
+            $reps = max(0, (int) ($raw['reps'] ?? 0));
+            $perExerciseSessions = max(0, (int) ($raw['sessions'] ?? 0));
+            $normalizedBundle[$type] = [
+                'reps' => $reps,
+                'sessions' => $perExerciseSessions
+            ];
+            $maxSessionsFromBundle = max($maxSessionsFromBundle, $perExerciseSessions);
+        } else {
+            $reps = max(0, (int) $raw);
+            $normalizedBundle[$type] = [
+                'reps' => $reps,
+                'sessions' => max(0, $sessions)
+            ];
+            $maxSessionsFromBundle = max($maxSessionsFromBundle, max(0, $sessions));
+        }
+    }
+
+    if ($sessions <= 0) {
+        $sessions = $maxSessionsFromBundle;
+    }
 }
 
 if ($patientId <= 0) {

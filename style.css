@@ -2652,9 +2652,23 @@ body.dark-mode .calendar-widget-card {
 
 .field-group select {
   appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, #4d869c 50%), linear-gradient(135deg, #4d869c 50%, transparent 50%);
-  background-position: calc(100% - 20px) calc(50% - 3px), calc(100% - 14px) calc(50% - 3px);
-  background-size: 6px 6px, 6px 6px;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 44px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 6.2c1.3 1.95 2.6 3.2 4.5 3.2s3.2-1.25 4.5-3.2' fill='none' stroke='%234d869c' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: calc(100% - 16px) center;
+  background-size: 16px 16px;
+  background-repeat: no-repeat;
+}
+
+.patients-filter-wrap select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 44px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 6.2c1.3 1.95 2.6 3.2 4.5 3.2s3.2-1.25 4.5-3.2' fill='none' stroke='%234d869c' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: calc(100% - 16px) center;
+  background-size: 16px 16px;
   background-repeat: no-repeat;
 }
 
@@ -3354,34 +3368,34 @@ body.auth-gated-home .calendar-dates {
 
 html,
 body.patients-page {
-  height: auto;
+  height: 100%;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: hidden;
 }
 
 .patients-page {
   background: var(--content-bg);
-  min-height: 100vh;
+  height: 100vh;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: hidden;
 }
 
 .patients-page .container {
-  min-height: 100vh;
+  height: 100vh;
 }
 
 .patients-page .content {
-  min-height: 100vh;
-  overflow: visible;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .patients-shell {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  min-height: 100%;
-  height: auto;
-  overflow: visible;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .patients-list-view,
@@ -3401,14 +3415,17 @@ body.patients-page {
 }
 
 .patients-list-view {
-  min-height: auto;
-  overflow: visible;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .patients-list-card {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  flex: 1;
+  overflow: hidden;
 }
 
 .patients-header-row {
@@ -3445,10 +3462,20 @@ body.patients-page {
 }
 
 .patients-list-actions {
-  display: grid;
-  grid-template-columns: 1.3fr 0.7fr;
+  display: flex;
+  align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+.patients-search-wrap {
+  flex: 1.35;
+  min-width: 0;
+}
+
+.patients-filter-wrap {
+  flex: 0.65;
+  min-width: 200px;
 }
 
 .patients-search-wrap input,
@@ -3456,14 +3483,15 @@ body.patients-page {
   width: 100%;
   border: none;
   border-radius: 12px;
-  background: #ffffff;
+  background-color: #ffffff;
   color: #425863;
   padding: 14px 16px;
   font-size: 0.95rem;
   font-weight: 500;
   outline: none;
+  min-height: 48px;
   box-shadow: inset 0 0 0 2px transparent;
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .patients-search-wrap input:focus,
@@ -3472,24 +3500,170 @@ body.patients-page {
 }
 
 .patients-table-wrap {
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
   min-height: 0;
   flex: 1;
+  border-radius: 12px;
+}
+
+.patients-table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+  border: 1px solid rgba(77, 134, 156, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.patient-page-btn {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: #6f93a3;
+}
+
+.patient-page-btn:hover,
+.patient-page-btn:focus-visible {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: #4d869c;
+}
+
+.patient-page-btn[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.patient-page-label {
+  color: #4f6976;
+  font-weight: 600;
+  min-width: 108px;
+  text-align: center;
+}
+
+.patients-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #edf7fc;
+}
+
+.patients-table tbody tr {
+  transition: background-color 0.16s ease;
+}
+
+.patients-table tbody tr:hover {
+  background: rgba(77, 134, 156, 0.1);
+}
+
+.patients-table .last-session-empty {
+  color: #8096a1;
+  font-size: 0.86rem;
 }
 
 .patients-table .table-view-btn {
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 8px 14px;
   background: #4d869c;
   color: #ffffff;
   font-weight: 700;
   cursor: pointer;
-  transition: filter 0.18s ease;
+  transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
 }
 
 .patients-table .table-view-btn:hover {
   filter: brightness(92%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(31, 90, 113, 0.22);
+}
+
+.status-chip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.status-chip-trigger {
+  border: none;
+  cursor: pointer;
+  gap: 4px;
+  transition: filter 0.18s ease, box-shadow 0.18s ease;
+}
+
+.status-chip-trigger i {
+  font-size: 0.7rem;
+  margin-left: 2px;
+}
+
+.status-chip-trigger:hover,
+.status-chip-trigger:focus-visible {
+  filter: brightness(97%);
+  box-shadow: 0 2px 10px rgba(31, 90, 113, 0.18);
+  outline: none;
+}
+
+.status-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(77, 134, 156, 0.26);
+  background: #ffffff;
+  box-shadow: 0 12px 24px rgba(20, 63, 80, 0.18);
+  z-index: 10;
+}
+
+.status-menu[hidden] {
+  display: none !important;
+}
+
+.status-menu-option {
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #2d5667;
+  text-align: left;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.status-menu-option:hover,
+.status-menu-option:focus-visible {
+  background: rgba(77, 134, 156, 0.12);
+  outline: none;
+}
+
+.status-menu-option.is-active {
+  background: rgba(77, 134, 156, 0.18);
+}
+
+.status-at-risk {
+  color: #9b3f2f;
+  background: rgba(224, 167, 55, 0.24);
+}
+
+.status-recovered {
+  color: #1f6d5d;
+  background: rgba(78, 170, 142, 0.2);
 }
 
 
@@ -3504,10 +3678,10 @@ body.patients-page {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 0;
   width: auto;
-  min-width: 220px;
-  padding: 10px 16px;
+  min-width: 170px;
+  padding: 8px 14px;
   border: none;
   border-radius: 12px;
   background: #4d869c;
@@ -3647,6 +3821,17 @@ body.patients-page {
   font-size: 0.88rem;
 }
 
+.patient-summary-actions {
+  margin-left: auto;
+}
+
+.patient-summary-view-btn {
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+
 .patient-top-row {
   display: grid;
   grid-template-columns: 1fr;
@@ -3737,6 +3922,146 @@ body.patients-page {
 
 .patient-medical-card .wizard-actions .profile-action-btn {
   width: 100%;
+}
+
+.patients-profile-view .field-group input:not([readonly]),
+.patients-profile-view .field-group textarea:not([readonly]),
+.patients-profile-view .field-group select:not([readonly]),
+.patients-profile-view .doctor-notes-sidebar textarea {
+  background: #ffffff;
+  border: 1px solid rgba(77, 134, 156, 0.22);
+  box-shadow: none;
+}
+
+.patients-profile-view .field-group input:not([readonly]):focus,
+.patients-profile-view .field-group textarea:not([readonly]):focus,
+.patients-profile-view .field-group select:not([readonly]):focus,
+.patients-profile-view .doctor-notes-sidebar textarea:focus {
+  box-shadow: inset 0 0 0 1.5px #4d869c;
+}
+
+.therapy-plan-card .widget-title {
+  margin-bottom: 8px;
+}
+
+.therapy-plan-compact-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.therapy-plan-template-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.therapy-plan-meta-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #607b88;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.therapy-plan-template-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: rgba(77, 134, 156, 0.18);
+  color: #1f5668;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.therapy-plan-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.therapy-plan-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(77, 134, 156, 0.24);
+}
+
+.therapy-plan-stat-item.therapy-plan-stat-full {
+  grid-column: 1 / -1;
+}
+
+.therapy-plan-meta-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #204d5e;
+}
+
+.therapy-plan-breakdown {
+  background: rgba(234, 245, 250, 0.7);
+  border: 1px solid rgba(77, 134, 156, 0.18);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.therapy-plan-breakdown-label {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #607b88;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.therapy-plan-breakdown-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 118px;
+  overflow-y: auto;
+}
+
+.therapy-plan-breakdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  font-size: 0.9rem;
+  color: #2d5565;
+}
+
+.therapy-plan-breakdown-item + .therapy-plan-breakdown-item {
+  border-top: 1px solid rgba(77, 134, 156, 0.16);
+}
+
+.therapy-plan-breakdown-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+}
+
+.therapy-plan-breakdown-left i {
+  color: #7a97a3;
+  font-size: 0.82rem;
+  width: 12px;
+  text-align: center;
+}
+
+.therapy-plan-breakdown-right {
+  color: #436674;
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.therapy-plan-breakdown-item.is-empty .therapy-plan-breakdown-left {
+  font-weight: 500;
+  color: #708892;
 }
 
 .sensor-summary-full-row {
@@ -3882,6 +4207,10 @@ body.patients-page {
   background: #edf7fc;
 }
 
+.patients-profile-view .doctor-notes-card textarea {
+  background: #ffffff;
+}
+
 .doctor-notes-card textarea:focus {
   border-color: #4d869c;
   box-shadow: 0 0 0 2px rgba(77, 134, 156, 0.18);
@@ -4018,6 +4347,79 @@ body.patients-page {
   color: #1f5668;
   font-size: 1.7rem;
   margin-bottom: 18px;
+}
+
+.patient-info-modal-card {
+  width: calc(100% - 28px);
+  max-width: 650px;
+  max-height: 92vh;
+  border-radius: 18px;
+  border: 1px solid rgba(77, 134, 156, 0.25);
+  box-shadow: 0 18px 34px rgba(16, 61, 78, 0.2);
+  padding: 18px;
+}
+
+.patient-info-modal-card .field-grid {
+  gap: 10px;
+}
+
+.patient-info-modal-card .field-group input,
+.patient-info-modal-card .field-group select {
+  background: #ffffff;
+}
+
+.patient-info-modal-card .field-group input[readonly] {
+  background: #f1f6f8;
+  color: #607b88;
+}
+
+.patient-inline-edit-wrap {
+  position: relative;
+}
+
+.patient-inline-edit-wrap input,
+.patient-inline-edit-wrap select {
+  padding-right: 54px;
+}
+
+.patient-inline-edit-btn {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #8aa0ab;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.patient-inline-edit-btn:hover,
+.patient-inline-edit-btn:focus-visible {
+  background: rgba(77, 134, 156, 0.12);
+  color: #5c7784;
+  outline: none;
+}
+
+.patient-inline-edit-btn.is-editing {
+  color: #2f9b72;
+}
+
+.patient-inline-edit-wrap input[readonly],
+.patient-inline-edit-wrap select:disabled {
+  background: #f3f8fa;
+  color: #647f8b;
+}
+
+.patient-info-actions .doctor-btn,
+.patient-info-actions .sign-in-btn {
+  min-height: 44px;
 }
 
 .hub-session-summary-card {
@@ -4321,8 +4723,70 @@ body.patients-page {
   outline: none;
 }
 
+.therapy-assign-new-card {
+  padding: 22px;
+  border-radius: 14px;
+}
+
+.therapy-assign-new-card .widget-title {
+  margin-bottom: 10px;
+}
+
+.therapy-assign-new-card .field-grid {
+  gap: 12px;
+}
+
+.therapy-assign-new-card .field-group {
+  gap: 7px;
+}
+
+.therapy-assign-new-card .field-group > span {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #44616e;
+}
+
 .therapy-assign-new-card .field-group select {
   background-color: #ffffff;
+  min-height: 52px;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1.5px rgba(77, 134, 156, 0.16);
+}
+
+.therapy-assign-new-card .field-group select:focus {
+  box-shadow: inset 0 0 0 2px #4d869c;
+}
+
+.therapy-assign-new-card .sign-in-btn {
+  margin-top: 2px;
+  transition: transform 0.16s ease, box-shadow 0.2s ease, filter 0.2s ease, background-color 0.2s ease;
+  box-shadow: 0 10px 18px rgba(43, 103, 127, 0.2);
+}
+
+.therapy-assign-new-card .sign-in-btn:hover,
+.therapy-assign-new-card .sign-in-btn:focus-visible {
+  filter: none;
+  transform: translateY(-1px);
+  background: #3f7891;
+  box-shadow: 0 12px 20px rgba(31, 90, 113, 0.28);
+}
+
+.therapy-assign-new-card .sign-in-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 7px 12px rgba(31, 90, 113, 0.2);
+}
+
+.therapy-assign-new-card .sign-in-btn.is-success {
+  background: #2f9b72;
+  box-shadow: 0 10px 16px rgba(47, 155, 114, 0.24);
+}
+
+.therapy-assign-new-card .sign-in-btn.is-success i {
+  margin-right: 6px;
+}
+
+.therapy-assign-new-card .notes-save-feedback {
+  margin-top: 2px;
 }
 
 .therapy-template-card h3 {
@@ -4399,15 +4863,171 @@ body.patients-page {
   gap: 20px;
 }
 
-.therapy-assignment-card .doctor-table td,
-.therapy-assignment-card .doctor-table th {
+.therapy-assignment-card .doctor-table {
+  border-collapse: separate;
+  border-spacing: 0 12px;
+}
+
+.therapy-assignment-card .doctor-table thead th {
+  border-bottom: none;
   white-space: nowrap;
+  color: #537280;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  padding: 4px 10px 6px;
+}
+
+.therapy-assignment-card .doctor-table tbody td {
+  border-top: 1px solid rgba(77, 134, 156, 0.2);
+  border-bottom: 1px solid rgba(77, 134, 156, 0.2);
+  border-left: none;
+  border-right: none;
+  background: rgba(255, 255, 255, 0.68);
+  padding: 14px 10px;
+  vertical-align: middle;
+}
+
+.therapy-assignment-card .doctor-table tbody td:first-child {
+  border-left: 1px solid rgba(77, 134, 156, 0.2);
+  border-radius: 10px 0 0 10px;
+  padding-left: 14px;
+}
+
+.therapy-assignment-card .doctor-table tbody td:last-child {
+  border-right: 1px solid rgba(77, 134, 156, 0.2);
+  border-radius: 0 10px 10px 0;
+  padding-right: 14px;
+}
+
+.therapy-assignment-card .doctor-table tbody tr.assignment-row-strip {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.therapy-assignment-card .doctor-table tbody tr.assignment-row-strip:hover td {
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 16px rgba(16, 54, 66, 0.08);
+}
+
+.therapy-assignment-card .doctor-table tbody tr.assignment-row-strip:hover {
+  transform: translateY(-1px);
+}
+
+.therapy-assignment-card .doctor-table td.assignment-patient-cell {
+  min-width: 150px;
+}
+
+.assignment-patient-name {
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: #1f4f60;
+}
+
+.assignment-plan-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.assignment-plan-pill.plan-pill-level1 {
+  color: #2f6074;
+  background: rgba(77, 134, 156, 0.2);
+}
+
+.assignment-plan-pill.plan-pill-level2 {
+  color: #1f6d5d;
+  background: rgba(78, 170, 142, 0.18);
+}
+
+.assignment-plan-pill.plan-pill-level3 {
+  color: #814f0f;
+  background: rgba(243, 180, 73, 0.24);
+}
+
+.assignment-plan-pill.plan-pill-custom {
+  color: #9a5b17;
+  background: rgba(236, 167, 65, 0.26);
+}
+
+.assignment-plan-pill.plan-pill-default {
+  color: #516c79;
+  background: rgba(103, 129, 140, 0.18);
 }
 
 .therapy-assignment-card .doctor-table td.assignment-plan-cell {
   white-space: normal;
-  line-height: 1.4;
+  line-height: 1.45;
   min-width: 220px;
+}
+
+.therapy-assignment-card .doctor-table td.assignment-sessions-cell {
+  white-space: normal;
+  line-height: 1.45;
+  min-width: 150px;
+}
+
+.assignment-metric-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.assignment-metric-list li {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding-left: 12px;
+}
+
+.assignment-metric-list li::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(77, 134, 156, 0.55);
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.assignment-metric-title {
+  color: #3e6070;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.assignment-metric-value {
+  color: #244f5f;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.assignment-metric-list.assignment-metric-list-compact li {
+  grid-template-columns: 1fr;
+}
+
+.assignment-metric-list.assignment-metric-list-compact li::before {
+  left: 0;
+}
+
+.assignment-metric-list.assignment-metric-list-compact .assignment-metric-value {
+  color: #355c6b;
+  font-weight: 600;
+}
+
+.assignment-action-cell {
+  width: 1%;
+  white-space: nowrap;
 }
 
 .therapy-assignment-card {
@@ -4425,7 +5045,17 @@ body.patients-page {
   justify-content: center;
   gap: 10px;
   margin-top: auto;
-  padding-top: 12px;
+  padding-top: 16px;
+}
+
+.therapy-assignment-card .therapy-pagination {
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+  border: 1px solid rgba(77, 134, 156, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 8px 12px;
 }
 
 .therapy-page-btn {
@@ -4463,14 +5093,70 @@ body.patients-page {
 }
 
 .therapy-edit-btn {
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1.5px solid #4d869c;
   border-radius: 10px;
-  padding: 8px 12px;
+  padding: 7px 11px;
   font-size: 0.84rem;
-  font-weight: 700;
-  color: #ffffff;
-  background: #4d869c;
+  font-weight: 600;
+  color: #3f768b;
+  background: transparent;
   cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.therapy-edit-btn:hover,
+.therapy-edit-btn:focus-visible {
+  background: rgba(77, 134, 156, 0.1);
+  color: #2e6578;
+  border-color: #3f768b;
+}
+
+.assignment-empty-cell {
+  border: 1px dashed rgba(77, 134, 156, 0.4) !important;
+  border-radius: 10px !important;
+  background: rgba(255, 255, 255, 0.52) !important;
+}
+
+.assignment-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.assignment-empty-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #284e5d;
+}
+
+.assignment-empty-copy {
+  margin: 0;
+  font-size: 0.86rem;
+  color: #5a7581;
+}
+
+.assignment-empty-cta {
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 0.88rem;
+}
+
+@media (max-width: 900px) {
+  .therapy-assignment-card .doctor-table {
+    border-spacing: 0 10px;
+  }
+
+  .therapy-assignment-card .doctor-table td.assignment-plan-cell {
+    min-width: 180px;
+  }
 }
 
 .therapy-edit-popup[hidden] {

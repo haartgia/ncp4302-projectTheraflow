@@ -125,11 +125,14 @@
                     <div class="field-grid">
                         <label class="field-group required-field">
                             <span>Select Patient</span>
-                            <select id="assignPatientSelect"></select>
+                            <select id="assignPatientSelect">
+                                <option value="" selected disabled>Search for a patient...</option>
+                            </select>
                         </label>
                         <label class="field-group required-field">
                             <span>Select Preset Template</span>
                             <select id="assignTemplateSelect">
+                                <option value="" selected disabled>Choose a difficulty level...</option>
                                 <option value="level1">Level 1: Beginner</option>
                                 <option value="level2">Level 2: Intermediate</option>
                                 <option value="level3">Level 3: Advanced</option>

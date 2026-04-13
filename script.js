@@ -1613,6 +1613,10 @@ function initializePatientsPage() {
     const tableBody = document.getElementById("patientTableBody");
     const searchInput = document.getElementById("patientSearchInput");
     const statusFilter = document.getElementById("patientStatusFilter");
+    const patientTablePagination = document.getElementById("patientTablePagination");
+    const patientTablePrevBtn = document.getElementById("patientTablePrevBtn");
+    const patientTableNextBtn = document.getElementById("patientTableNextBtn");
+    const patientTablePageLabel = document.getElementById("patientTablePageLabel");
     const openModalButton = document.getElementById("openAddPatientModal");
     const closeModalButton = document.getElementById("closeAddPatientModal");
     const modal = document.getElementById("addPatientModal");
@@ -1637,6 +1641,25 @@ function initializePatientsPage() {
     const clinicalTreatmentGoalCounter = document.getElementById("clinicalTreatmentGoalCounter");
     const saveClinicalInfoButton = document.getElementById("saveClinicalInfo");
     const clinicalSaveFeedback = document.getElementById("clinicalSaveFeedback");
+    const openPatientInfoModalButton = document.getElementById("openPatientInfoModal");
+    const patientInfoModal = document.getElementById("patientInfoModal");
+    const patientInfoModalBackdrop = document.getElementById("patientInfoModalBackdrop");
+    const closePatientInfoModalButton = document.getElementById("closePatientInfoModal");
+    const cancelPatientInfoBtn = document.getElementById("cancelPatientInfoBtn");
+    const patientInfoForm = document.getElementById("patientInfoForm");
+    const patientInfoFeedback = document.getElementById("patientInfoFeedback");
+    const patientInfoFirstName = document.getElementById("patientInfoFirstName");
+    const patientInfoLastName = document.getElementById("patientInfoLastName");
+    const patientInfoDob = document.getElementById("patientInfoDob");
+    const patientInfoAge = document.getElementById("patientInfoAge");
+    const patientInfoGender = document.getElementById("patientInfoGender");
+    const patientInfoEmail = document.getElementById("patientInfoEmail");
+    const patientInfoBackupContact = document.getElementById("patientInfoBackupContact");
+    const patientInfoUsername = document.getElementById("patientInfoUsername");
+    const patientInfoPassword = document.getElementById("patientInfoPassword");
+    const patientInfoStrokeType = document.getElementById("patientInfoStrokeType");
+    const patientInfoAffectedHand = document.getElementById("patientInfoAffectedHand");
+    const patientInlineEditButtons = patientInfoModal ? Array.from(patientInfoModal.querySelectorAll(".patient-inline-edit-btn")) : [];
 
     const profileName = document.getElementById("profilePatientName");
     const profileBreadcrumbName = document.getElementById("patientProfileBreadcrumbName");
@@ -1646,9 +1669,10 @@ function initializePatientsPage() {
     const profileGrip = document.getElementById("profileGrip");
     const profileFlexion = document.getElementById("profileFlexion");
     const profileRepetitions = document.getElementById("profileRepetitions");
-    const planDuration = document.getElementById("planDuration");
     const planRepetitions = document.getElementById("planRepetitions");
     const planSessions = document.getElementById("planSessions");
+    const planTemplateName = document.getElementById("planTemplateName");
+    const planExerciseList = document.getElementById("planExerciseList");
 
     let patients = [];
     let activePatientId = "";
@@ -1656,7 +1680,10 @@ function initializePatientsPage() {
     let gripChartInstance = null;
     let flexionChartInstance = null;
     let profileMetricsTimer = null;
+    let patientTablePage = 1;
     const characterCounterUpdaters = [];
+    const STATUS_OPTIONS = ["Recovering", "At Risk", "Recovered"];
+    const PATIENT_TABLE_PAGE_SIZE = 10;
 
     function bindCharacterCounter(inputElement, counterElement, maxLength) {
         if (!inputElement || !counterElement) {
@@ -1698,6 +1725,83 @@ function initializePatientsPage() {
         return `${Number(value || 0).toFixed(1)} deg`;
     }
 
+    function exerciseTypeLabel(type) {
+        if (type === "full_extension") {
+            return "Full Extension";
+        }
+        if (type === "full_close") {
+            return "Full Close";
+        }
+        return "Open-Close Exercise";
+    }
+
+    function exerciseTypeIcon(type) {
+        if (type === "full_extension") {
+            return "fa-solid fa-hand-middle-finger";
+        }
+        if (type === "full_close") {
+            return "fa-solid fa-hand-fist";
+        }
+        return "fa-regular fa-hand";
+    }
+
+    function setPlanField(element, value) {
+        if (!element) {
+            return;
+        }
+
+        const text = String(value ?? "0");
+        if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+            element.value = text;
+            return;
+        }
+
+        element.textContent = text;
+    }
+
+    function formatPlanSessionsDisplay(therapyPlan) {
+        const exercises = Array.isArray(therapyPlan?.exercises) ? therapyPlan.exercises : [];
+        const totalSessions = exercises.reduce((sum, item) => sum + Math.max(0, Number(item?.sessions || 0)), 0);
+        if (totalSessions > 0) {
+            return String(totalSessions);
+        }
+        return String(Math.max(0, Number(therapyPlan?.sessionsPerDay || 0)));
+    }
+
+    function renderPlanExercises(therapyPlan) {
+        if (!planExerciseList) {
+            return;
+        }
+
+        const exercises = Array.isArray(therapyPlan?.exercises) ? therapyPlan.exercises : [];
+        if (!exercises.length) {
+            planExerciseList.innerHTML = `
+                <li class="therapy-plan-breakdown-item is-empty">
+                    <span class="therapy-plan-breakdown-left">No exercise details available.</span>
+                </li>
+            `;
+            return;
+        }
+
+        planExerciseList.innerHTML = exercises
+            .map(item => {
+                const reps = Math.max(0, Number(item?.reps || 0));
+                const sessions = Math.max(0, Number(item?.sessions || 0));
+                const exerciseType = String(item?.type || "open_close");
+                const iconClass = exerciseTypeIcon(exerciseType);
+                return `
+                    <li class="therapy-plan-breakdown-item">
+                        <span class="therapy-plan-breakdown-left">
+                            <i class="${iconClass}" aria-hidden="true"></i>
+                            <span>${exerciseTypeLabel(exerciseType)}</span>
+                        </span>
+                        <span class="therapy-plan-breakdown-right">${reps} reps | ${sessions} ${sessions === 1 ? "session" : "sessions"}</span>
+                    </li>
+                `;
+            })
+            .join("");
+    }
+
     // Load patients from the API.
     fetch('api/patients/list.php')
         .then(response => response.ok ? response.json() : null)
@@ -1717,31 +1821,88 @@ function initializePatientsPage() {
                 strokeType: row.stroke_type || 'Unknown',
                 strokeSide: row.affected_hand || 'Unknown',
                 affectedHand: row.affected_hand || 'Unknown',
-                lastSession: row.last_session || 'N/A',
-                status: row.status || 'Stable',
+                lastSession: row.last_session || '',
+                status: normalizePatientStatus(row.status || 'Recovering'),
                 isActiveToday: false,
                 metrics: { grip: '0 N', flexion: '0 deg', repetitionsToday: '0' },
-                therapyPlan: { duration: 20, repetitions: 120, sessionsPerDay: 2 },
+                therapyPlan: { templateName: 'Default', duration: 0, repetitions: 0, sessionsPerDay: 0, exercises: [] },
                 notes: '',
                 chart: { grip: [0, 0, 0, 0, 0, 0, 0], flexion: [0, 0, 0, 0, 0, 0, 0] }
             }));
             activePatientId = patients[0]?.id || '';
+            patientTablePage = 1;
             renderPatientTable();
         })
         .catch(() => {
             patients = [];
             activePatientId = "";
+            patientTablePage = 1;
             renderPatientTable();
         });
 
-    function getStatusPill(status) {
-        if (status === "Improving") {
-            return "status-improving";
+    function normalizePatientStatus(status) {
+        const normalized = String(status || "").trim().toLowerCase();
+        if (normalized === "at risk" || normalized === "needs attention") {
+            return "At Risk";
         }
-        if (status === "Needs Attention") {
-            return "status-attention";
+        if (normalized === "recovered" || normalized === "improving") {
+            return "Recovered";
+        }
+        if (normalized === "stable" || normalized === "recovering") {
+            return "Recovering";
+        }
+        return "Recovering";
+    }
+
+    function getStatusPill(status) {
+        const normalized = normalizePatientStatus(status);
+        if (normalized === "At Risk") {
+            return "status-at-risk";
+        }
+        if (normalized === "Recovered") {
+            return "status-recovered";
         }
         return "status-stable";
+    }
+
+    function formatLastSession(lastSession) {
+        const text = String(lastSession || "").trim();
+        if (!text || text.toLowerCase() === "n/a") {
+            return '<span class="last-session-empty">No data</span>';
+        }
+        return text;
+    }
+
+    function closeAllStatusMenus() {
+        if (!tableBody) {
+            return;
+        }
+
+        tableBody.querySelectorAll(".status-menu").forEach(menu => {
+            menu.hidden = true;
+        });
+
+        tableBody.querySelectorAll(".status-chip-trigger").forEach(trigger => {
+            trigger.setAttribute("aria-expanded", "false");
+        });
+    }
+
+    function renderStatusMenu(patientId, currentStatus) {
+        return `
+            <div class="status-chip-wrap">
+                <button type="button" class="status-chip-trigger status-pill ${getStatusPill(currentStatus)}" data-status-patient-id="${patientId}" aria-haspopup="menu" aria-expanded="false">
+                    <span>${currentStatus}</span>
+                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                </button>
+                <div class="status-menu" role="menu" hidden>
+                    ${STATUS_OPTIONS.map(status => `
+                        <button type="button" class="status-menu-option ${status === currentStatus ? "is-active" : ""}" data-status-value="${status}" data-status-patient-id="${patientId}" role="menuitem">
+                            ${status}
+                        </button>
+                    `).join("")}
+                </div>
+            </div>
+        `;
     }
 
     function getFilteredPatients() {
@@ -1755,7 +1916,7 @@ function initializePatientsPage() {
             if (selectedStatus === "Active Today") {
                 matchesFilter = patient.isActiveToday;
             } else if (selectedStatus !== "all") {
-                matchesFilter = patient.status === selectedStatus;
+                matchesFilter = normalizePatientStatus(patient.status) === selectedStatus;
             }
 
             return matchesSearch && matchesFilter;
@@ -1768,6 +1929,10 @@ function initializePatientsPage() {
         }
 
         const filteredPatients = getFilteredPatients();
+        const totalPages = Math.max(1, Math.ceil(filteredPatients.length / PATIENT_TABLE_PAGE_SIZE));
+        patientTablePage = Math.min(totalPages, Math.max(1, patientTablePage));
+        const startIndex = (patientTablePage - 1) * PATIENT_TABLE_PAGE_SIZE;
+        const pagePatients = filteredPatients.slice(startIndex, startIndex + PATIENT_TABLE_PAGE_SIZE);
 
         tableBody.innerHTML = "";
         if (!filteredPatients.length) {
@@ -1776,21 +1941,35 @@ function initializePatientsPage() {
                     <td colspan="6">No patients match your search/filter.</td>
                 </tr>
             `;
+            if (patientTablePagination && patientTablePrevBtn && patientTableNextBtn && patientTablePageLabel) {
+                patientTablePagination.hidden = true;
+                patientTablePrevBtn.disabled = true;
+                patientTableNextBtn.disabled = true;
+                patientTablePageLabel.textContent = "Page 1 of 1";
+            }
             return;
         }
 
-        filteredPatients.forEach(patient => {
+        pagePatients.forEach(patient => {
             const row = document.createElement("tr");
             row.innerHTML = `
                 <td>${patient.name}</td>
                 <td>${patient.age}</td>
                 <td>${patient.strokeSide}</td>
-                <td>${patient.lastSession}</td>
-                <td><span class="status-pill ${getStatusPill(patient.status)}">${patient.status}</span></td>
+                <td>${formatLastSession(patient.lastSession)}</td>
+                <td class="patient-status-cell">${renderStatusMenu(patient.id, normalizePatientStatus(patient.status))}</td>
                 <td><button type="button" class="table-view-btn" data-patient-id="${patient.id}">View</button></td>
             `;
             tableBody.appendChild(row);
         });
+
+        if (patientTablePagination && patientTablePrevBtn && patientTableNextBtn && patientTablePageLabel) {
+            const hasPagination = filteredPatients.length > PATIENT_TABLE_PAGE_SIZE;
+            patientTablePagination.hidden = !hasPagination;
+            patientTablePrevBtn.disabled = patientTablePage <= 1;
+            patientTableNextBtn.disabled = patientTablePage >= totalPages;
+            patientTablePageLabel.textContent = `Page ${patientTablePage} of ${totalPages}`;
+        }
     }
 
     function destroyProfileCharts() {
@@ -1970,15 +2149,10 @@ function initializePatientsPage() {
         if (profileRepetitions) {
             profileRepetitions.textContent = patient.metrics.repetitionsToday;
         }
-        if (planDuration) {
-            planDuration.value = String(patient.therapyPlan.duration);
-        }
-        if (planRepetitions) {
-            planRepetitions.value = String(patient.therapyPlan.repetitions);
-        }
-        if (planSessions) {
-            planSessions.value = String(patient.therapyPlan.sessionsPerDay);
-        }
+        setPlanField(planRepetitions, patient.therapyPlan.repetitions);
+        setPlanField(planSessions, formatPlanSessionsDisplay(patient.therapyPlan));
+        setPlanField(planTemplateName, patient.therapyPlan.templateName || "Default");
+        renderPlanExercises(patient.therapyPlan);
         if (notesInput) {
             notesInput.value = patient.notes || "";
         }
@@ -2019,9 +2193,11 @@ function initializePatientsPage() {
             patient.metrics.repetitionsToday = String(Number(summary.repetitionsToday || 0));
 
             const plan = payload.plan || {};
-            patient.therapyPlan.duration = Number(plan.duration_min || 20);
-            patient.therapyPlan.repetitions = Number(plan.target_repetitions || 120);
-            patient.therapyPlan.sessionsPerDay = Number(plan.sessions_per_day || 2);
+            patient.therapyPlan.templateName = String(plan.template_name || "Default");
+            patient.therapyPlan.duration = Number.isFinite(Number(plan.duration_min)) ? Number(plan.duration_min) : 0;
+            patient.therapyPlan.repetitions = Number.isFinite(Number(plan.target_repetitions)) ? Number(plan.target_repetitions) : 0;
+            patient.therapyPlan.sessionsPerDay = Number.isFinite(Number(plan.sessions_per_day)) ? Number(plan.sessions_per_day) : 0;
+            patient.therapyPlan.exercises = Array.isArray(plan.exercises) ? plan.exercises : [];
 
             const weekly = payload.weeklyChart || {};
             const gripSeries = Array.isArray(weekly.grip) ? weekly.grip : patient.chart.grip;
@@ -2035,9 +2211,10 @@ function initializePatientsPage() {
                 if (profileGrip) profileGrip.textContent = patient.metrics.grip;
                 if (profileFlexion) profileFlexion.textContent = patient.metrics.flexion;
                 if (profileRepetitions) profileRepetitions.textContent = patient.metrics.repetitionsToday;
-                if (planDuration) planDuration.value = String(patient.therapyPlan.duration);
-                if (planRepetitions) planRepetitions.value = String(patient.therapyPlan.repetitions);
-                if (planSessions) planSessions.value = String(patient.therapyPlan.sessionsPerDay);
+                setPlanField(planRepetitions, patient.therapyPlan.repetitions);
+                setPlanField(planSessions, formatPlanSessionsDisplay(patient.therapyPlan));
+                setPlanField(planTemplateName, patient.therapyPlan.templateName || "Default");
+                renderPlanExercises(patient.therapyPlan);
                 if (updateCharts) {
                     renderProfileCharts(patient);
                 }
@@ -2071,9 +2248,176 @@ function initializePatientsPage() {
         }
     }
 
-    async function saveClinicalData(patientDbId, { diagnosis, treatmentGoal, doctorNotes }) {
+    function activePatientRecord() {
+        return patients.find(entry => entry.id === activePatientId) || null;
+    }
+
+    async function loadPatientInfoForModal() {
+        const patient = activePatientRecord();
+        if (!patient) {
+            return;
+        }
+
+        const patientDbId = Number(patient.dbId || 0);
+        if (!patientDbId) {
+            throw new Error("Invalid patient selected.");
+        }
+
+        const response = await fetch(`api/patients/profile_manage.php?patientId=${patientDbId}`);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload?.ok || !payload?.patient) {
+            throw new Error(payload?.error || "Unable to load patient information.");
+        }
+
+        const details = payload.patient;
+        if (patientInfoFirstName) patientInfoFirstName.value = String(details.firstName || "");
+        if (patientInfoLastName) patientInfoLastName.value = String(details.lastName || "");
+        if (patientInfoDob) patientInfoDob.value = String(details.dob || "");
+        if (patientInfoAge) patientInfoAge.value = String(Number(details.age || 0));
+        if (patientInfoGender) patientInfoGender.value = String(details.gender || "");
+        if (patientInfoEmail) patientInfoEmail.value = String(details.email || "");
+        if (patientInfoBackupContact) patientInfoBackupContact.value = String(details.backupContact || "");
+        if (patientInfoUsername) patientInfoUsername.value = String(details.username || "");
+        if (patientInfoPassword) patientInfoPassword.value = "";
+        if (patientInfoStrokeType) patientInfoStrokeType.value = String(details.strokeType || "");
+        if (patientInfoAffectedHand) patientInfoAffectedHand.value = String(details.affectedHand || "");
+    }
+
+    function setInlineFieldEditing(fieldElement, toggleButton, isEditing) {
+        if (!fieldElement || !toggleButton) {
+            return;
+        }
+
+        if (fieldElement instanceof HTMLSelectElement) {
+            fieldElement.disabled = !isEditing;
+        } else {
+            fieldElement.readOnly = !isEditing;
+        }
+
+        toggleButton.classList.toggle("is-editing", isEditing);
+        toggleButton.setAttribute("aria-label", isEditing ? "Confirm changes" : "Edit field");
+        const icon = toggleButton.querySelector("i");
+        if (icon) {
+            icon.className = isEditing ? "fa-solid fa-check" : "fa-solid fa-pen";
+        }
+
+        if (isEditing) {
+            fieldElement.focus();
+            if (fieldElement instanceof HTMLInputElement || fieldElement instanceof HTMLTextAreaElement) {
+                fieldElement.select?.();
+            }
+        }
+    }
+
+    function resetInlineFieldEditStates() {
+        patientInlineEditButtons.forEach(button => {
+            const targetId = String(button.getAttribute("data-inline-edit-target") || "").trim();
+            if (!targetId) {
+                return;
+            }
+            const field = document.getElementById(targetId);
+            if (!field || !(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) {
+                return;
+            }
+            setInlineFieldEditing(field, button, false);
+        });
+    }
+
+    function openPatientInfoModal() {
+        if (!patientInfoModal) {
+            return;
+        }
+
+        if (patientInfoFeedback) {
+            patientInfoFeedback.textContent = "";
+        }
+
+        loadPatientInfoForModal()
+            .then(() => {
+                resetInlineFieldEditStates();
+                patientInfoModal.hidden = false;
+                document.body.style.overflow = "hidden";
+            })
+            .catch(error => {
+                alert(error instanceof Error ? error.message : "Unable to load patient information.");
+            });
+    }
+
+    function closePatientInfoModal() {
+        if (!patientInfoModal) {
+            return;
+        }
+
+        patientInfoModal.hidden = true;
+        if (patientInfoForm) {
+            patientInfoForm.reset();
+        }
+        resetInlineFieldEditStates();
+        if (patientInfoFeedback) {
+            patientInfoFeedback.textContent = "";
+        }
+        document.body.style.overflow = "";
+    }
+
+    async function savePatientInfoFromModal() {
+        const patient = activePatientRecord();
+        if (!patient) {
+            throw new Error("No active patient selected.");
+        }
+
+        const patientDbId = Number(patient.dbId || 0);
+        if (!patientDbId) {
+            throw new Error("Invalid patient selected.");
+        }
+
+        const body = {
+            patientId: patientDbId,
+            firstName: String(patientInfoFirstName?.value || "").trim(),
+            lastName: String(patientInfoLastName?.value || "").trim(),
+            dob: String(patientInfoDob?.value || "").trim(),
+            age: Number(patientInfoAge?.value || 0),
+            gender: String(patientInfoGender?.value || "").trim(),
+            email: String(patientInfoEmail?.value || "").trim(),
+            backupContact: String(patientInfoBackupContact?.value || "").trim(),
+            strokeType: String(patientInfoStrokeType?.value || "").trim(),
+            affectedHand: String(patientInfoAffectedHand?.value || "").trim(),
+            password: String(patientInfoPassword?.value || "")
+        };
+
+        const response = await fetch("api/patients/profile_manage.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload?.ok) {
+            throw new Error(payload?.error || "Unable to save patient information.");
+        }
+
+        const nextName = `${body.firstName} ${body.lastName}`.trim();
+        patients = patients.map(entry => {
+            if (entry.id !== patient.id) {
+                return entry;
+            }
+
+            return {
+                ...entry,
+                name: nextName || entry.name,
+                age: body.age,
+                strokeType: body.strokeType,
+                strokeSide: body.affectedHand,
+                affectedHand: body.affectedHand
+            };
+        });
+
+        setProfilePatient(patient.id);
+        renderPatientTable();
+    }
+
+    async function saveClinicalData(patientDbId, { diagnosis, treatmentGoal, doctorNotes }, options = {}) {
         if (!patientDbId) return false;
-        if (clinicalSaveFeedback) {
+        const showClinicalFeedback = options.showClinicalFeedback !== false;
+        if (showClinicalFeedback && clinicalSaveFeedback) {
             clinicalSaveFeedback.textContent = "Saving medical info...";
         }
         try {
@@ -2091,16 +2435,34 @@ function initializePatientsPage() {
             if (!response.ok || !payload?.ok) {
                 throw new Error(payload?.error || "Unable to save medical info.");
             }
-            if (clinicalSaveFeedback) {
+            if (showClinicalFeedback && clinicalSaveFeedback) {
                 clinicalSaveFeedback.textContent = "Medical info saved.";
             }
             return true;
         } catch (err) {
-            if (clinicalSaveFeedback) {
+            if (showClinicalFeedback && clinicalSaveFeedback) {
                 clinicalSaveFeedback.textContent = err instanceof Error ? err.message : "Unable to save medical info.";
             }
             return false;
         }
+    }
+
+    async function persistPatientStatus(patientDbId, status) {
+        const response = await fetch("api/patients/update_status.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                patientId: patientDbId,
+                status
+            })
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload?.ok) {
+            throw new Error(payload?.error || "Unable to save patient status.");
+        }
+
+        return String(payload.status || status);
     }
 
     function showProfileView(patientId) {
@@ -2400,17 +2762,18 @@ function initializePatientsPage() {
                     strokeType,
                     strokeSide: affectedHand === "Left" ? "Left" : "Right",
                     affectedHand,
-                    lastSession: "N/A",
-                    status: "Stable",
+                    lastSession: "",
+                    status: "Recovering",
                     isActiveToday: false,
                     metrics: { grip: "0 N", flexion: "0 deg", repetitionsToday: "0" },
-                    therapyPlan: { duration: 0, repetitions: 0, sessionsPerDay: 0 },
+                    therapyPlan: { templateName: "Default", duration: 0, repetitions: 0, sessionsPerDay: 0, exercises: [] },
                     notes: "",
                     chart: { grip: [0, 0, 0, 0, 0, 0, 0], flexion: [0, 0, 0, 0, 0, 0, 0] }
                 };
 
                 patients = [patient, ...patients];
                 activePatientId = patient.id;
+                patientTablePage = 1;
                 renderPatientTable();
                 closeModal();
             } else {
@@ -2422,6 +2785,51 @@ function initializePatientsPage() {
     }
 
     tableBody?.addEventListener("click", event => {
+        const statusOptionButton = event.target instanceof HTMLElement ? event.target.closest(".status-menu-option") : null;
+        if (statusOptionButton) {
+            const patientId = statusOptionButton.getAttribute("data-status-patient-id");
+            const nextStatus = normalizePatientStatus(statusOptionButton.getAttribute("data-status-value") || "Recovering");
+            if (patientId) {
+                const targetPatient = patients.find(patient => patient.id === patientId);
+                if (!targetPatient) {
+                    return;
+                }
+
+                persistPatientStatus(targetPatient.dbId || targetPatient.id, nextStatus)
+                    .then(savedStatus => {
+                        patients = patients.map(patient => {
+                            if (patient.id !== patientId) {
+                                return patient;
+                            }
+                            return {
+                                ...patient,
+                                status: normalizePatientStatus(savedStatus)
+                            };
+                        });
+                        renderPatientTable();
+                    })
+                    .catch(error => {
+                        alert(error instanceof Error ? error.message : "Unable to save patient status.");
+                    });
+            }
+            return;
+        }
+
+        const statusTriggerButton = event.target instanceof HTMLElement ? event.target.closest(".status-chip-trigger") : null;
+        if (statusTriggerButton) {
+            const container = statusTriggerButton.closest(".status-chip-wrap");
+            const targetMenu = container?.querySelector(".status-menu");
+            if (!targetMenu) {
+                return;
+            }
+
+            const shouldOpen = targetMenu.hidden;
+            closeAllStatusMenus();
+            targetMenu.hidden = !shouldOpen;
+            statusTriggerButton.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+            return;
+        }
+
         const targetButton = event.target instanceof HTMLElement ? event.target.closest(".table-view-btn") : null;
         if (!targetButton) {
             return;
@@ -2435,12 +2843,99 @@ function initializePatientsPage() {
 
     backToListButton?.addEventListener("click", showListView);
 
-    searchInput?.addEventListener("input", renderPatientTable);
-    statusFilter?.addEventListener("change", renderPatientTable);
+    searchInput?.addEventListener("input", () => {
+        patientTablePage = 1;
+        renderPatientTable();
+    });
+    statusFilter?.addEventListener("change", () => {
+        patientTablePage = 1;
+        renderPatientTable();
+    });
+
+    patientTablePrevBtn?.addEventListener("click", () => {
+        patientTablePage = Math.max(1, patientTablePage - 1);
+        renderPatientTable();
+    });
+
+    patientTableNextBtn?.addEventListener("click", () => {
+        const filteredCount = getFilteredPatients().length;
+        const totalPages = Math.max(1, Math.ceil(filteredCount / PATIENT_TABLE_PAGE_SIZE));
+        patientTablePage = Math.min(totalPages, patientTablePage + 1);
+        renderPatientTable();
+    });
 
     openModalButton?.addEventListener("click", openModal);
     closeModalButton?.addEventListener("click", closeModal);
     modalBackdrop?.addEventListener("click", closeModal);
+    openPatientInfoModalButton?.addEventListener("click", openPatientInfoModal);
+    closePatientInfoModalButton?.addEventListener("click", closePatientInfoModal);
+    cancelPatientInfoBtn?.addEventListener("click", closePatientInfoModal);
+    patientInfoModalBackdrop?.addEventListener("click", closePatientInfoModal);
+
+    patientInfoForm?.addEventListener("submit", event => {
+        event.preventDefault();
+        if (patientInfoFeedback) {
+            patientInfoFeedback.textContent = "Saving patient information...";
+        }
+
+        savePatientInfoFromModal()
+            .then(() => {
+                if (patientInfoFeedback) {
+                    patientInfoFeedback.textContent = "Patient information saved.";
+                }
+                closePatientInfoModal();
+            })
+            .catch(error => {
+                if (patientInfoFeedback) {
+                    patientInfoFeedback.textContent = error instanceof Error ? error.message : "Unable to save patient information.";
+                }
+            });
+    });
+
+    patientInlineEditButtons.forEach(button => {
+        button.addEventListener("click", () => {
+            const targetId = String(button.getAttribute("data-inline-edit-target") || "").trim();
+            if (!targetId) {
+                return;
+            }
+
+            const field = document.getElementById(targetId);
+            if (!field || !(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) {
+                return;
+            }
+
+            const currentlyEditing = button.classList.contains("is-editing");
+            setInlineFieldEditing(field, button, !currentlyEditing);
+        });
+    });
+
+    [
+        patientInfoFirstName,
+        patientInfoLastName,
+        patientInfoDob,
+        patientInfoAge,
+        patientInfoEmail,
+        patientInfoBackupContact,
+        patientInfoPassword,
+        patientInfoStrokeType
+    ].forEach(field => {
+        field?.addEventListener("keydown", event => {
+            if (event.key !== "Enter") {
+                return;
+            }
+
+            const targetId = field.id;
+            const button = patientInfoModal ? patientInfoModal.querySelector(`.patient-inline-edit-btn[data-inline-edit-target="${targetId}"]`) : null;
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            if (button.classList.contains("is-editing")) {
+                event.preventDefault();
+                setInlineFieldEditing(field, button, false);
+            }
+        });
+    });
 
     addPatientForm?.addEventListener("submit", event => {
         event.preventDefault();
@@ -2514,6 +3009,25 @@ function initializePatientsPage() {
         if (event.key === "Escape" && modal && !modal.hidden) {
             closeModal();
         }
+        if (event.key === "Escape" && patientInfoModal && !patientInfoModal.hidden) {
+            closePatientInfoModal();
+        }
+        if (event.key === "Escape") {
+            closeAllStatusMenus();
+        }
+    });
+
+    document.addEventListener("click", event => {
+        const target = event.target;
+        if (!(target instanceof Node) || !tableBody) {
+            return;
+        }
+        const clickedInsideTable = tableBody.contains(target);
+        const clickedStatusControl = target instanceof HTMLElement && Boolean(target.closest(".status-chip-wrap"));
+        if (clickedInsideTable && clickedStatusControl) {
+            return;
+        }
+        closeAllStatusMenus();
     });
 
     saveNotesButton?.addEventListener("click", async () => {
@@ -2536,7 +3050,7 @@ function initializePatientsPage() {
             diagnosis,
             treatmentGoal,
             doctorNotes: patient.notes
-        });
+        }, { showClinicalFeedback: false });
 
         if (notesFeedback) {
             notesFeedback.textContent = saved ? "Notes saved." : "Unable to save notes.";
@@ -2636,8 +3150,9 @@ function initializeTherapyPlansPage() {
     let editingPopupMode = "template";
     let templateRowCount = 1;
     let assignmentsPage = 1;
+    let applyButtonSuccessTimer = null;
 
-    const ASSIGNMENTS_PAGE_SIZE = 6;
+    const ASSIGNMENTS_PAGE_SIZE = 2;
 
     const templateRows = [
         {
@@ -2714,14 +3229,78 @@ function initializeTherapyPlansPage() {
         }
     }
 
+    function planBadgeClass(label) {
+        const normalized = String(label || "").trim().toLowerCase();
+        if (normalized.includes("level 1") || normalized === "level1") {
+            return "plan-pill-level1";
+        }
+        if (normalized.includes("level 2") || normalized === "level2") {
+            return "plan-pill-level2";
+        }
+        if (normalized.includes("level 3") || normalized === "level3") {
+            return "plan-pill-level3";
+        }
+        if (normalized.includes("custom")) {
+            return "plan-pill-custom";
+        }
+        return "plan-pill-default";
+    }
+
+    function renderPlanBadge(label) {
+        const text = String(label || "Default");
+        return `<span class="assignment-plan-pill ${planBadgeClass(text)}">${text}</span>`;
+    }
+
     function summarizeAssignmentPlan(exercises, fallbackRepetitions) {
         if (!Array.isArray(exercises) || !exercises.length) {
-            return `Open-Close Exercise: ${Math.max(0, Number(fallbackRepetitions || 0))} reps`;
+            return `
+                <ul class="assignment-metric-list">
+                    <li>
+                        <span class="assignment-metric-title">Open-Close Exercise</span>
+                        <span class="assignment-metric-value">${Math.max(0, Number(fallbackRepetitions || 0))} reps</span>
+                    </li>
+                </ul>
+            `;
         }
 
-        return exercises
-            .map(item => `${exerciseLabel(item.type)}: ${Math.max(0, Number(item.reps || 0))} reps`)
-            .join("<br>");
+        return `
+            <ul class="assignment-metric-list">
+                ${exercises.map(item => `
+                    <li>
+                        <span class="assignment-metric-title">${exerciseLabel(item.type)}</span>
+                        <span class="assignment-metric-value">${Math.max(0, Number(item.reps || 0))} reps</span>
+                    </li>
+                `).join("")}
+            </ul>
+        `;
+    }
+
+    function summarizeAssignmentSessions(exercises, fallbackSessions) {
+        if (!Array.isArray(exercises) || !exercises.length) {
+            const sessions = Math.max(0, Number(fallbackSessions || 0));
+            const label = sessions === 1 ? "session" : "sessions";
+            return `
+                <ul class="assignment-metric-list assignment-metric-list-compact">
+                    <li>
+                        <span class="assignment-metric-value">${sessions} ${label}</span>
+                    </li>
+                </ul>
+            `;
+        }
+
+        return `
+            <ul class="assignment-metric-list assignment-metric-list-compact">
+                ${exercises.map(item => {
+                    const sessions = Math.max(0, Number(item.sessions || 0));
+                    const label = sessions === 1 ? "session" : "sessions";
+                    return `
+                        <li>
+                            <span class="assignment-metric-value">${sessions} ${label}</span>
+                        </li>
+                    `;
+                }).join("")}
+            </ul>
+        `;
     }
 
     function updateTemplateStats(template) {
@@ -2813,7 +3392,7 @@ function initializeTherapyPlansPage() {
             return;
         }
 
-        const selectedValue = assignTemplateSelect.value || "level1";
+        const selectedValue = String(assignTemplateSelect.value || "").trim();
         const templateOrder = ["level1", "level2", "level3"];
         assignTemplateSelect.innerHTML = templateOrder
             .map(templateId => {
@@ -2821,7 +3400,28 @@ function initializeTherapyPlansPage() {
                 return `<option value="${templateId}">${template.label}</option>`;
             })
             .join("");
-        assignTemplateSelect.value = templateOrder.includes(selectedValue) ? selectedValue : "level1";
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Choose a difficulty level...";
+        placeholder.disabled = true;
+        assignTemplateSelect.insertBefore(placeholder, assignTemplateSelect.firstChild);
+        assignTemplateSelect.value = templateOrder.includes(selectedValue) ? selectedValue : "";
+    }
+
+    function showApplySuccessState() {
+        if (!applyTemplateBtn) {
+            return;
+        }
+
+        if (applyButtonSuccessTimer) {
+            clearTimeout(applyButtonSuccessTimer);
+        }
+
+        applyTemplateBtn.classList.add("is-success");
+
+        applyButtonSuccessTimer = setTimeout(() => {
+            applyTemplateBtn.classList.remove("is-success");
+        }, 1600);
     }
 
     function updateTemplateRowVisibility() {
@@ -3017,9 +3617,15 @@ function initializeTherapyPlansPage() {
             return;
         }
 
-        assignPatientSelect.innerHTML = assignments.length
-            ? assignments.map(assignment => `<option value="${assignment.id}">${assignment.patientName}</option>`).join("")
-            : "<option value=\"\">No patients</option>";
+        if (!assignments.length) {
+            assignPatientSelect.innerHTML = '<option value="" selected disabled>No patients available</option>';
+            return;
+        }
+
+        assignPatientSelect.innerHTML = [
+            '<option value="" selected disabled>Search for a patient...</option>',
+            ...assignments.map(assignment => `<option value="${assignment.id}">${assignment.patientName}</option>`)
+        ].join("");
     }
 
     function renderAssignments() {
@@ -3034,15 +3640,30 @@ function initializeTherapyPlansPage() {
 
         assignmentsBody.innerHTML = pageItems.length
             ? pageItems.map(assignment => `
-                <tr>
-                    <td>${assignment.patientName}</td>
-                    <td>${assignment.label || "Default"}</td>
+                <tr class="assignment-row-strip">
+                    <td class="assignment-patient-cell"><span class="assignment-patient-name">${assignment.patientName}</span></td>
+                    <td class="assignment-plan-status-cell">${renderPlanBadge(assignment.label || "Default")}</td>
                     <td class="assignment-plan-cell">${summarizeAssignmentPlan(assignment.exercises, assignment.repetitions)}</td>
-                    <td>${assignment.sessionsPerDay}</td>
-                    <td><button type="button" class="therapy-edit-btn" data-assignment-id="${assignment.id}">Edit</button></td>
+                    <td class="assignment-sessions-cell">${summarizeAssignmentSessions(assignment.exercises, assignment.sessionsPerDay)}</td>
+                    <td class="assignment-action-cell">
+                        <button type="button" class="therapy-edit-btn" data-assignment-id="${assignment.id}" aria-label="Edit ${assignment.patientName} assignment">
+                            <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                            <span>Edit</span>
+                        </button>
+                    </td>
                 </tr>
             `).join("")
-            : '<tr><td colspan="5">No patients added yet.</td></tr>';
+            : `
+                <tr>
+                    <td colspan="5" class="assignment-empty-cell">
+                        <div class="assignment-empty-state">
+                            <p class="assignment-empty-title">No active assignments found</p>
+                            <p class="assignment-empty-copy">Start by selecting a patient and applying a template.</p>
+                            <button type="button" class="doctor-btn assignment-empty-cta" id="assignmentEmptyCta">Assign First Plan</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
 
         if (assignmentsPagination && assignmentsPrevBtn && assignmentsNextBtn && assignmentsPageLabel) {
             const hasPagination = assignments.length > ASSIGNMENTS_PAGE_SIZE;
@@ -3073,11 +3694,16 @@ function initializeTherapyPlansPage() {
 
                     const sessionsPerDay = Number(row.sessions_per_day || 0);
                     const exercises = parsedBundle && typeof parsedBundle === "object"
-                        ? [
-                            { type: "open_close", reps: Number(parsedBundle.open_close || 0), sessions: sessionsPerDay },
-                            { type: "full_extension", reps: Number(parsedBundle.full_extension || 0), sessions: sessionsPerDay },
-                            { type: "full_close", reps: Number(parsedBundle.full_close || 0), sessions: sessionsPerDay }
-                        ].filter(item => item.reps > 0)
+                        ? ["open_close", "full_extension", "full_close"].map(type => {
+                            const raw = parsedBundle[type];
+                            const reps = raw && typeof raw === "object"
+                                ? Number(raw.reps || 0)
+                                : Number(raw || 0);
+                            const perExerciseSessions = raw && typeof raw === "object"
+                                ? Number(raw.sessions || sessionsPerDay || 0)
+                                : sessionsPerDay;
+                            return { type, reps, sessions: perExerciseSessions };
+                        }).filter(item => item.reps > 0)
                         : [];
 
                     return {
@@ -3163,6 +3789,13 @@ function initializeTherapyPlansPage() {
     }
 
     assignmentsBody?.addEventListener("click", event => {
+        const ctaButton = event.target instanceof HTMLElement ? event.target.closest("#assignmentEmptyCta") : null;
+        if (ctaButton) {
+            assignPatientSelect?.focus();
+            assignPatientSelect?.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+        }
+
         const editButton = event.target instanceof HTMLElement ? event.target.closest(".therapy-edit-btn") : null;
         if (!editButton) {
             return;
@@ -3181,6 +3814,23 @@ function initializeTherapyPlansPage() {
 
         const selectedPatientId = assignPatientSelect.value;
         const selectedTemplateId = assignTemplateSelect.value;
+
+        if (!selectedPatientId) {
+            if (assignFeedback) {
+                assignFeedback.textContent = "Select a patient before applying a template.";
+            }
+            assignPatientSelect.focus();
+            return;
+        }
+
+        if (!selectedTemplateId) {
+            if (assignFeedback) {
+                assignFeedback.textContent = "Choose a difficulty level before applying.";
+            }
+            assignTemplateSelect.focus();
+            return;
+        }
+
         const selectedTemplate = templates[selectedTemplateId];
         if (!selectedTemplate) {
             return;
@@ -3201,10 +3851,15 @@ function initializeTherapyPlansPage() {
 
         const active = assignments.find(item => item.id === selectedPatientId);
         if (active) {
-            const exerciseBundle = { open_close: 0, full_extension: 0, full_close: 0 };
+            const exerciseBundle = {
+                open_close: { reps: 0, sessions: 0 },
+                full_extension: { reps: 0, sessions: 0 },
+                full_close: { reps: 0, sessions: 0 }
+            };
             (selectedTemplate.exercises || []).forEach(item => {
                 const type = normalizeExerciseType(item.type);
-                exerciseBundle[type] += Math.max(0, Number(item.reps || 0));
+                exerciseBundle[type].reps += Math.max(0, Number(item.reps || 0));
+                exerciseBundle[type].sessions = Math.max(exerciseBundle[type].sessions, Math.max(0, Number(item.sessions || 0)));
             });
 
             void fetch("api/doctor/therapy_plans.php", {
@@ -3225,6 +3880,8 @@ function initializeTherapyPlansPage() {
             const name = assignments.find(item => item.id === selectedPatientId)?.patientName || "Patient";
             assignFeedback.textContent = `${selectedTemplate.label} assigned to ${name}.`;
         }
+
+        showApplySuccessState();
     });
 
     templateCustomizeButtons.forEach(button => {
@@ -3277,10 +3934,15 @@ function initializeTherapyPlansPage() {
 
             const active = assignments.find(item => item.id === editingAssignmentId);
             if (active) {
-                const exerciseBundle = { open_close: 0, full_extension: 0, full_close: 0 };
+                const exerciseBundle = {
+                    open_close: { reps: 0, sessions: 0 },
+                    full_extension: { reps: 0, sessions: 0 },
+                    full_close: { reps: 0, sessions: 0 }
+                };
                 nextExercises.forEach(item => {
                     const type = normalizeExerciseType(item.type);
-                    exerciseBundle[type] += Math.max(0, Number(item.reps || 0));
+                    exerciseBundle[type].reps += Math.max(0, Number(item.reps || 0));
+                    exerciseBundle[type].sessions = Math.max(exerciseBundle[type].sessions, Math.max(0, Number(item.sessions || 0)));
                 });
 
                 void fetch("api/doctor/therapy_plans.php", {

@@ -69,9 +69,9 @@
                             <label class="sr-only" for="patientStatusFilter">Filter patients</label>
                             <select id="patientStatusFilter" aria-label="Filter patients by status">
                                 <option value="all">All Patients</option>
-                                <option value="Improving">Improving</option>
-                                <option value="Stable">Stable</option>
-                                <option value="Needs Attention">Needs Attention</option>
+                                <option value="Recovering">Recovering</option>
+                                <option value="At Risk">At Risk</option>
+                                <option value="Recovered">Recovered</option>
                                 <option value="Active Today">Active Today</option>
                             </select>
                         </div>
@@ -92,15 +92,23 @@
                             <tbody id="patientTableBody"></tbody>
                         </table>
                     </div>
+                    <div class="patients-table-pagination" id="patientTablePagination" hidden>
+                        <button type="button" class="doctor-btn patient-page-btn" id="patientTablePrevBtn" aria-label="Previous page">
+                            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                        </button>
+                        <span class="patient-page-label" id="patientTablePageLabel">Page 1 of 1</span>
+                        <button type="button" class="doctor-btn patient-page-btn" id="patientTableNextBtn" aria-label="Next page">
+                            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
 
             <div class="patients-profile-view is-hidden" id="patientProfileView" aria-live="polite">
                 <header class="patient-profile-header">
-                    <div class="patient-profile-heading">
-                        <h2>Patient Profile</h2>
-                        <p class="patient-profile-breadcrumb">Patients / Patient Profile: <strong id="patientProfileBreadcrumbName">Patient Name</strong></p>
-                    </div>
+                    <button type="button" class="patient-back-link profile-action-btn" id="backToPatientList">
+                        <span class="patient-back-link-label">Back to Patients</span>
+                    </button>
                 </header>
 
                 <div class="patient-main-tri-row">
@@ -117,23 +125,38 @@
                                     <span>Affected Hand: <strong id="profileAffectedHand">-</strong></span>
                                 </div>
                             </div>
+                            <div class="patient-summary-actions">
+                                <button type="button" class="doctor-btn patient-summary-view-btn" id="openPatientInfoModal">View</button>
+                            </div>
                         </article>
 
                         <article class="widget widget-green therapy-plan-card">
                             <h3 class="widget-title">Therapy Plan</h3>
-                            <div class="field-grid field-grid-two">
-                                <label class="field-group">
-                                    <span>Duration (min)</span>
-                                    <input id="planDuration" type="number" min="1" value="20" readonly>
-                                </label>
-                                <label class="field-group">
-                                    <span>Target Repetitions</span>
-                                    <input id="planRepetitions" type="number" min="1" value="150" readonly>
-                                </label>
-                                <label class="field-group field-group-span-2">
-                                    <span>Sessions per Day</span>
-                                    <input id="planSessions" type="number" min="1" value="3" readonly>
-                                </label>
+                            <div class="therapy-plan-compact-shell">
+                                <div class="therapy-plan-template-row">
+                                    <span class="therapy-plan-meta-label">Assigned Template</span>
+                                    <span id="planTemplateName" class="therapy-plan-template-pill">Default</span>
+                                </div>
+
+                                <div class="therapy-plan-stat-grid">
+                                    <div class="therapy-plan-stat-item">
+                                        <span class="therapy-plan-meta-label">Target Repetitions</span>
+                                        <strong id="planRepetitions" class="therapy-plan-meta-value">0</strong>
+                                    </div>
+                                    <div class="therapy-plan-stat-item">
+                                        <span class="therapy-plan-meta-label">Sessions per Day</span>
+                                        <strong id="planSessions" class="therapy-plan-meta-value">0</strong>
+                                    </div>
+                                </div>
+
+                                <div class="therapy-plan-breakdown" aria-live="polite">
+                                    <p class="therapy-plan-breakdown-label">Plan Details</p>
+                                    <ul id="planExerciseList" class="therapy-plan-breakdown-list">
+                                        <li class="therapy-plan-breakdown-item is-empty">
+                                            <span class="therapy-plan-breakdown-left">No exercise details available.</span>
+                                        </li>
+                                    </ul>
+                                </div>
                             </div>
                         </article>
                     </div>
@@ -209,20 +232,133 @@
                     </article>
                 </div>
 
-                <div class="patient-profile-footer-actions">
-                    <button type="button" class="patient-back-link profile-action-btn" id="backToPatientList">
-                        <span class="patient-back-link-icon" aria-hidden="true">
-                            <i class="fa-solid fa-arrow-left-long"></i>
-                        </span>
-                        <span class="patient-back-link-label">Back to Patients</span>
-                    </button>
-                </div>
-
             </div>
 
         </section>
     </main>
 
+</div>
+
+<div class="patients-modal" id="patientInfoModal" role="dialog" aria-modal="true" aria-labelledby="patientInfoTitle" hidden>
+    <div class="patients-modal-backdrop" id="patientInfoModalBackdrop"></div>
+    <div class="patients-modal-card widget widget-blue patient-info-modal-card">
+        <button type="button" class="patients-modal-close" id="closePatientInfoModal" aria-label="Close patient information">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <h2 id="patientInfoTitle">Patient Information</h2>
+        <form id="patientInfoForm" novalidate>
+            <div class="field-grid field-grid-two">
+                <label class="field-group required-field">
+                    <span>First Name</span>
+                    <div class="patient-inline-edit-wrap">
+                        <input type="text" id="patientInfoFirstName" required>
+                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoFirstName" aria-label="Edit first name">
+                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </label>
+                <label class="field-group required-field">
+                    <span>Last Name</span>
+                    <div class="patient-inline-edit-wrap">
+                        <input type="text" id="patientInfoLastName" required>
+                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoLastName" aria-label="Edit last name">
+                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </label>
+                <label class="field-group required-field">
+                    <span>DOB</span>
+                    <div class="patient-inline-edit-wrap">
+                        <input type="date" id="patientInfoDob" required>
+                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoDob" aria-label="Edit date of birth">
+                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </label>
+                <label class="field-group required-field">
+                    <span>Age</span>
+                    <div class="patient-inline-edit-wrap">
+                        <input type="number" id="patientInfoAge" min="0" max="130" required>
+                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoAge" aria-label="Edit age">
+                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </label>
+                <label class="field-group required-field">
+                    <span>Gender</span>
+                    <div class="patient-inline-edit-wrap">
+                        <select id="patientInfoGender" required>
+                            <option value="" selected disabled>Select gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoGender" aria-label="Edit gender">
+                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </label>
+                <label class="field-group required-field">
+                    <span>Email Address</span>
+                    <div class="patient-inline-edit-wrap">
+                        <input type="email" id="patientInfoEmail" required>
+                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoEmail" aria-label="Edit email address">
+                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </label>
+                <label class="field-group">
+                    <span>Backup Contact</span>
+                    <div class="patient-inline-edit-wrap">
+                        <input type="text" id="patientInfoBackupContact" placeholder="Phone or email">
+                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoBackupContact" aria-label="Edit backup contact">
+                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </label>
+                <label class="field-group required-field">
+                    <span>Username</span>
+                    <input type="text" id="patientInfoUsername" readonly>
+                </label>
+                <label class="field-group">
+                    <span>Password</span>
+                    <div class="patient-inline-edit-wrap">
+                        <input type="password" id="patientInfoPassword" placeholder="Leave blank to keep current">
+                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoPassword" aria-label="Edit password">
+                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </label>
+                <label class="field-group required-field">
+                    <span>Stroke</span>
+                    <div class="patient-inline-edit-wrap">
+                        <input type="text" id="patientInfoStrokeType" required>
+                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoStrokeType" aria-label="Edit stroke type">
+                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </label>
+                <label class="field-group required-field">
+                    <span>Affected Hand</span>
+                    <div class="patient-inline-edit-wrap">
+                        <select id="patientInfoAffectedHand" required>
+                            <option value="" selected disabled>Select hand</option>
+                            <option value="Left">Left</option>
+                            <option value="Right">Right</option>
+                        </select>
+                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoAffectedHand" aria-label="Edit affected hand">
+                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </label>
+            </div>
+            <div class="wizard-actions wizard-actions-end patient-info-actions">
+                <button type="button" class="doctor-btn" id="cancelPatientInfoBtn">Cancel</button>
+                <button type="submit" class="sign-in-btn" id="savePatientInfoBtn">Save Changes</button>
+            </div>
+            <p class="notes-save-feedback" id="patientInfoFeedback" aria-live="polite"></p>
+        </form>
+    </div>
 </div>
 
 <div class="patients-modal" id="addPatientModal" role="dialog" aria-modal="true" aria-labelledby="addPatientTitle" hidden>
