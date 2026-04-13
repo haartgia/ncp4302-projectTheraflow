@@ -20,10 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $plan = getPatientPlan($pdo, $patientId);
 
     $latestStmt = $pdo->prepare(
-        'SELECT grip_strength, flexion_angle, repetitions, note, recorded_at
+           'SELECT id, grip_strength, flexion_angle, repetitions, note, recorded_at
          FROM sensor_data
          WHERE patient_id = ?
-         ORDER BY recorded_at DESC
+            ORDER BY recorded_at DESC, id DESC
          LIMIT 1'
     );
     $latestStmt->execute([$patientId]);

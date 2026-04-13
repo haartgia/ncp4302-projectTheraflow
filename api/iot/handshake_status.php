@@ -22,27 +22,26 @@ if ($patientId <= 0) {
     exit;
 }
 
-$handshakeWindowSeconds = 45;
+$handshakeWindowSeconds = 8;
 
 $stmt = $pdo->prepare(
-    'SELECT recorded_at
+    'SELECT recorded_at, TIMESTAMPDIFF(SECOND, recorded_at, NOW()) AS age_seconds
      FROM sessions
      WHERE patient_id = ? AND source = ?
      ORDER BY recorded_at DESC, id DESC
      LIMIT 1'
 );
-$stmt->execute([$patientId, 'rehab_glove']);
-$lastRecordedAt = (string) ($stmt->fetchColumn() ?: '');
+$stmt->execute([$patientId, 'esp32_glove']);
+$row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-$ageSeconds = null;
+$lastRecordedAt = (string) ($row['recorded_at'] ?? '');
+$ageSecondsRaw = isset($row['age_seconds']) ? (int) $row['age_seconds'] : null;
+$ageSeconds = $ageSecondsRaw;
 $handshake = false;
 
-if ($lastRecordedAt !== '') {
-    $lastTs = strtotime($lastRecordedAt);
-    if ($lastTs !== false) {
-        $ageSeconds = max(0, time() - $lastTs);
-        $handshake = $ageSeconds <= $handshakeWindowSeconds;
-    }
+if ($ageSecondsRaw !== null) {
+    // Future timestamps should not be treated as connected.
+    $handshake = $ageSecondsRaw >= 0 && $ageSecondsRaw <= $handshakeWindowSeconds;
 }
 
 echo json_encode([

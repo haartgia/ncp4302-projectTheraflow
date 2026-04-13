@@ -44,6 +44,42 @@ After pulling, you must set up the MySQL databases before login/registration and
 - `database/` -> DB scripts, now split by database and also kept as combined bootstrap
 - Root HTML/PHP files -> page entry points used by the current routing
 
+## ESP32 / Prototype Integration
+
+Your glove prototype can post sensor readings directly to the existing IoT sync endpoint:
+
+- URL: `http://localhost/ncp4302-projectTheraflow/api/iot/sync_session.php`
+- Method: `POST`
+- Content type: `application/json`
+- Required field: `patient_id`
+- Optional hardware token: set `THERAFLOW_IOT_TOKEN` on the server and send it as `X-IOT-Token`
+
+Accepted payload fields include `grip_percent`, `grip_strength`, `peakForce`, `finger_angles`, `fingerAngles`, `smoothedAngles`, `flexion_angle`, `maxFlexion`, `repetitions`, `status`, and `source`.
+
+Example JSON:
+
+```json
+{
+   "patient_id": 1,
+   "source": "esp32_glove",
+   "status": "streaming",
+   "grip_percent": 42.8,
+   "finger_angles": [12.4, 18.1, 22.5, 25.0, 28.3],
+   "repetitions": 6,
+   "note": "Live glove reading"
+}
+```
+
+If your firmware already calculates smoothed finger angles and grip percentage, post those values every 1-2 seconds or once per repetition rather than every 200 ms. The dashboard uses the latest synced session to show the glove as connected and to populate the recovery charts.
+
+The handshake badge on the home screen polls `api/iot/handshake_status.php`, which now recognizes `esp32_glove` sessions as connected.
+
+Calibration now works as a web-triggered command:
+
+- The Calibrate button on the Exercises page posts a request to `api/iot/calibration_command.php`.
+- The ESP32 polls that endpoint, runs calibration only after it sees the request, and then marks the command complete.
+- The web UI waits for the completion status before allowing the session to continue.
+
 ## Pre-Push Checklist
 
 - API endpoints load without PHP fatal errors.

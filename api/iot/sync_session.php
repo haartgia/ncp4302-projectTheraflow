@@ -38,6 +38,36 @@ function averageFromMixed($value): ?float
     return null;
 }
 
+function firstNonEmptyValue(array $payload, array $keys)
+{
+    foreach ($keys as $key) {
+        if (!array_key_exists($key, $payload)) {
+            continue;
+        }
+
+        $value = $payload[$key];
+        if ($value !== null && $value !== '' && $value !== []) {
+            return $value;
+        }
+    }
+
+    return null;
+}
+
+function angleSummary(array $payload): ?float
+{
+    $candidate = firstNonEmptyValue($payload, [
+        'flexion_readings',
+        'flexionReadings',
+        'finger_angles',
+        'fingerAngles',
+        'smoothedAngles',
+        'angles'
+    ]);
+
+    return averageFromMixed($candidate);
+}
+
 $expectedToken = trim((string) getenv('THERAFLOW_IOT_TOKEN'));
 $providedToken = (string) ($_SERVER['HTTP_X_IOT_TOKEN'] ?? '');
 if ($providedToken === '') {
@@ -47,6 +77,16 @@ if ($providedToken === '') {
 if ($expectedToken !== '' && !hash_equals($expectedToken, $providedToken)) {
     http_response_code(401);
     echo json_encode(['ok' => false, 'error' => 'Unauthorized hardware token']);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    echo json_encode([
+        'ok' => true,
+        'endpoint' => 'sync_session',
+        'status' => 'ready',
+        'usage' => 'Send POST with application/json and patient_id to ingest sensor data'
+    ]);
     exit;
 }
 
@@ -72,19 +112,35 @@ if (!$patientExistsStmt->fetch()) {
     exit;
 }
 
-$gripStrength = averageFromMixed($payload['grip_readings'] ?? $payload['gripReadings'] ?? null);
+$gripStrength = averageFromMixed(firstNonEmptyValue($payload, [
+    'grip_readings',
+    'gripReadings',
+    'grip_values',
+    'gripValues'
+]));
 if ($gripStrength === null) {
-    $gripStrength = averageFromMixed($payload['grip_strength'] ?? $payload['gripStrength'] ?? $payload['peakForce'] ?? null) ?? 0.0;
+    $gripStrength = averageFromMixed(firstNonEmptyValue($payload, [
+        'grip_strength',
+        'gripStrength',
+        'grip_percent',
+        'gripPercent',
+        'grip',
+        'peakForce'
+    ])) ?? 0.0;
 }
 
-$flexionAngle = averageFromMixed($payload['flexion_readings'] ?? $payload['flexionReadings'] ?? null);
+$flexionAngle = angleSummary($payload);
 if ($flexionAngle === null) {
-    $flexionAngle = averageFromMixed($payload['flexion_angle'] ?? $payload['flexionAngle'] ?? $payload['maxFlexion'] ?? null) ?? 0.0;
+    $flexionAngle = averageFromMixed(firstNonEmptyValue($payload, [
+        'flexion_angle',
+        'flexionAngle',
+        'maxFlexion'
+    ])) ?? 0.0;
 }
 
 $repetitions = (int) ($payload['repetitions'] ?? 0);
 $status = trim((string) ($payload['status'] ?? 'Synced'));
-$source = trim((string) ($payload['source'] ?? 'rehab_glove'));
+$source = trim((string) (firstNonEmptyValue($payload, ['source']) ?? 'rehab_glove'));
 if ($source === '') {
     $source = 'rehab_glove';
 }

@@ -252,6 +252,7 @@ $usernameOut = $username !== '' ? $username : '';
 
 echo json_encode([
     'ok' => true,
+    'patient_id' => $patientId,
     'profile' => [
         'full_name' => $fullNameOut,
         'date_of_birth' => $dob,

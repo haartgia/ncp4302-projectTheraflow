@@ -2937,26 +2937,41 @@ function initializeExerciseHubPage() {
     const retryStepBtn = document.getElementById("hubStepRetryBtn");
     const nextStepBtn = document.getElementById("hubStepNextBtn");
 
-    // Step nav dots
-    const navDots = [1, 2, 3, 4].map(n => document.getElementById(`navDot${n}`));
+    // Step nav dots (optional; dot nav may be hidden/removed)
+    const navDots = Array.from(document.querySelectorAll(".wizard-step-dot"));
 
     // Step panels
     const stepPair      = document.getElementById("stepPair");
     const stepCalibrate = document.getElementById("stepCalibrate");
+    const stepTest      = document.getElementById("stepTest");
     const stepDiagnose  = document.getElementById("stepDiagnose");
     const stepSession   = document.getElementById("stepSession");
-    const stepPanels    = [stepPair, stepCalibrate, stepDiagnose, stepSession];
+    const stepPanels    = [stepPair, stepCalibrate, stepTest, stepDiagnose, stepSession];
 
     // Step 1 — Pair
     const pairButton    = document.getElementById("hubPairButton");
     const pairStatus    = document.getElementById("hubPairStatus");
+    const patientIdHint  = document.getElementById("hubPatientIdHint");
     const searchingAnim = document.getElementById("searchingAnimation");
+    const searchingLabel = document.getElementById("searchingLabel");
 
     // Step 2 — Calibrate
     const calibrateBtn      = document.getElementById("hubCalibrateBtn");
+    const calibrationProgressFill = document.getElementById("hubCalibrationProgressFill");
+    const calibrationProgressLabel = document.getElementById("hubCalibrationProgressLabel");
     const calibrationGrid   = document.getElementById("calibrationFingerGrid");
     const calibrationStatus = document.getElementById("hubCalibrationStatus");
     const calibrationPrompt = document.getElementById("calibrationPrompt");
+
+    // Step 3 — Testing Stage
+    const testRepsEl        = document.getElementById("hubTestReps");
+    const testMovementEl    = document.getElementById("hubTestMovement");
+    const testForceEl       = document.getElementById("hubTestForce");
+    const testTimeEl        = document.getElementById("hubTestTime");
+    const testRingProgressEl = document.getElementById("hubTestRingProgress");
+    const startTestBtn      = document.getElementById("hubStartTestBtn");
+    const stopTestBtn       = document.getElementById("hubStopTestBtn");
+    const testStatus        = document.getElementById("hubTestStatus");
 
     // Step 3 — Select Exercise (Therapy Mode)
     const diagStatus         = document.getElementById("hubDiagStatus");
@@ -2966,7 +2981,6 @@ function initializeExerciseHubPage() {
     const holdWrap           = document.getElementById("exerciseHoldWrap");
     const speedButtons       = Array.from(document.querySelectorAll("#exerciseSpeedGroup [data-speed]"));
     const holdButtons        = Array.from(document.querySelectorAll("#exerciseHoldGroup [data-hold-seconds]"));
-    const exerciseStartBtn   = document.getElementById("hubExerciseStartBtn");
     const therapyDurationEl  = document.getElementById("hubTherapyDuration");
     const therapyRepsEl      = document.getElementById("hubTherapyReps");
 
@@ -2988,18 +3002,37 @@ function initializeExerciseHubPage() {
 
     // ── State ─────────────────────────────────────────────────────────────────
     let gloveConnected = false;
-    const fingerNames = ["Thumb", "Index", "Middle", "Ring", "Little"];
+    let currentPatientId = null;
+    const fingerNames = ["Index", "Middle", "Ring", "Pinky"];
     const calibrationState = fingerNames.map(name => ({ name, zero: null, max: null, current: 0 }));
     const diagResults = { maxExtension: 0, maxFlexion: 0, peakForce: 0 };
     let planTargetReps = 120;
     let planDurationMin = 15;
     let calibrationPhase = "zero";
     let calibrationComplete = false;
+    let calibrationRequested = false;
+    let calibrationPollTimer = null;
+    let calibrationRequestedAt = 0;
     let sessionPrepared = false;
     let selectedExercise = "";
     let selectedSpeed = "normal";
     let selectedHoldSeconds = 5;
+    let exerciseConfirmed = false;
+    let testCompleted = false;
     let currentStep = 1;
+
+    const testState = {
+        isRunning: false,
+        reps: 0,
+        totalForce: 0,
+        sampleCount: 0,
+        startTime: null,
+        intervalId: null,
+        motionPhase: "",
+        lastReadingId: 0,
+        lastReadingAt: "",
+        lastReadingTs: 0
+    };
 
     const sessionState = {
         isRunning: false,
@@ -3010,7 +3043,10 @@ function initializeExerciseHubPage() {
         startTime: null,
         intervalId: null,
         holdProgressSeconds: 0,
-        motionPhase: ""
+        motionPhase: "",
+        lastReadingId: 0,
+        lastReadingAt: "",
+        lastReadingTs: 0
     };
 
     const exerciseLabelMap = {
@@ -3028,12 +3064,253 @@ function initializeExerciseHubPage() {
         if (el) el.textContent = text;
     }
 
+    function setCalibrationProgress(percent) {
+        const p = Math.max(0, Math.min(100, Number(percent) || 0));
+        if (calibrationProgressFill) {
+            calibrationProgressFill.style.width = `${p}%`;
+        }
+        if (calibrationProgressLabel) {
+            calibrationProgressLabel.textContent = `${Math.round(p)}%`;
+        }
+    }
+
+    function renderPatientIdHint() {
+        if (!patientIdHint) return;
+        patientIdHint.hidden = true;
+    }
+
+    async function loadPatientContext() {
+        try {
+            const response = await fetch("api/patient/profile_details.php", { cache: "no-store" });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload?.ok) {
+                throw new Error(payload?.error || "Unable to load patient context");
+            }
+
+            currentPatientId = Number(payload.patient_id || 0) || null;
+        } catch {
+            currentPatientId = null;
+        }
+
+        renderPatientIdHint();
+        return currentPatientId;
+    }
+
+    async function requestGloveCalibration() {
+        if (!currentPatientId) {
+            await loadPatientContext();
+        }
+
+        if (!currentPatientId) {
+            throw new Error("Patient ID not loaded yet. Refresh the page and try again.");
+        }
+
+        const response = await fetch("api/iot/calibration_command.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                patient_id: currentPatientId,
+                command: "calibrate"
+            })
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload?.ok) {
+            throw new Error(payload?.error || "Unable to request calibration");
+        }
+
+        return payload;
+    }
+
+    async function requestGloveCommand(command) {
+        if (!currentPatientId) {
+            throw new Error("Patient ID not loaded yet.");
+        }
+
+        const response = await fetch("api/iot/calibration_command.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                patient_id: currentPatientId,
+                command
+            })
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload?.ok) {
+            throw new Error(payload?.error || `Unable to send ${command} command`);
+        }
+
+        return payload;
+    }
+
+    async function fetchCalibrationCommandStatus() {
+        if (!currentPatientId) {
+            return null;
+        }
+
+        const response = await fetch(`api/iot/calibration_command.php?patient_id=${currentPatientId}`, { cache: "no-store" });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload?.ok) {
+            throw new Error(payload?.error || "Unable to load calibration status");
+        }
+
+        return payload.command || null;
+    }
+
+    function stopCalibrationPolling() {
+        if (calibrationPollTimer) {
+            clearInterval(calibrationPollTimer);
+            calibrationPollTimer = null;
+        }
+    }
+
+    function syncCalibrationButtonState() {
+        if (!calibrateBtn) return;
+        calibrateBtn.disabled = calibrationRequested || calibrationPollTimer !== null || calibrationComplete;
+    }
+
+    async function pollCalibrationUntilComplete() {
+        try {
+            const command = await fetchCalibrationCommandStatus();
+            if (!command) {
+                setMsg(calibrationStatus, "Waiting for the glove to receive the calibration request...");
+                return;
+            }
+
+            if (command.status === "completed") {
+                stopCalibrationPolling();
+                calibrationRequested = false;
+                calibrationComplete = true;
+                syncCalibrationButtonState();
+                calibrationState.forEach(finger => {
+                    if (finger.zero === null) finger.zero = 0;
+                    if (finger.max === null) finger.max = 90;
+                    finger.current = 90;
+                });
+                renderCalibrationGrid();
+                setCalibrationProgress(100);
+                setMsg(calibrationStatus, "Calibration complete. You can continue to Step 3.");
+                updateStepNavigationState();
+                goToStep(3);
+                loadTherapyPlan();
+                return;
+            }
+
+            if (command.status === "in_progress") {
+                const phase = String(command?.payload?.phase || "");
+                const secondsRemaining = Number(command?.payload?.seconds_remaining || 0);
+
+                if (phase === "full_extension_hold") {
+                    calibrationState.forEach(finger => {
+                        finger.current = 0;
+                    });
+                    renderCalibrationGrid();
+                    setCalibrationProgress(((5 - Math.max(0, secondsRemaining)) / 10) * 100);
+                    setMsg(calibrationStatus, `Calibration Step 1/2: Fully extend your hand (${secondsRemaining}s remaining).`);
+                    return;
+                }
+
+                if (phase === "full_close_hold") {
+                    calibrationState.forEach(finger => {
+                        finger.current = 90;
+                    });
+                    renderCalibrationGrid();
+                    setCalibrationProgress((5 + (5 - Math.max(0, secondsRemaining))) / 10 * 100);
+                    setMsg(calibrationStatus, `Calibration Step 2/2: Fully close your hand (${secondsRemaining}s remaining).`);
+                    return;
+                }
+
+                setMsg(calibrationStatus, "Calibration in progress on glove...");
+                return;
+            }
+
+            if (command.status === "dispatched" || command.status === "pending") {
+                const ageMs = calibrationRequestedAt > 0 ? Date.now() - calibrationRequestedAt : 0;
+                if (ageMs > 9000) {
+                    setMsg(calibrationStatus, `No glove response yet. Make sure ESP32 patientId matches your web patient ID (${currentPatientId ?? "unknown"}) and that the glove is online.`);
+                    return;
+                }
+
+                setMsg(calibrationStatus, "Calibration running on the glove... keep following the glove prompts.");
+                syncCalibrationButtonState();
+            }
+        } catch {
+            setMsg(calibrationStatus, "Waiting for calibration status from the glove...");
+        }
+    }
+
     function pseudoRandom(min, max) {
         return Number((Math.random() * (max - min) + min).toFixed(1));
     }
 
     async function readGloveValue(min, max) {
         return pseudoRandom(min, max);
+    }
+
+    async function fetchLatestGloveReading() {
+        const response = await fetch("api/patient/exercise_session.php", {
+            method: "GET",
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload?.ok) {
+            throw new Error(payload?.error || "Unable to read glove sensor data.");
+        }
+
+        const row = payload?.lastReading;
+        if (!row) {
+            return null;
+        }
+
+        return {
+            id: Number(row.id || 0),
+            force: Number(row.grip_strength || 0),
+            movement: Number(row.flexion_angle || 0),
+            recordedAt: String(row.recorded_at || row.recordedAt || "")
+        };
+    }
+
+    async function refreshGloveConnectionState({ showStatus = false } = {}) {
+        try {
+            const response = await fetch("api/iot/handshake_status.php", { cache: "no-store", credentials: "same-origin" });
+            const payload = await response.json().catch(() => ({}));
+            const connected = Boolean(response.ok && payload?.ok && payload?.handshake === true);
+
+            gloveConnected = connected;
+            updateStepNavigationState();
+
+            if (connected) {
+                const gloveName = "Theraflow Glove";
+                announceGlovePaired(gloveName);
+                if (showStatus || currentStep === 1) {
+                    setMsg(searchingLabel, `Connected to ${gloveName} over Wi-Fi.`);
+                    if (searchingAnim) searchingAnim.classList.remove("is-searching");
+                    if (searchingAnim) searchingAnim.classList.add("is-connected");
+                }
+            } else {
+                announceGloveOffline();
+                if (showStatus || currentStep === 1) {
+                    setMsg(searchingLabel, "Searching for Glove...");
+                    if (searchingAnim) searchingAnim.classList.add("is-searching");
+                    if (searchingAnim) searchingAnim.classList.remove("is-connected");
+                }
+            }
+
+            return connected;
+        } catch {
+            gloveConnected = false;
+            announceGloveOffline();
+            updateStepNavigationState();
+            if (showStatus || currentStep === 1) {
+                setMsg(searchingLabel, "Searching for Glove...");
+                if (searchingAnim) searchingAnim.classList.add("is-searching");
+                if (searchingAnim) searchingAnim.classList.remove("is-connected");
+            }
+            return false;
+        }
     }
 
     // ── Step navigation ───────────────────────────────────────────────────────
@@ -3047,11 +3324,21 @@ function initializeExerciseHubPage() {
         repsRingProgressEl.style.strokeDashoffset = `${(circumference * (1 - progress)).toFixed(2)}`;
     }
 
+    function updateTestProgressRing(reps) {
+        if (!testRingProgressEl) return;
+        const progress = reps > 0 ? Math.max(0, Math.min(1, 1 - Math.exp(-reps / 3))) : 0;
+        const radius = Number(testRingProgressEl.getAttribute("r") || 46);
+        const circumference = 2 * Math.PI * radius;
+        testRingProgressEl.style.strokeDasharray = `${circumference.toFixed(2)} ${circumference.toFixed(2)}`;
+        testRingProgressEl.style.strokeDashoffset = `${(circumference * (1 - progress)).toFixed(2)}`;
+    }
+
     function canAccessStep(stepNumber) {
         if (stepNumber <= 1) return true;
-        if (stepNumber === 2) return gloveConnected;
+        if (stepNumber === 2) return true;
         if (stepNumber === 3) return gloveConnected && calibrationComplete;
-        if (stepNumber === 4) return gloveConnected && calibrationComplete && sessionPrepared;
+        if (stepNumber === 4) return gloveConnected && calibrationComplete && testCompleted;
+        if (stepNumber === 5) return gloveConnected && calibrationComplete && sessionPrepared;
         return false;
     }
 
@@ -3066,17 +3353,16 @@ function initializeExerciseHubPage() {
 
         if (backStepBtn) {
             backStepBtn.disabled = currentStep <= 1;
-        }
-        if (nextStepBtn) {
-            nextStepBtn.disabled = !canAccessStep(currentStep + 1);
-        }
-
-        if (backStepBtn) {
-            backStepBtn.hidden = currentStep === 1 || currentStep === 2;
+            backStepBtn.hidden = currentStep === 1;
         }
 
         if (nextStepBtn) {
-            nextStepBtn.hidden = true;
+            const hasNextStep = currentStep < 5;
+            nextStepBtn.hidden = !hasNextStep;
+            nextStepBtn.textContent = "Next";
+            nextStepBtn.setAttribute("aria-label", "Go to next step");
+            nextStepBtn.disabled = currentStep === 4 ? !selectedExercise : (!hasNextStep || !canAccessStep(currentStep + 1));
+            nextStepBtn.classList.remove("is-confirmed");
         }
 
         if (retryStepBtn) {
@@ -3088,11 +3374,13 @@ function initializeExerciseHubPage() {
     function attemptStep(stepNumber) {
         if (!canAccessStep(stepNumber)) {
             if (stepNumber === 2) {
-                setMsg(pairStatus, "Connect your glove first to continue.");
+                setMsg(pairStatus, "Calibration is available. If needed, use Refresh to check glove status.");
             } else if (stepNumber === 3) {
                 setMsg(calibrationStatus, "Complete calibration first to continue.");
             } else if (stepNumber === 4) {
-                setMsg(diagStatus, "Confirm the selected exercise in Step 3 to continue.");
+                setMsg(testStatus, "Complete the testing stage first.");
+            } else if (stepNumber === 5) {
+                setMsg(diagStatus, "Confirm the selected exercise in Step 4 to continue.");
             }
             return;
         }
@@ -3100,6 +3388,16 @@ function initializeExerciseHubPage() {
     }
 
     function goToStep(stepNumber) {
+        if (currentStep === 3 && stepNumber !== 3 && testState.isRunning) {
+            if (testState.intervalId) {
+                clearInterval(testState.intervalId);
+                testState.intervalId = null;
+            }
+            testState.isRunning = false;
+            if (startTestBtn) startTestBtn.disabled = false;
+            if (stopTestBtn) stopTestBtn.disabled = true;
+        }
+
         currentStep = stepNumber;
 
         if (stepperViewport) {
@@ -3115,7 +3413,7 @@ function initializeExerciseHubPage() {
             panel.classList.toggle("is-locked", i + 1 > stepNumber);
         });
 
-        root.classList.toggle("is-focus-mode", stepNumber === 4);
+        root.classList.toggle("is-focus-mode", stepNumber === 5);
 
         // Update nav dots
         navDots.forEach((dot, i) => {
@@ -3130,29 +3428,13 @@ function initializeExerciseHubPage() {
     // ── STEP 1: Connect ───────────────────────────────────────────────────────
     pairButton?.addEventListener("click", async () => {
         pairButton.disabled = true;
-        if (searchingAnim) searchingAnim.hidden = false;
+        setMsg(searchingLabel, "Searching for Glove...");
         if (searchingAnim) searchingAnim.classList.add("is-searching");
-        setMsg(pairStatus, "Searching for glove on Wi-Fi…");
+        if (searchingAnim) searchingAnim.classList.remove("is-connected");
 
-        await new Promise(r => setTimeout(r, 1600));
+        await refreshGloveConnectionState({ showStatus: true });
 
-        const found = Math.random() > 0.15;
-        if (!found) {
-            if (searchingAnim) searchingAnim.hidden = true;
-            if (searchingAnim) searchingAnim.classList.remove("is-searching");
-            pairButton.disabled = false;
-            setMsg(pairStatus, "Glove not found. Confirm both devices are on the same 2.4GHz network and try again.");
-            return;
-        }
-
-        if (searchingAnim) searchingAnim.hidden = true;
-        if (searchingAnim) searchingAnim.classList.remove("is-searching");
-        const gloveName = "Theraflow Glove";
-        setMsg(pairStatus, `Connected to ${gloveName} over Wi-Fi.`);
-        gloveConnected = true;
-        announceGlovePaired(gloveName);
-        updateStepNavigationState();
-        goToStep(2);
+        pairButton.disabled = false;
     });
 
     function announceGlovePaired(name) {
@@ -3169,20 +3451,25 @@ function initializeExerciseHubPage() {
         } catch { /* storage may be blocked in private-browsing mode */ }
     }
 
+    function announceGloveOffline() {
+        try {
+            const gloveData = JSON.parse(localStorage.getItem("theraflow_glove") || "{}");
+            gloveData.connected = false;
+            gloveData.sessionActive = false;
+            gloveData.lastOfflineAt = Date.now();
+            localStorage.setItem("theraflow_glove", JSON.stringify(gloveData));
+        } catch { /* storage may be blocked in private-browsing mode */ }
+    }
+
     // ── STEP 2: Calibrate ─────────────────────────────────────────────────────
     function renderCalibrationGrid() {
         if (!calibrationGrid) return;
         calibrationGrid.innerHTML = calibrationState.map(finger => {
             const zeroLocked = finger.zero !== null;
             const maxLocked = finger.max !== null;
-            const effectiveMax = finger.max !== null ? Math.max(finger.max, 1) : 180;
             const currentDeg = Number(finger.current || 0);
-            const fillPercent = Math.max(0, Math.min(100, (currentDeg / effectiveMax) * 100));
             return `<div class="calibration-finger ${zeroLocked && maxLocked ? "is-locked" : ""}">
                 <strong>${finger.name}</strong>
-                <div class="calibration-meter" aria-hidden="true">
-                    <div class="calibration-meter-fill" style="height:${fillPercent.toFixed(1)}%"></div>
-                </div>
                 <span>Current: ${currentDeg.toFixed(1)}&deg;</span>
                 <span>0&deg;: ${finger.zero === null ? "&mdash;" : `${finger.zero.toFixed(1)}&deg;`}</span>
                 <span>Max: ${finger.max === null ? "&mdash;" : `${finger.max.toFixed(1)}&deg;`}</span>
@@ -3192,18 +3479,19 @@ function initializeExerciseHubPage() {
 
     function updateCalibrationPrompt() {
         if (calibrationPhase === "zero") {
-            setMsg(calibrationStatus, "Keep hand still — reading baseline for all 5 fingers…");
+            setMsg(calibrationStatus, "Keep hand still — reading baseline for all 4 fingers…");
             setMsg(calibrationPrompt, "Rest your hand flat and relaxed. The system will capture the 0° baseline.");
             if (calibrateBtn) calibrateBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Capture Zero Point';
             return;
         }
 
-        setMsg(calibrationStatus, "Make a firm fist — capturing maximum flex for all 5 fingers…");
+        setMsg(calibrationStatus, "Make a firm fist — capturing maximum flex for all 4 fingers…");
         setMsg(calibrationPrompt, "Close your hand into a fist to capture the maximum flex baseline.");
         if (calibrateBtn) calibrateBtn.innerHTML = '<i class="fa-solid fa-hand-fist"></i> Capture Max Flex';
     }
 
     function resetCalibrationFlow() {
+        stopCalibrationPolling();
         calibrationState.forEach(finger => {
             finger.zero = null;
             finger.max = null;
@@ -3212,65 +3500,211 @@ function initializeExerciseHubPage() {
 
         calibrationPhase = "zero";
         calibrationComplete = false;
+        calibrationRequested = false;
+        syncCalibrationButtonState();
+        testCompleted = false;
         sessionPrepared = false;
         diagResults.maxFlexion = 0;
         diagResults.maxExtension = 0;
 
+        if (testState.intervalId) {
+            clearInterval(testState.intervalId);
+            testState.intervalId = null;
+        }
+        testState.isRunning = false;
+        testState.reps = 0;
+        testState.totalForce = 0;
+        testState.sampleCount = 0;
+        testState.startTime = null;
+        testState.motionPhase = "";
+        testState.lastReadingId = 0;
+        testState.lastReadingAt = "";
+        testState.lastReadingTs = 0;
+
         if (calibrateBtn) {
             calibrateBtn.disabled = false;
         }
+        if (startTestBtn) startTestBtn.disabled = false;
+        if (stopTestBtn) stopTestBtn.disabled = true;
+        if (testRepsEl) testRepsEl.textContent = "0";
+        if (testMovementEl) testMovementEl.textContent = "0.0°";
+        if (testForceEl) testForceEl.textContent = "0.0 N";
+        if (testTimeEl) testTimeEl.textContent = "0:00";
+        updateTestProgressRing(0);
+        setMsg(testStatus, "Ready to test glove data.");
 
         renderCalibrationGrid();
         updateCalibrationPrompt();
-        setMsg(calibrationStatus, "0/5 fingers calibrated. Values cleared.");
+        setCalibrationProgress(0);
+        setMsg(calibrationStatus, "0/4 fingers calibrated. Values cleared.");
         setMsg(diagStatus, "Calibration reset. Complete Step 2 again to continue.");
         goToStep(2);
         updateStepNavigationState();
     }
 
     calibrateBtn?.addEventListener("click", async () => {
-        calibrateBtn.disabled = true;
-        updateCalibrationPrompt();
-
-        if (calibrationPhase === "zero") {
-            for (let i = 0; i < calibrationState.length; i++) {
-                calibrationState[i].zero = await readGloveValue(0, 12);
-                calibrationState[i].current = calibrationState[i].zero;
-                renderCalibrationGrid();
-                await new Promise(r => setTimeout(r, 300));
-            }
-            calibrationPhase = "max";
-            calibrateBtn.disabled = false;
-            setMsg(calibrationStatus, "Zero point recorded. Now capture maximum flex.");
-            updateCalibrationPrompt();
+        if (calibrationRequested || calibrationPollTimer !== null || calibrationComplete) {
             return;
         }
 
-        for (let i = 0; i < calibrationState.length; i++) {
-            calibrationState[i].max = await readGloveValue(120, 180);
-            calibrationState[i].current = calibrationState[i].max;
-            renderCalibrationGrid();
-            await new Promise(r => setTimeout(r, 300));
-        }
+        calibrateBtn.disabled = true;
 
-        calibrationComplete = true;
-        const count = calibrationState.filter(f => f.zero !== null && f.max !== null).length;
-        const avgMax = calibrationState.reduce((sum, finger) => sum + (finger.max || 0), 0) / calibrationState.length;
-        diagResults.maxFlexion = avgMax;
-        diagResults.maxExtension = avgMax;
-        setMsg(calibrationStatus, `${count}/5 fingers calibrated. Calibration complete.`);
-        updateStepNavigationState();
-        goToStep(3);
-        loadTherapyPlan();
+        try {
+            const payload = await requestGloveCalibration();
+            calibrationRequested = true;
+            calibrationComplete = false;
+            syncCalibrationButtonState();
+            calibrationRequestedAt = Date.now();
+            setCalibrationProgress(0);
+            setMsg(calibrationStatus, `Calibration request sent to the glove (command #${payload.command_id}). Waiting for completion...`);
+            stopCalibrationPolling();
+            calibrationPollTimer = window.setInterval(() => {
+                void pollCalibrationUntilComplete();
+            }, 2000);
+            void pollCalibrationUntilComplete();
+        } catch (err) {
+            calibrationRequested = false;
+            calibrationComplete = false;
+            syncCalibrationButtonState();
+            setMsg(calibrationStatus, err instanceof Error ? err.message : "Unable to request calibration.");
+        }
     });
 
     retryStepBtn?.addEventListener("click", () => {
         resetCalibrationFlow();
     });
 
-    renderCalibrationGrid();
+    startTestBtn?.addEventListener("click", async () => {
+        if (testState.isRunning) return;
 
-    // ── STEP 3: Select Exercise (Therapy Mode) ──────────────────────────────
+        testCompleted = false;
+        testState.isRunning = true;
+        testState.reps = 0;
+        testState.totalForce = 0;
+        testState.sampleCount = 0;
+        testState.startTime = Date.now();
+        testState.motionPhase = "";
+        testState.lastReadingId = 0;
+        testState.lastReadingAt = "";
+        testState.lastReadingTs = 0;
+
+        if (testRepsEl) testRepsEl.textContent = "0";
+        if (testMovementEl) testMovementEl.textContent = "0.0°";
+        if (testForceEl) testForceEl.textContent = "0.0 N";
+        if (testTimeEl) testTimeEl.textContent = "0:00";
+        updateTestProgressRing(0);
+
+        startTestBtn.disabled = true;
+        if (stopTestBtn) stopTestBtn.disabled = false;
+        setMsg(testStatus, "Testing stage running — glove is streaming live data…");
+
+        try {
+            await requestGloveCommand("start_session");
+            setMsg(testStatus, "Testing stage started on glove. Move your hand to stream live data.");
+        } catch (err) {
+            testState.isRunning = false;
+            startTestBtn.disabled = false;
+            if (stopTestBtn) stopTestBtn.disabled = true;
+            setMsg(testStatus, err instanceof Error ? err.message : "Unable to start glove test stream.");
+            return;
+        }
+
+        const OPEN_THRESHOLD_DEG = 10;
+        const CLOSE_THRESHOLD_DEG = 80;
+
+        testState.intervalId = setInterval(async () => {
+            let reading = null;
+            try {
+                reading = await fetchLatestGloveReading();
+            } catch (err) {
+                setMsg(testStatus, err instanceof Error ? err.message : "Unable to read glove data.");
+                return;
+            }
+
+            if (!reading) {
+                setMsg(testStatus, "Waiting for real glove data...");
+                return;
+            }
+
+            const recordedAt = reading.recordedAt;
+            if ((reading.id > 0 && reading.id === testState.lastReadingId) || (!reading.id && recordedAt && recordedAt === testState.lastReadingAt)) {
+                setMsg(testStatus, "No new glove sample yet. Keep moving your hand.");
+                return;
+            }
+
+            const currentTs = Date.parse(recordedAt);
+            testState.lastReadingId = Number(reading.id || 0);
+            testState.lastReadingAt = recordedAt;
+            testState.lastReadingTs = Number.isFinite(currentTs) ? currentTs : Date.now();
+
+            const force = reading.force;
+            const movement = reading.movement;
+
+            const nextPhase = movement <= OPEN_THRESHOLD_DEG ? "open" : movement >= CLOSE_THRESHOLD_DEG ? "close" : "";
+            if (nextPhase === "close" && testState.motionPhase === "open") {
+                testState.reps += 1;
+                testState.motionPhase = "close";
+            } else if (nextPhase === "open" && testState.motionPhase !== "open") {
+                testState.motionPhase = "open";
+            } else if (testState.motionPhase === "" && nextPhase !== "") {
+                testState.motionPhase = nextPhase;
+            }
+
+            testState.totalForce += force;
+            testState.sampleCount += 1;
+
+            const avgForce = testState.totalForce / testState.sampleCount;
+            const elapsed = testState.startTime ? Math.floor((Date.now() - testState.startTime) / 1000) : 0;
+            const mm = Math.floor(elapsed / 60);
+            const ss = String(elapsed % 60).padStart(2, "0");
+
+            if (testRepsEl) testRepsEl.textContent = String(testState.reps);
+            if (testMovementEl) testMovementEl.textContent = `${movement.toFixed(1)}°`;
+            if (testForceEl) testForceEl.textContent = `${avgForce.toFixed(1)} N`;
+            if (testTimeEl) testTimeEl.textContent = `${mm}:${ss}`;
+            updateTestProgressRing(testState.reps);
+
+            if (!testCompleted && testState.sampleCount > 0) {
+                testCompleted = true;
+                updateStepNavigationState();
+                setMsg(testStatus, "Testing stage complete. You can continue to Step 4.");
+            }
+        }, 1000);
+    });
+
+    stopTestBtn?.addEventListener("click", async () => {
+        if (testState.intervalId) {
+            clearInterval(testState.intervalId);
+            testState.intervalId = null;
+        }
+        testState.isRunning = false;
+        if (startTestBtn) startTestBtn.disabled = false;
+        stopTestBtn.disabled = true;
+
+        try {
+            await requestGloveCommand("stop_session");
+        } catch {
+            // Keep UI responsive even if command acknowledgment is delayed.
+        }
+
+        if (testCompleted) {
+            setMsg(testStatus, "Testing stopped. Continue to Step 4.");
+        } else {
+            setMsg(testStatus, "No valid sample captured yet. Start test again.");
+        }
+    });
+
+    renderCalibrationGrid();
+    void loadPatientContext();
+    void refreshGloveConnectionState();
+    setMsg(searchingLabel, "Searching for Glove...");
+    if (searchingAnim) searchingAnim.classList.add("is-searching");
+    setInterval(() => {
+        void refreshGloveConnectionState();
+    }, 5000);
+    updateTestProgressRing(0);
+
+    // ── STEP 4: Select Exercise (Therapy Mode) ──────────────────────────────
     function updateExerciseOptionsVisibility() {
         if (!selectedExercise) {
             if (speedWrap) speedWrap.hidden = true;
@@ -3284,6 +3718,7 @@ function initializeExerciseHubPage() {
     }
 
     function renderExerciseSelection() {
+        exerciseConfirmed = false;
         exerciseCards.forEach(card => {
             const type = String(card.getAttribute("data-exercise-type") || "");
             card.classList.toggle("is-selected", type === selectedExercise);
@@ -3304,6 +3739,7 @@ function initializeExerciseHubPage() {
         });
 
         updateExerciseOptionsVisibility();
+        updateStepNavigationState();
     }
 
     function applyTherapyPlan(plan) {
@@ -3392,7 +3828,7 @@ function initializeExerciseHubPage() {
         });
     });
 
-    exerciseStartBtn?.addEventListener("click", () => {
+    function confirmSelectedExercise() {
         if (!calibrationComplete) {
             setMsg(diagStatus, "Complete calibration before selecting an exercise.");
             return;
@@ -3401,12 +3837,24 @@ function initializeExerciseHubPage() {
             setMsg(diagStatus, "Select an exercise type to continue.");
             return;
         }
+
         refreshSessionSummary();
         sessionPrepared = true;
+        exerciseConfirmed = true;
         updateStepNavigationState();
-        goToStep(4);
+        if (nextStepBtn) {
+            nextStepBtn.textContent = "Next";
+            nextStepBtn.setAttribute("aria-label", "Go to next step");
+        }
+        goToStep(5);
         setMsg(sessionStatus, "");
-    });
+
+        void requestGloveCommand("start_session").then(() => {
+            setMsg(sessionStatus, "Session start sent to the glove.");
+        }).catch(err => {
+            setMsg(sessionStatus, err instanceof Error ? err.message : "Unable to start glove session.");
+        });
+    }
 
     navDots.forEach((dot, index) => {
         dot?.addEventListener("click", () => {
@@ -3419,13 +3867,18 @@ function initializeExerciseHubPage() {
     });
 
     nextStepBtn?.addEventListener("click", () => {
-        attemptStep(Math.min(4, currentStep + 1));
+        if (currentStep === 4) {
+            confirmSelectedExercise();
+            return;
+        }
+
+        attemptStep(Math.min(5, currentStep + 1));
     });
 
-    // ── STEP 4: Session ───────────────────────────────────────────────────────
+    // ── STEP 5: Session ───────────────────────────────────────────────────────
     startSessionBtn?.addEventListener("click", () => {
         if (!selectedExercise) {
-            setMsg(sessionStatus, "Select an exercise first in Step 3.");
+            setMsg(sessionStatus, "Select an exercise first in Step 4.");
             return;
         }
         if (sessionState.isRunning) return;
@@ -3437,6 +3890,9 @@ function initializeExerciseHubPage() {
         sessionState.sampleCount = 0;
         sessionState.holdProgressSeconds = 0;
         sessionState.motionPhase = "";
+        sessionState.lastReadingId = 0;
+        sessionState.lastReadingAt = "";
+        sessionState.lastReadingTs = 0;
 
         if (sessionRepsEl) sessionRepsEl.textContent = "0";
         if (sessionMovementEl) sessionMovementEl.textContent = "0.0°";
@@ -3447,11 +3903,40 @@ function initializeExerciseHubPage() {
         if (endSessionBtn) endSessionBtn.disabled = false;
         setMsg(sessionStatus, "Session running — glove is streaming live data…");
 
-        const speedChance = selectedSpeed === "slow" ? 0.45 : selectedSpeed === "fast" ? 0.75 : 0.6;
+        const OPEN_THRESHOLD_DEG = 10;
+        const CLOSE_THRESHOLD_DEG = 80;
 
         sessionState.intervalId = setInterval(async () => {
-            const force   = await readGloveValue(15, 60);
-            const movement = await readGloveValue(0, 180);
+            let reading = null;
+            try {
+                reading = await fetchLatestGloveReading();
+            } catch (err) {
+                setMsg(sessionStatus, err instanceof Error ? err.message : "Unable to read glove data.");
+                return;
+            }
+
+            if (!reading) {
+                setMsg(sessionStatus, "Waiting for real glove data...");
+                return;
+            }
+
+            const recordedAt = reading.recordedAt;
+            if ((reading.id > 0 && reading.id === sessionState.lastReadingId) || (!reading.id && recordedAt && recordedAt === sessionState.lastReadingAt)) {
+                setMsg(sessionStatus, "No new glove sample yet. Keep moving your hand.");
+                return;
+            }
+
+            const currentTs = Date.parse(recordedAt);
+            const deltaSeconds = sessionState.lastReadingTs > 0 && Number.isFinite(currentTs)
+                ? Math.max(0.2, Math.min(3, (currentTs - sessionState.lastReadingTs) / 1000))
+                : 1;
+
+            sessionState.lastReadingId = Number(reading.id || 0);
+            sessionState.lastReadingAt = recordedAt;
+            sessionState.lastReadingTs = Number.isFinite(currentTs) ? currentTs : Date.now();
+
+            const force = reading.force;
+            const movement = reading.movement;
 
             if (sessionMovementEl) {
                 sessionMovementEl.textContent = `${movement.toFixed(1)}°`;
@@ -3459,11 +3944,11 @@ function initializeExerciseHubPage() {
 
             if (isHoldExercise(selectedExercise)) {
                 const maintained = selectedExercise === "full_grip_hold"
-                    ? movement >= 145
-                    : movement <= 35;
+                    ? movement >= CLOSE_THRESHOLD_DEG
+                    : movement <= OPEN_THRESHOLD_DEG;
 
                 if (maintained) {
-                    sessionState.holdProgressSeconds += 1;
+                    sessionState.holdProgressSeconds += deltaSeconds;
                     if (sessionState.holdProgressSeconds >= selectedHoldSeconds) {
                         sessionState.reps += 1;
                         sessionState.holdProgressSeconds = 0;
@@ -3473,17 +3958,21 @@ function initializeExerciseHubPage() {
                     sessionState.holdProgressSeconds = 0;
                 }
             } else {
-                const nextPhase = movement <= 50 ? "open" : movement >= 130 ? "close" : "";
-                if (nextPhase && nextPhase !== sessionState.motionPhase && Math.random() < speedChance) {
-                    if (sessionState.motionPhase) {
-                        sessionState.reps += 1;
-                    }
+                const nextPhase = movement <= OPEN_THRESHOLD_DEG ? "open" : movement >= CLOSE_THRESHOLD_DEG ? "close" : "";
+                if (nextPhase === "close" && sessionState.motionPhase === "open") {
+                    sessionState.reps += 1;
+                    sessionState.motionPhase = "close";
+                } else if (nextPhase === "open" && sessionState.motionPhase !== "open") {
+                    sessionState.motionPhase = "open";
+                } else if (sessionState.motionPhase === "" && nextPhase !== "") {
                     sessionState.motionPhase = nextPhase;
                 }
             }
 
             sessionState.totalForce  += force;
             sessionState.sampleCount += 1;
+            diagResults.maxFlexion = Math.max(Number(diagResults.maxFlexion || 0), movement);
+            diagResults.peakForce = Math.max(Number(diagResults.peakForce || 0), force);
 
             const avgForce = sessionState.totalForce / sessionState.sampleCount;
             const elapsed  = Math.floor((Date.now() - sessionState.startTime) / 1000);
@@ -3518,6 +4007,12 @@ function initializeExerciseHubPage() {
         sessionState.isRunning = false;
         if (endSessionBtn) endSessionBtn.disabled = true;
         setMsg(sessionStatus, "Saving session…");
+
+        try {
+            await requestGloveCommand("stop_session");
+        } catch (err) {
+            setMsg(sessionStatus, err instanceof Error ? err.message : "Unable to stop glove session.");
+        }
 
         const avgForce = sessionState.sampleCount > 0
             ? sessionState.totalForce / sessionState.sampleCount

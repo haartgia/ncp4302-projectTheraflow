@@ -38,39 +38,103 @@ if (!isset($_SESSION['role']) || strtolower((string) $_SESSION['role']) !== 'pat
             <div class="patient-header-row">
                 <div>
                     <h1 id="exerciseHubTitle">Exercises</h1>
-                    <p class="subheader">Complete each step before your session: Connect &rarr; Calibrate &rarr; Select Exercise &rarr; Session.</p>
+                    <p class="subheader">Complete each step before your session: Status &rarr; Calibrate &rarr; Testing &rarr; Select Exercise &rarr; Session.</p>
                 </div>
             </div>
 
             <div class="exercise-stepper-viewport" id="exerciseStepperViewport">
-            <!-- STEP 1: Connect -->
+            <!-- STEP 1: Connection Status -->
             <article class="widget widget-blue wizard-panel" id="stepPair">
-                <h2 class="widget-title">Step 1 &mdash; Connect Your Glove (Wi-Fi)</h2>
-                <p class="widget-label">Connect to your Theraflow glove over Wi-Fi. Make sure your glove and device share the same 2.4GHz network.</p>
+                <h2 class="widget-title hub-step-heading" id="hubStep1Heading">
+                    <span class="hub-step-number">Step 1</span>
+                    <span class="hub-step-label">Glove Connection Status</span>
+                </h2>
+                <p class="widget-label">Theraflow checks glove connectivity automatically. Use refresh if you restart the ESP32 or switch Wi-Fi.</p>
                 <button type="button" class="sign-in-btn" id="hubPairButton">
-                    <i class="fa-solid fa-wifi"></i> Connect to Glove (Wi-Fi)
+                    <i class="fa-solid fa-rotate-right"></i> Refresh Glove Status
                 </button>
-                <div class="searching-animation" id="searchingAnimation" hidden>
+                <div class="searching-animation" id="searchingAnimation">
                     <div class="search-pulse"></div>
-                    <span class="search-label">Searching for Glove&hellip;</span>
+                    <span class="search-label" id="searchingLabel">Searching for Glove...</span>
                 </div>
-                <p class="notes-save-feedback" id="hubPairStatus">Not connected.</p>
             </article>
 
             <!-- STEP 2: Calibration (unlocked after pairing) -->
             <article class="widget widget-blue wizard-panel" id="stepCalibrate" hidden>
-                <h2 class="widget-title">Step 2 &mdash; Mandatory Calibration</h2>
-                <p class="widget-label" id="calibrationPrompt">Rest your hand flat and relaxed. The system will capture the 0&deg; baseline for all 5 fingers.</p>
+                <h2 class="widget-title hub-step-heading" id="hubStep2Heading">
+                    <span class="hub-step-number">Step 2</span>
+                    <span class="hub-step-label">Mandatory Calibration</span>
+                </h2>
+                <p class="widget-label" id="calibrationPrompt">Rest your hand flat and relaxed. The system will capture the 0&deg; baseline for all 4 fingers.</p>
                 <button type="button" class="sign-in-btn" id="hubCalibrateBtn">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Begin Calibration
                 </button>
-                <div class="calibration-finger-grid" id="calibrationFingerGrid"></div>
+                <div class="calibration-progress-wrap" id="hubCalibrationProgressWrap" aria-hidden="true">
+                    <div class="calibration-progress-track">
+                        <div class="calibration-progress-fill" id="hubCalibrationProgressFill"></div>
+                    </div>
+                    <div class="calibration-progress-label" id="hubCalibrationProgressLabel">0%</div>
+                </div>
                 <p class="notes-save-feedback" id="hubCalibrationStatus">Waiting for calibration start.</p>
             </article>
 
-            <!-- STEP 3: Select Exercise (Therapy Mode) -->
+            <!-- STEP 3: Testing Stage -->
+            <article class="widget widget-green wizard-panel" id="stepTest" hidden>
+                <h2 class="widget-title hub-step-heading" id="hubStep3Heading">
+                    <span class="hub-step-number">Step 3</span>
+                    <span class="hub-step-label">Testing Stage</span>
+                </h2>
+                <p class="widget-label" id="hubTestIntro">Test your glove stream before exercise selection. Press <strong>Start Test</strong> and move your hand naturally.</p>
+
+                <div class="session-pane" id="hubTestPane">
+                    <div class="session-meta-bar">
+                        <div class="session-meta-item">Stage: <strong>Testing</strong></div>
+                        <div class="session-meta-item">Source: <strong>Live Glove Data</strong></div>
+                    </div>
+
+                    <div class="session-main-grid">
+                        <div class="session-main-focus" id="hubTestRepTile">
+                            <div class="session-tile-label">Current Repetition Count</div>
+                            <div class="rep-progress-ring" aria-hidden="true">
+                                <svg viewBox="0 0 120 120" class="rep-progress-svg">
+                                    <circle class="rep-ring-track" cx="60" cy="60" r="46"></circle>
+                                    <circle class="rep-ring-progress" id="hubTestRingProgress" cx="60" cy="60" r="46"></circle>
+                                </svg>
+                                <div class="session-main-reps" id="hubTestReps">0</div>
+                            </div>
+                        </div>
+
+                        <div class="session-side-stack">
+                            <div class="session-side-tile" id="hubTestTimerTile">
+                                <div class="session-tile-label">Timer</div>
+                                <div class="session-tile-value" id="hubTestTime">0:00</div>
+                            </div>
+                            <div class="session-side-tile">
+                                <div class="session-tile-label">Avg Force</div>
+                                <div class="session-tile-value" id="hubTestForce">0.0 N</div>
+                            </div>
+                            <div class="session-side-tile">
+                                <div class="session-tile-label">Finger Movement</div>
+                                <div class="session-tile-value" id="hubTestMovement">0.0&deg;</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="session-action-group">
+                        <button type="button" class="sign-in-btn session-start-btn" id="hubStartTestBtn"><i class="fa-solid fa-play"></i> Start Test</button>
+                        <button type="button" class="doctor-btn session-end-btn" id="hubStopTestBtn" disabled>Stop Test</button>
+                    </div>
+                </div>
+
+                <p class="notes-save-feedback" id="hubTestStatus" aria-live="polite">Ready to test glove data.</p>
+            </article>
+
+            <!-- STEP 4: Select Exercise (Therapy Mode) -->
             <article class="widget widget-green wizard-panel" id="stepDiagnose" hidden>
-                <h2 class="widget-title">Step 3 &mdash; Select Exercise (Therapy Mode)</h2>
+                <h2 class="widget-title hub-step-heading" id="hubStep4Heading">
+                    <span class="hub-step-number">Step 4</span>
+                    <span class="hub-step-label">Select Exercise (Therapy Mode)</span>
+                </h2>
                 <p class="widget-label">Choose one exercise type, then configure its options before starting your therapy session.</p>
 
                 <div class="exercise-choice-grid" id="exerciseChoiceGrid" role="radiogroup" aria-label="Exercise type">
@@ -104,13 +168,15 @@ if (!isset($_SESSION['role']) || strtolower((string) $_SESSION['role']) !== 'pat
                     </div>
                 </div>
 
-                <button type="button" class="sign-in-btn" id="hubExerciseStartBtn"><i class="fa-solid fa-check"></i> Confirm Exercise</button>
                 <p class="notes-save-feedback" id="hubDiagStatus" aria-live="polite"></p>
             </article>
 
-            <!-- STEP 4: Session -->
+            <!-- STEP 5: Session -->
             <article class="widget widget-green wizard-panel" id="stepSession" hidden>
-                <h2 class="widget-title">Step 4 &mdash; Session</h2>
+                <h2 class="widget-title hub-step-heading" id="hubStep5Heading">
+                    <span class="hub-step-number">Step 5</span>
+                    <span class="hub-step-label">Session</span>
+                </h2>
                 <p class="widget-label" id="hubSessionIntro">Your exercise is selected. Press <strong>Start Session</strong> to begin.</p>
 
                 <div class="session-pane" id="therapySessionPane">
@@ -160,20 +226,13 @@ if (!isset($_SESSION['role']) || strtolower((string) $_SESSION['role']) !== 'pat
             <div class="exercise-stepper-footer">
                 <div class="exercise-stepper-left-actions">
                     <button type="button" class="doctor-btn exercise-stepper-nav-btn" id="hubStepBackBtn" aria-label="Go to previous step">
-                        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
-                        <span class="sr-only">Back</span>
+                        Back
                     </button>
                     <button type="button" class="doctor-btn exercise-stepper-nav-btn" id="hubStepRetryBtn" aria-label="Retry calibration" hidden>
                         <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
-                        <span class="sr-only">Retry</span>
+                        Retry
                     </button>
                 </div>
-                <nav class="wizard-steps-nav wizard-steps-nav-dots" aria-label="Exercise setup steps">
-                    <button type="button" class="wizard-step-dot is-active" id="navDot1" data-step="1" aria-label="Connect" title="Connect"></button>
-                    <button type="button" class="wizard-step-dot" id="navDot2" data-step="2" aria-label="Calibrate" title="Calibrate"></button>
-                    <button type="button" class="wizard-step-dot" id="navDot3" data-step="3" aria-label="Select" title="Select"></button>
-                    <button type="button" class="wizard-step-dot" id="navDot4" data-step="4" aria-label="Session" title="Session"></button>
-                </nav>
                 <button type="button" class="sign-in-btn exercise-stepper-nav-btn" id="hubStepNextBtn" aria-label="Go to next step">Next</button>
             </div>
         </section>

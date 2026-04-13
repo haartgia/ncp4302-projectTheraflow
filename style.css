@@ -4494,17 +4494,30 @@ body.patients-page {
 body.exercise-hub-page .patient-shell {
   width: min(1020px, 100%);
   margin: 0 auto;
-  padding: 20px 18px 24px;
+  min-height: clamp(440px, 60vh, 680px);
+  padding: 24px 18px 30px;
   border-radius: 24px;
-  background: #f7fbfd;
-  border: 1px solid rgba(77, 134, 156, 0.2);
-  box-shadow: 0 14px 32px rgba(31, 86, 104, 0.08);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+body.exercise-hub-page .content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 24px 20px;
+}
+
+body.exercise-hub-page .patient-shell {
+  margin: 0;
 }
 
 body.dark-mode.exercise-hub-page .patient-shell {
-  background: #142833;
-  border-color: rgba(121, 175, 196, 0.24);
-  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .patient-header-row h1 {
@@ -5605,6 +5618,7 @@ body.exercise-hub-page #stepCalibrate .widget-title {
 body.exercise-hub-page #stepCalibrate .widget-label {
   margin-top: 0;
   margin-bottom: 12px;
+  text-align: center;
 }
 
 body.exercise-hub-page #stepCalibrate #hubCalibrateBtn {
@@ -5619,6 +5633,39 @@ body.exercise-hub-page #stepCalibrate .calibration-finger-grid {
 
 body.exercise-hub-page #stepCalibrate .notes-save-feedback {
   margin-top: 0;
+  text-align: center;
+}
+
+.calibration-progress-wrap {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.calibration-progress-track {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(77, 134, 156, 0.16);
+  overflow: hidden;
+}
+
+.calibration-progress-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #76a8ba 0%, #4d869c 100%);
+  transition: width 0.25s ease;
+}
+
+.calibration-progress-label {
+  min-width: 44px;
+  text-align: right;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #2f5f73;
 }
 
 .calibration-finger {
@@ -5628,10 +5675,10 @@ body.exercise-hub-page #stepCalibrate .notes-save-feedback {
   padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   color: #48616d;
   font-size: 0.82rem;
-  min-height: 220px;
+  min-height: 128px;
   align-items: center;
 }
 
@@ -5750,7 +5797,13 @@ body.exercise-hub-page #stepCalibrate .notes-save-feedback {
 }
 /* ── Exercise Wizard ────────────────────────────────────────────────────── */
 .exercise-stepper-viewport {
+  display: block;
   transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+body.exercise-hub-page .exercise-stepper-viewport .wizard-panel {
+  width: 100%;
+  min-height: 0;
 }
 
 .exercise-stepper-viewport.is-switching {
@@ -5759,9 +5812,9 @@ body.exercise-hub-page #stepCalibrate .notes-save-feedback {
 }
 
 .exercise-stepper-footer {
-  margin-top: 14px;
-  display: grid;
-  grid-template-columns: minmax(110px, 1fr) auto minmax(110px, 1fr);
+  margin-top: 12px;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: 12px;
 }
@@ -5773,54 +5826,56 @@ body.exercise-hub-page #stepCalibrate .notes-save-feedback {
 }
 
 .exercise-stepper-left-actions {
-  grid-column: 1;
-  justify-self: start;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 10px;
 }
 
 body.exercise-hub-page #hubStepBackBtn {
-  width: 56px;
-  min-width: 56px;
-  min-height: 56px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: #3f7a90;
-  justify-self: start;
+  width: auto;
+  min-width: 132px;
+  min-height: 52px;
+  padding: 0 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(77, 134, 156, 0.45);
+  background: #ffffff;
+  color: #2f6072;
   box-shadow: none;
-}
-
-body.exercise-hub-page #hubStepBackBtn i {
-  font-size: 1.85rem;
-  line-height: 1;
 }
 
 body.exercise-hub-page #hubStepBackBtn:hover,
 body.exercise-hub-page #hubStepBackBtn:focus-visible {
-  background: transparent;
+  background: rgba(77, 134, 156, 0.1);
 }
 
 body.exercise-hub-page #hubStepRetryBtn {
-  width: 56px;
-  min-width: 56px;
-  min-height: 56px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: #3f7a90;
+  width: auto;
+  min-width: 132px;
+  min-height: 52px;
+  padding: 0 18px;
+  gap: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(77, 134, 156, 0.45);
+  background: #ffffff;
+  color: #2f6072;
   box-shadow: none;
 }
 
 body.exercise-hub-page #hubStepRetryBtn i {
-  font-size: 1.6rem;
+  font-size: 0.95rem;
   line-height: 1;
 }
 
 body.exercise-hub-page #hubStepRetryBtn:hover,
 body.exercise-hub-page #hubStepRetryBtn:focus-visible {
-  background: transparent;
+  background: rgba(77, 134, 156, 0.1);
+}
+
+body.exercise-hub-page #hubStepNextBtn {
+  width: auto;
+  min-width: 132px;
+  min-height: 52px;
+  padding: 0 22px;
 }
 
 .exercise-stepper-footer .exercise-stepper-nav-btn[hidden] {
@@ -5828,7 +5883,7 @@ body.exercise-hub-page #hubStepRetryBtn:focus-visible {
 }
 
 .wizard-steps-nav {
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   gap: 12px;
@@ -5900,7 +5955,25 @@ body.exercise-hub-page #hubStepRetryBtn:focus-visible {
   border-radius: 50%;
   border: 3px solid #4d869c;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
   animation: pulse-ring 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.searching-animation.is-connected .search-pulse {
+  border-color: #2f9b72;
+  background: #2f9b72;
+  animation: none;
+}
+
+.searching-animation.is-connected .search-pulse::after {
+  content: "\2713";
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 @keyframes pulse-ring {
@@ -6153,12 +6226,64 @@ body.exercise-hub-page .notes-save-feedback {
   font-size: calc(0.88rem + 2px);
 }
 
+body.exercise-hub-page .hub-step-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+body.exercise-hub-page .hub-step-number {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #1f5668;
+}
+
+body.exercise-hub-page .hub-step-label {
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #2f6f86;
+}
+
+body.exercise-hub-page .wizard-panel:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+body.exercise-hub-page #stepPair .widget-label,
+body.exercise-hub-page #stepCalibrate .widget-label {
+  margin-top: 0;
+  text-align: left;
+}
+
+body.exercise-hub-page #stepCalibrate .calibration-progress-wrap,
+body.exercise-hub-page #stepCalibrate .notes-save-feedback,
+body.exercise-hub-page #stepTest .widget-label,
+body.exercise-hub-page #stepTest .session-pane,
+body.exercise-hub-page #stepTest .notes-save-feedback,
+body.exercise-hub-page #stepDiagnose .widget-label,
+body.exercise-hub-page #stepDiagnose .exercise-choice-grid,
+body.exercise-hub-page #stepDiagnose .exercise-options-wrap,
+body.exercise-hub-page #stepDiagnose #hubExerciseStartBtn,
+body.exercise-hub-page #stepDiagnose #hubDiagStatus,
+body.exercise-hub-page #stepSession .widget-label,
+body.exercise-hub-page #stepSession .session-pane,
+body.exercise-hub-page #stepSession .notes-save-feedback {
+  text-align: left;
+}
+
+body.exercise-hub-page #stepTest .session-pane,
 body.exercise-hub-page #stepSession .session-pane {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
+body.exercise-hub-page #stepTest .session-meta-bar,
 body.exercise-hub-page #stepSession .session-meta-bar {
   display: flex;
   justify-content: flex-start;
@@ -6170,17 +6295,20 @@ body.exercise-hub-page #stepSession .session-meta-bar {
   padding: 0;
 }
 
+body.exercise-hub-page #stepTest .session-meta-item,
 body.exercise-hub-page #stepSession .session-meta-item {
   font-size: 1.1rem;
   font-weight: 600;
   color: #3e6472;
 }
 
+body.exercise-hub-page #stepTest .session-meta-item strong,
 body.exercise-hub-page #stepSession .session-meta-item strong {
   color: #1f5668;
   font-weight: 800;
 }
 
+body.exercise-hub-page #stepTest .session-main-grid,
 body.exercise-hub-page #stepSession .session-main-grid {
   display: grid;
   grid-template-columns: 3fr 2fr;
@@ -6188,6 +6316,8 @@ body.exercise-hub-page #stepSession .session-main-grid {
   min-height: 360px;
 }
 
+body.exercise-hub-page #stepTest .session-main-focus,
+body.exercise-hub-page #stepTest .session-side-tile,
 body.exercise-hub-page #stepSession .session-main-focus,
 body.exercise-hub-page #stepSession .session-side-tile {
   border-radius: 12px;
@@ -6195,6 +6325,7 @@ body.exercise-hub-page #stepSession .session-side-tile {
   background: #ffffff;
 }
 
+body.exercise-hub-page #stepTest .session-main-focus,
 body.exercise-hub-page #stepSession .session-main-focus {
   padding: 30px;
   display: flex;
@@ -6204,6 +6335,7 @@ body.exercise-hub-page #stepSession .session-main-focus {
   gap: 10px;
 }
 
+body.exercise-hub-page #stepTest .session-side-stack,
 body.exercise-hub-page #stepSession .session-side-stack {
   display: flex;
   flex-direction: column;
@@ -6211,6 +6343,7 @@ body.exercise-hub-page #stepSession .session-side-stack {
   height: 100%;
 }
 
+body.exercise-hub-page #stepTest .session-side-tile,
 body.exercise-hub-page #stepSession .session-side-tile {
   padding: 16px;
   display: flex;
@@ -6220,6 +6353,7 @@ body.exercise-hub-page #stepSession .session-side-tile {
   flex: 1 1 0;
 }
 
+body.exercise-hub-page #stepTest .session-tile-label,
 body.exercise-hub-page #stepSession .session-tile-label {
   font-size: 14px;
   font-weight: 600;
@@ -6229,6 +6363,7 @@ body.exercise-hub-page #stepSession .session-tile-label {
   margin-bottom: 6px;
 }
 
+body.exercise-hub-page #stepTest .session-tile-value,
 body.exercise-hub-page #stepSession .session-tile-value {
   font-size: 2.5rem;
   line-height: 1;
@@ -6236,6 +6371,7 @@ body.exercise-hub-page #stepSession .session-tile-value {
   color: #1f5668;
 }
 
+body.exercise-hub-page #stepTest .session-main-reps,
 body.exercise-hub-page #stepSession .session-main-reps {
   font-size: 6rem;
   line-height: 1;
@@ -6246,12 +6382,14 @@ body.exercise-hub-page #stepSession .session-main-reps {
   justify-content: center;
 }
 
+body.exercise-hub-page #stepTest .rep-progress-ring,
 body.exercise-hub-page #stepSession .rep-progress-ring {
   width: 220px;
   height: 220px;
   margin-top: 4px;
 }
 
+body.exercise-hub-page #stepTest .session-action-group,
 body.exercise-hub-page #stepSession .session-action-group {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6259,6 +6397,8 @@ body.exercise-hub-page #stepSession .session-action-group {
   margin-top: 4px;
 }
 
+body.exercise-hub-page #stepTest .session-start-btn,
+body.exercise-hub-page #stepTest .session-end-btn,
 body.exercise-hub-page #stepSession .session-start-btn,
 body.exercise-hub-page #stepSession .session-end-btn {
   width: 100%;
@@ -6266,23 +6406,28 @@ body.exercise-hub-page #stepSession .session-end-btn {
   border-radius: 12px;
 }
 
+body.exercise-hub-page #stepTest .session-start-btn,
 body.exercise-hub-page #stepSession .session-start-btn {
   background: #4d869c;
   border: 2px solid #4d869c;
   color: #ffffff;
 }
 
+body.exercise-hub-page #stepTest .session-start-btn:hover,
+body.exercise-hub-page #stepTest .session-start-btn:focus-visible,
 body.exercise-hub-page #stepSession .session-start-btn:hover,
 body.exercise-hub-page #stepSession .session-start-btn:focus-visible {
   filter: brightness(95%);
 }
 
+body.exercise-hub-page #stepTest .session-end-btn,
 body.exercise-hub-page #stepSession .session-end-btn {
   background: transparent;
   border: 2px solid #4d869c;
   color: #4d869c;
 }
 
+body.exercise-hub-page #stepTest .session-end-btn:disabled,
 body.exercise-hub-page #stepSession .session-end-btn:disabled {
   border-color: #4d869c;
   color: #4d869c;
@@ -6352,20 +6497,24 @@ body.exercise-hub-page .patient-shell.is-focus-mode #stepSession #hubSessionTime
 }
 
 @media (max-width: 980px) {
+  body.exercise-hub-page #stepTest .session-meta-bar,
   body.exercise-hub-page #stepSession .session-meta-bar {
     flex-direction: column;
     align-items: flex-start;
   }
 
+  body.exercise-hub-page #stepTest .session-main-grid,
   body.exercise-hub-page #stepSession .session-main-grid {
     grid-template-columns: 1fr;
     min-height: 0;
   }
 
+  body.exercise-hub-page #stepTest .session-side-stack,
   body.exercise-hub-page #stepSession .session-side-stack {
     height: auto;
   }
 
+  body.exercise-hub-page #stepTest .session-action-group,
   body.exercise-hub-page #stepSession .session-action-group {
     grid-template-columns: 1fr;
   }
@@ -7280,8 +7429,31 @@ body.dark-mode .exercise-plan-meta strong {
 
   body.exercise-hub-page .patient-shell {
     width: 100%;
+    min-height: 0;
     border-radius: 18px;
     padding: 16px 14px 20px;
+  }
+
+  body.exercise-hub-page .exercise-stepper-footer {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  body.exercise-hub-page .exercise-stepper-left-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  body.exercise-hub-page #hubStepNextBtn {
+    width: 100%;
+  }
+
+  body.exercise-hub-page .content {
+    min-height: auto;
+    align-items: flex-start;
+    padding: 16px;
   }
 
   .recovery-best-metrics {
