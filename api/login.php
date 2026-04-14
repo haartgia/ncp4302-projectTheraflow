@@ -124,6 +124,72 @@ function patientHasTherapyData(PDO $pdo, int $patientId): bool
     return false;
 }
 
+function resolvePatientIdForSession(PDO $pdo, int $userId, string $sessionUsername, string $loginIdentifier): int
+{
+    try {
+        $patientColumns = getTableColumns($pdo, 'patients');
+    } catch (Throwable $e) {
+        return 0;
+    }
+
+    $hasUserId = in_array('user_id', $patientColumns, true);
+    $hasUsername = in_array('username', $patientColumns, true);
+    $hasContact = in_array('contact', $patientColumns, true);
+    $hasBackupEmail = in_array('backup_email', $patientColumns, true);
+
+    if ($userId > 0 && $hasUserId && $hasUsername && $sessionUsername !== '') {
+        $byUserAndUsername = $pdo->prepare('SELECT id FROM patients WHERE user_id = ? AND username = ? ORDER BY id DESC LIMIT 1');
+        $byUserAndUsername->execute([$userId, $sessionUsername]);
+        $patientId = (int) ($byUserAndUsername->fetchColumn() ?: 0);
+        if ($patientId > 0) {
+            return $patientId;
+        }
+    }
+
+    $identifierIsEmail = filter_var($loginIdentifier, FILTER_VALIDATE_EMAIL) !== false;
+    if ($userId > 0 && $hasUserId && $identifierIsEmail && ($hasContact || $hasBackupEmail)) {
+        $whereParts = [];
+        $params = [$userId];
+        if ($hasContact) {
+            $whereParts[] = 'contact = ?';
+            $params[] = $loginIdentifier;
+        }
+        if ($hasBackupEmail) {
+            $whereParts[] = 'backup_email = ?';
+            $params[] = $loginIdentifier;
+        }
+
+        if ($whereParts) {
+            $byUserAndEmail = $pdo->prepare('SELECT id FROM patients WHERE user_id = ? AND (' . implode(' OR ', $whereParts) . ') ORDER BY id DESC LIMIT 1');
+            $byUserAndEmail->execute($params);
+            $patientId = (int) ($byUserAndEmail->fetchColumn() ?: 0);
+            if ($patientId > 0) {
+                return $patientId;
+            }
+        }
+    }
+
+    if ($userId > 0 && $hasUserId) {
+        $byUser = $pdo->prepare('SELECT id FROM patients WHERE user_id = ? ORDER BY id DESC LIMIT 1');
+        $byUser->execute([$userId]);
+        $patientId = (int) ($byUser->fetchColumn() ?: 0);
+        if ($patientId > 0) {
+            return $patientId;
+        }
+    }
+
+    if ($hasUsername && $sessionUsername !== '') {
+        $byUsername = $pdo->prepare('SELECT id FROM patients WHERE username = ? ORDER BY id DESC LIMIT 1');
+        $byUsername->execute([$sessionUsername]);
+        $patientId = (int) ($byUsername->fetchColumn() ?: 0);
+        if ($patientId > 0) {
+            return $patientId;
+        }
+    }
+
+    return 0;
+}
+
 $usersTable = resolveTableName($pdo, ['users', 'theraflowusers_db.users', 'theraflow_db.users']);
 if ($usersTable === null) {
     http_response_code(500);
@@ -289,17 +355,13 @@ $_SESSION['role'] = $role;
 if ($role === 'patient') {
     // Keep patient context explicit for accounts not linked to users.id.
     if ($sessionPatientId <= 0) {
-        try {
-            $patientIdStmt = $pdo->prepare('SELECT id FROM patients WHERE user_id = ? LIMIT 1');
-            $patientIdStmt->execute([$userId]);
-            $sessionPatientId = (int) ($patientIdStmt->fetchColumn() ?: 0);
-        } catch (Throwable $e) {
-            // Ignore and proceed without patient_id if unavailable.
-        }
+        $sessionPatientId = resolvePatientIdForSession($pdo, $userId, (string) ($_SESSION['username'] ?? ''), $identifier);
     }
 
     if ($sessionPatientId > 0) {
         $_SESSION['patient_id'] = $sessionPatientId;
+    } else {
+        unset($_SESSION['patient_id']);
     }
 }
 
@@ -313,13 +375,7 @@ if ($role === 'doctor') {
 } elseif ($role === 'patient') {
     $patientIdForRedirect = $sessionPatientId;
     if ($patientIdForRedirect <= 0 && $userId > 0) {
-        try {
-            $patientRedirectStmt = $pdo->prepare('SELECT id FROM patients WHERE user_id = ? LIMIT 1');
-            $patientRedirectStmt->execute([$userId]);
-            $patientIdForRedirect = (int) ($patientRedirectStmt->fetchColumn() ?: 0);
-        } catch (Throwable $e) {
-            // Keep default redirect if patient lookup fails.
-        }
+        $patientIdForRedirect = resolvePatientIdForSession($pdo, $userId, (string) ($_SESSION['username'] ?? ''), $identifier);
     }
 
     // First login goes to exercise page. Returning patients go to dashboard.

@@ -223,7 +223,7 @@ try {
         $emailCheck->execute([$accountEmail]);
         if ($emailCheck->fetch()) {
             http_response_code(409);
-            echo json_encode(['ok' => false, 'error' => $backupEmail !== '' ? 'Backup email already in use' : 'Username already taken']);
+            echo json_encode(['ok' => false, 'error' => 'Email already in use']);
             exit;
         }
     }
@@ -237,6 +237,11 @@ try {
         if ($passwordColumn !== null) {
             $insertColumns = ['email', $passwordColumn];
             $insertValues = [$accountEmail, $passwordHash];
+
+            if (in_array('username', $usersColumns, true)) {
+                $insertColumns[] = 'username';
+                $insertValues[] = $username;
+            }
 
             if (in_array('first_name', $usersColumns, true)) {
                 $insertColumns[] = 'first_name';

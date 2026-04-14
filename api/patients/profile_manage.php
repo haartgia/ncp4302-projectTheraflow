@@ -38,6 +38,19 @@ function resolveTableName(PDO $pdo, array $candidates): ?string
     return null;
 }
 
+function passwordHashMatches(string $plainText, string $storedHash): bool
+{
+    if ($plainText === '' || $storedHash === '') {
+        return false;
+    }
+
+    if (password_verify($plainText, $storedHash)) {
+        return true;
+    }
+
+    return hash_equals(hash('sha256', $plainText), $storedHash);
+}
+
 $patientId = 0;
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $patientId = (int) ($_GET['patientId'] ?? 0);
@@ -82,6 +95,8 @@ $usersTable = resolveTableName($pdo, ['users', 'theraflow_db.users', 'theraflowu
 $usersColumns = $usersTable ? tableColumns($pdo, $usersTable) : [];
 $userIdColumn = in_array('id', $usersColumns, true) ? 'id' : (in_array('user_id', $usersColumns, true) ? 'user_id' : null);
 $userPasswordColumn = in_array('password', $usersColumns, true) ? 'password' : (in_array('password_hash', $usersColumns, true) ? 'password_hash' : null);
+$userEmailColumn = in_array('email', $usersColumns, true) ? 'email' : null;
+$userUsernameColumn = in_array('username', $usersColumns, true) ? 'username' : null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $firstName = trim((string) ($patient['first_name'] ?? ''));
@@ -127,109 +142,197 @@ if (!is_array($payload)) {
     $payload = $_POST;
 }
 
-$firstName = trim((string) ($payload['firstName'] ?? ''));
-$lastName = trim((string) ($payload['lastName'] ?? ''));
-$dob = trim((string) ($payload['dob'] ?? ''));
-$age = (int) ($payload['age'] ?? 0);
-$gender = trim((string) ($payload['gender'] ?? ''));
-$email = strtolower(trim((string) ($payload['email'] ?? '')));
-$backupContact = trim((string) ($payload['backupContact'] ?? ''));
-$strokeType = trim((string) ($payload['strokeType'] ?? ''));
-$affectedHand = trim((string) ($payload['affectedHand'] ?? ''));
-$newPassword = (string) ($payload['password'] ?? '');
-
-if ($firstName === '' || $lastName === '' || $dob === '' || $gender === '' || $email === '' || $strokeType === '' || $affectedHand === '') {
-    http_response_code(422);
-    echo json_encode(['ok' => false, 'error' => 'Please complete all required fields.']);
-    exit;
-}
-
-if ($age < 0 || $age > 130) {
-    http_response_code(422);
-    echo json_encode(['ok' => false, 'error' => 'Age must be between 0 and 130.']);
-    exit;
-}
-
-if (!in_array($gender, ['Male', 'Female', 'Other'], true)) {
-    http_response_code(422);
-    echo json_encode(['ok' => false, 'error' => 'Invalid gender.']);
-    exit;
-}
-
-if (!in_array($affectedHand, ['Left', 'Right'], true)) {
-    http_response_code(422);
-    echo json_encode(['ok' => false, 'error' => 'Affected hand must be Left or Right.']);
-    exit;
-}
-
-$dateObj = DateTime::createFromFormat('Y-m-d', $dob);
-if (!$dateObj || $dateObj->format('Y-m-d') !== $dob) {
-    http_response_code(422);
-    echo json_encode(['ok' => false, 'error' => 'DOB must be a valid date.']);
-    exit;
-}
-
-if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    http_response_code(422);
-    echo json_encode(['ok' => false, 'error' => 'Email address must be valid.']);
-    exit;
-}
-
-if ($backupContact !== '') {
-    $backupCompact = str_replace(' ', '', $backupContact);
-    $backupIsEmail = filter_var($backupContact, FILTER_VALIDATE_EMAIL) !== false;
-    $backupIsPhone = preg_match('/^\+?\d{7,15}$/', $backupCompact) === 1;
-    if (!$backupIsEmail && !$backupIsPhone) {
-        http_response_code(422);
-        echo json_encode(['ok' => false, 'error' => 'Backup contact must be a valid phone number or email.']);
-        exit;
+$profileFieldKeys = ['firstName', 'lastName', 'dob', 'age', 'gender', 'email', 'backupContact', 'strokeType', 'affectedHand'];
+$isProfileUpdateRequested = false;
+foreach ($profileFieldKeys as $fieldKey) {
+    if (array_key_exists($fieldKey, $payload)) {
+        $isProfileUpdateRequested = true;
+        break;
     }
 }
 
-if ($newPassword !== '') {
+$currentPassword = (string) ($payload['currentPassword'] ?? '');
+$newPassword = (string) ($payload['newPassword'] ?? ($payload['password'] ?? ''));
+$confirmNewPassword = (string) ($payload['confirmNewPassword'] ?? '');
+if ($confirmNewPassword === '' && !array_key_exists('newPassword', $payload)) {
+    $confirmNewPassword = $newPassword;
+}
+$isPasswordUpdateRequested = ($currentPassword !== '' || $newPassword !== '' || $confirmNewPassword !== '');
+
+if (!$isProfileUpdateRequested && !$isPasswordUpdateRequested) {
+    http_response_code(422);
+    echo json_encode(['ok' => false, 'error' => 'No changes were submitted.']);
+    exit;
+}
+
+if ($isProfileUpdateRequested) {
+    $firstName = trim((string) ($payload['firstName'] ?? ''));
+    $lastName = trim((string) ($payload['lastName'] ?? ''));
+    $dob = trim((string) ($payload['dob'] ?? ''));
+    $age = (int) ($payload['age'] ?? 0);
+    $gender = trim((string) ($payload['gender'] ?? ''));
+    $email = strtolower(trim((string) ($payload['email'] ?? '')));
+    $backupContact = trim((string) ($payload['backupContact'] ?? ''));
+    $strokeType = trim((string) ($payload['strokeType'] ?? ''));
+    $affectedHand = trim((string) ($payload['affectedHand'] ?? ''));
+
+    if ($firstName === '' || $lastName === '' || $dob === '' || $gender === '' || $email === '' || $strokeType === '' || $affectedHand === '') {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'error' => 'Please complete all required fields.']);
+        exit;
+    }
+
+    if ($age < 0 || $age > 130) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'error' => 'Age must be between 0 and 130.']);
+        exit;
+    }
+
+    if (!in_array($gender, ['Male', 'Female', 'Other'], true)) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'error' => 'Invalid gender.']);
+        exit;
+    }
+
+    if (!in_array($affectedHand, ['Left', 'Right'], true)) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'error' => 'Affected hand must be Left or Right.']);
+        exit;
+    }
+
+    $dateObj = DateTime::createFromFormat('Y-m-d', $dob);
+    if (!$dateObj || $dateObj->format('Y-m-d') !== $dob) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'error' => 'DOB must be a valid date.']);
+        exit;
+    }
+
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'error' => 'Email address must be valid.']);
+        exit;
+    }
+
+    if ($backupContact !== '') {
+        $backupCompact = str_replace(' ', '', $backupContact);
+        $backupIsEmail = filter_var($backupContact, FILTER_VALIDATE_EMAIL) !== false;
+        $backupIsPhone = preg_match('/^\+?\d{7,15}$/', $backupCompact) === 1;
+        if (!$backupIsEmail && !$backupIsPhone) {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'error' => 'Backup contact must be a valid phone number or email.']);
+            exit;
+        }
+    }
+
+    $fullName = trim($firstName . ' ' . $lastName);
+    $linkedUserId = (int) ($patient['user_id'] ?? 0);
+
+    if ($linkedUserId > 0 && $usersTable && $userIdColumn && $userEmailColumn) {
+        $userEmailConflict = $pdo->prepare('SELECT 1 FROM ' . $usersTable . ' WHERE ' . $userEmailColumn . ' = ? AND ' . $userIdColumn . ' <> ? LIMIT 1');
+        $userEmailConflict->execute([$email, $linkedUserId]);
+        if ($userEmailConflict->fetchColumn()) {
+            http_response_code(409);
+            echo json_encode(['ok' => false, 'error' => 'Email already exists.']);
+            exit;
+        }
+    }
+
+    $updatePatient = $pdo->prepare(
+        'UPDATE patients
+         SET name = ?, first_name = ?, last_name = ?, date_of_birth = ?, age = ?, gender = ?, contact = ?, backup_email = ?, stroke_type = ?, affected_hand = ?
+         WHERE id = ? AND doctor_id = ?
+         LIMIT 1'
+    );
+    $updatePatient->execute([
+        $fullName,
+        $firstName,
+        $lastName,
+        $dob,
+        $age,
+        $gender,
+        $email,
+        $backupContact !== '' ? $backupContact : null,
+        $strokeType,
+        $affectedHand,
+        $patientId,
+        $doctorId
+    ]);
+
+    if ($linkedUserId > 0 && $usersTable && $userIdColumn) {
+        $userUpdateParts = [];
+        $userUpdateValues = [];
+
+        if ($userEmailColumn) {
+            $userUpdateParts[] = $userEmailColumn . ' = ?';
+            $userUpdateValues[] = $email;
+        }
+
+        if ($userUsernameColumn) {
+            $nextUsername = trim((string) ($patient['username'] ?? ''));
+            if ($nextUsername !== '') {
+                $userUpdateParts[] = $userUsernameColumn . ' = ?';
+                $userUpdateValues[] = $nextUsername;
+            }
+        }
+
+        if ($userUpdateParts) {
+            $userUpdateValues[] = $linkedUserId;
+            $updateUserProfile = $pdo->prepare('UPDATE ' . $usersTable . ' SET ' . implode(', ', $userUpdateParts) . ' WHERE ' . $userIdColumn . ' = ? LIMIT 1');
+            $updateUserProfile->execute($userUpdateValues);
+        }
+    }
+}
+
+if ($isPasswordUpdateRequested) {
+    if ($currentPassword === '' || $newPassword === '' || $confirmNewPassword === '') {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'error' => 'Please provide current password, new password, and repeat password.']);
+        exit;
+    }
+
+    if (!hash_equals($newPassword, $confirmNewPassword)) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'error' => 'New password and repeat password must match.']);
+        exit;
+    }
+
     if (strlen($newPassword) < 6 || !preg_match('/[A-Z]/', $newPassword) || !preg_match('/\d/', $newPassword) || !preg_match('/[^A-Za-z0-9]/', $newPassword)) {
         http_response_code(422);
         echo json_encode(['ok' => false, 'error' => 'Password must be at least 6 characters with uppercase, number, and special character.']);
         exit;
     }
-}
 
-$fullName = trim($firstName . ' ' . $lastName);
-
-$updatePatient = $pdo->prepare(
-    'UPDATE patients
-     SET name = ?, first_name = ?, last_name = ?, date_of_birth = ?, age = ?, gender = ?, contact = ?, backup_email = ?, stroke_type = ?, affected_hand = ?
-     WHERE id = ? AND doctor_id = ?
-     LIMIT 1'
-);
-$updatePatient->execute([
-    $fullName,
-    $firstName,
-    $lastName,
-    $dob,
-    $age,
-    $gender,
-    $email,
-    $backupContact !== '' ? $backupContact : null,
-    $strokeType,
-    $affectedHand,
-    $patientId,
-    $doctorId
-]);
-
-if ($newPassword !== '' && $usersTable && $userIdColumn && $userPasswordColumn) {
+    $linkedUserPasswordHash = '';
     $linkedUserId = (int) ($patient['user_id'] ?? 0);
-    if ($linkedUserId > 0) {
-        $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
-        $updateUser = $pdo->prepare('UPDATE ' . $usersTable . ' SET ' . $userPasswordColumn . ' = ? WHERE ' . $userIdColumn . ' = ? LIMIT 1');
-        $updateUser->execute([$passwordHash, $linkedUserId]);
+    if ($usersTable && $userIdColumn && $userPasswordColumn && $linkedUserId > 0) {
+        try {
+            $userPasswordStmt = $pdo->prepare('SELECT ' . $userPasswordColumn . ' AS stored_hash FROM ' . $usersTable . ' WHERE ' . $userIdColumn . ' = ? LIMIT 1');
+            $userPasswordStmt->execute([$linkedUserId]);
+            $linkedUserRow = $userPasswordStmt->fetch(PDO::FETCH_ASSOC);
+            $linkedUserPasswordHash = trim((string) ($linkedUserRow['stored_hash'] ?? ''));
+        } catch (Throwable $e) {
+            $linkedUserPasswordHash = '';
+        }
     }
-}
 
-if ($newPassword !== '') {
-    $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
+    $patientPasswordHash = trim((string) ($patient['password_hash'] ?? ''));
+    $currentPasswordValid = passwordHashMatches($currentPassword, $patientPasswordHash)
+        || passwordHashMatches($currentPassword, $linkedUserPasswordHash);
+
+    if (!$currentPasswordValid) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'error' => 'Current password is incorrect.']);
+        exit;
+    }
+
+    $nextPasswordHash = password_hash($newPassword, PASSWORD_DEFAULT);
+    if ($usersTable && $userIdColumn && $userPasswordColumn && $linkedUserId > 0) {
+        $updateUser = $pdo->prepare('UPDATE ' . $usersTable . ' SET ' . $userPasswordColumn . ' = ? WHERE ' . $userIdColumn . ' = ? LIMIT 1');
+        $updateUser->execute([$nextPasswordHash, $linkedUserId]);
+    }
+
     $updatePatientPassword = $pdo->prepare('UPDATE patients SET password_hash = ? WHERE id = ? AND doctor_id = ? LIMIT 1');
-    $updatePatientPassword->execute([$passwordHash, $patientId, $doctorId]);
+    $updatePatientPassword->execute([$nextPasswordHash, $patientId, $doctorId]);
 }
 
 echo json_encode(['ok' => true]);

@@ -80,19 +80,31 @@ function getCurrentPatient(PDO $pdo): array
     $patient = null;
 
     if ($patientSessionId > 0) {
-        $stmt = $pdo->prepare('SELECT * FROM patients WHERE id = ? LIMIT 1');
-        $stmt->execute([$patientSessionId]);
+        if ($hasUserId && $userId > 0) {
+            $stmt = $pdo->prepare('SELECT * FROM patients WHERE id = ? AND user_id = ? LIMIT 1');
+            $stmt->execute([$patientSessionId, $userId]);
+            $patient = $stmt->fetch();
+        } else {
+            $stmt = $pdo->prepare('SELECT * FROM patients WHERE id = ? LIMIT 1');
+            $stmt->execute([$patientSessionId]);
+            $patient = $stmt->fetch();
+        }
+    }
+
+    if (!$patient && $hasUserId && $hasUsername && $userId > 0 && $username !== '') {
+        $stmt = $pdo->prepare('SELECT * FROM patients WHERE user_id = ? AND username = ? LIMIT 1');
+        $stmt->execute([$userId, $username]);
         $patient = $stmt->fetch();
     }
 
     if (!$patient && $hasUserId && $userId > 0) {
-        $stmt = $pdo->prepare('SELECT * FROM patients WHERE user_id = ? LIMIT 1');
+        $stmt = $pdo->prepare('SELECT * FROM patients WHERE user_id = ? ORDER BY id DESC LIMIT 1');
         $stmt->execute([$userId]);
         $patient = $stmt->fetch();
     }
 
     if (!$patient && $hasUsername && $username !== '') {
-        $stmt = $pdo->prepare('SELECT * FROM patients WHERE username = ? LIMIT 1');
+        $stmt = $pdo->prepare('SELECT * FROM patients WHERE username = ? ORDER BY id DESC LIMIT 1');
         $stmt->execute([$username]);
         $patient = $stmt->fetch();
     }

@@ -323,8 +323,8 @@
                 <label class="field-group">
                     <span>Password</span>
                     <div class="patient-inline-edit-wrap">
-                        <input type="password" id="patientInfoPassword" placeholder="Leave blank to keep current">
-                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoPassword" aria-label="Edit password">
+                        <input type="text" id="patientInfoPassword" value="••••••••" readonly>
+                        <button type="button" class="patient-inline-edit-btn" data-password-edit-trigger="true" aria-label="Open change password dialog">
                             <i class="fa-solid fa-pen" aria-hidden="true"></i>
                         </button>
                     </div>
@@ -353,10 +353,55 @@
                 </label>
             </div>
             <div class="wizard-actions wizard-actions-end patient-info-actions">
-                <button type="button" class="doctor-btn" id="cancelPatientInfoBtn">Cancel</button>
-                <button type="submit" class="sign-in-btn" id="savePatientInfoBtn">Save Changes</button>
+                <button type="button" class="sign-in-btn" id="donePatientInfoBtn">Done</button>
             </div>
             <p class="notes-save-feedback" id="patientInfoFeedback" aria-live="polite"></p>
+        </form>
+    </div>
+</div>
+
+<div class="patients-modal" id="patientPasswordModal" role="dialog" aria-modal="true" aria-labelledby="patientPasswordTitle" hidden>
+    <div class="patients-modal-backdrop" id="patientPasswordModalBackdrop"></div>
+    <div class="patients-modal-card widget widget-blue patient-password-modal-card">
+        <button type="button" class="patients-modal-close" id="closePatientPasswordModal" aria-label="Close change password dialog">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <h2 id="patientPasswordTitle">Change Password</h2>
+        <form id="patientPasswordForm" novalidate>
+            <div class="field-grid">
+                <label class="field-group required-field">
+                    <span>Current Password</span>
+                    <div class="registration-password-wrap">
+                        <input type="password" id="patientCurrentPassword" autocomplete="current-password" spellcheck="false" required>
+                        <button type="button" class="registration-password-toggle patient-password-toggle" data-password-target="patientCurrentPassword" aria-label="Show current password" aria-pressed="false">
+                            <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </label>
+                <label class="field-group required-field">
+                    <span>New Password</span>
+                    <div class="registration-password-wrap">
+                        <input type="password" id="patientNewPassword" minlength="6" autocomplete="new-password" spellcheck="false" required>
+                        <button type="button" class="registration-password-toggle patient-password-toggle" data-password-target="patientNewPassword" aria-label="Show new password" aria-pressed="false">
+                            <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </label>
+                <label class="field-group required-field">
+                    <span>Repeat New Password</span>
+                    <div class="registration-password-wrap">
+                        <input type="password" id="patientRepeatPassword" minlength="6" autocomplete="new-password" spellcheck="false" required>
+                        <button type="button" class="registration-password-toggle patient-password-toggle" data-password-target="patientRepeatPassword" aria-label="Show repeated password" aria-pressed="false">
+                            <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </label>
+            </div>
+            <div class="wizard-actions patient-info-actions patient-password-actions">
+                <button type="button" class="doctor-btn" id="cancelPatientPasswordBtn">Cancel</button>
+                <button type="submit" class="sign-in-btn" id="savePatientPasswordBtn">Update Password</button>
+            </div>
+            <p class="notes-save-feedback" id="patientPasswordFeedback" aria-live="polite"></p>
         </form>
     </div>
 </div>

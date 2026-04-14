@@ -1645,7 +1645,7 @@ function initializePatientsPage() {
     const patientInfoModal = document.getElementById("patientInfoModal");
     const patientInfoModalBackdrop = document.getElementById("patientInfoModalBackdrop");
     const closePatientInfoModalButton = document.getElementById("closePatientInfoModal");
-    const cancelPatientInfoBtn = document.getElementById("cancelPatientInfoBtn");
+    const donePatientInfoBtn = document.getElementById("donePatientInfoBtn");
     const patientInfoForm = document.getElementById("patientInfoForm");
     const patientInfoFeedback = document.getElementById("patientInfoFeedback");
     const patientInfoFirstName = document.getElementById("patientInfoFirstName");
@@ -1660,6 +1660,16 @@ function initializePatientsPage() {
     const patientInfoStrokeType = document.getElementById("patientInfoStrokeType");
     const patientInfoAffectedHand = document.getElementById("patientInfoAffectedHand");
     const patientInlineEditButtons = patientInfoModal ? Array.from(patientInfoModal.querySelectorAll(".patient-inline-edit-btn")) : [];
+    const patientPasswordModal = document.getElementById("patientPasswordModal");
+    const patientPasswordModalBackdrop = document.getElementById("patientPasswordModalBackdrop");
+    const closePatientPasswordModalButton = document.getElementById("closePatientPasswordModal");
+    const cancelPatientPasswordBtn = document.getElementById("cancelPatientPasswordBtn");
+    const patientPasswordForm = document.getElementById("patientPasswordForm");
+    const patientCurrentPassword = document.getElementById("patientCurrentPassword");
+    const patientNewPassword = document.getElementById("patientNewPassword");
+    const patientRepeatPassword = document.getElementById("patientRepeatPassword");
+    const patientPasswordFeedback = document.getElementById("patientPasswordFeedback");
+    const patientPasswordToggles = patientPasswordForm ? Array.from(patientPasswordForm.querySelectorAll('.patient-password-toggle[data-password-target]')) : [];
 
     const profileName = document.getElementById("profilePatientName");
     const profileBreadcrumbName = document.getElementById("patientProfileBreadcrumbName");
@@ -1803,7 +1813,7 @@ function initializePatientsPage() {
     }
 
     // Load patients from the API.
-    fetch('api/patients/list.php')
+    fetch('api/patients/list.php', { cache: 'no-store' })
         .then(response => response.ok ? response.json() : null)
         .then(data => {
             if (!Array.isArray(data)) {
@@ -2263,7 +2273,7 @@ function initializePatientsPage() {
             throw new Error("Invalid patient selected.");
         }
 
-        const response = await fetch(`api/patients/profile_manage.php?patientId=${patientDbId}`);
+        const response = await fetch(`api/patients/profile_manage.php?patientId=${patientDbId}`, { cache: "no-store" });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || !payload?.ok || !payload?.patient) {
             throw new Error(payload?.error || "Unable to load patient information.");
@@ -2278,7 +2288,7 @@ function initializePatientsPage() {
         if (patientInfoEmail) patientInfoEmail.value = String(details.email || "");
         if (patientInfoBackupContact) patientInfoBackupContact.value = String(details.backupContact || "");
         if (patientInfoUsername) patientInfoUsername.value = String(details.username || "");
-        if (patientInfoPassword) patientInfoPassword.value = "";
+        if (patientInfoPassword) patientInfoPassword.value = "••••••••";
         if (patientInfoStrokeType) patientInfoStrokeType.value = String(details.strokeType || "");
         if (patientInfoAffectedHand) patientInfoAffectedHand.value = String(details.affectedHand || "");
     }
@@ -2323,6 +2333,27 @@ function initializePatientsPage() {
         });
     }
 
+    async function commitInlinePatientField(button, fieldElement) {
+        if (patientInfoFeedback) {
+            patientInfoFeedback.textContent = "Saving changes...";
+        }
+
+        button.disabled = true;
+        try {
+            await savePatientInfoFromModal();
+            setInlineFieldEditing(fieldElement, button, false);
+            if (patientInfoFeedback) {
+                patientInfoFeedback.textContent = "Saved.";
+            }
+        } catch (error) {
+            if (patientInfoFeedback) {
+                patientInfoFeedback.textContent = error instanceof Error ? error.message : "Unable to save patient information.";
+            }
+        } finally {
+            button.disabled = false;
+        }
+    }
+
     function openPatientInfoModal() {
         if (!patientInfoModal) {
             return;
@@ -2359,6 +2390,52 @@ function initializePatientsPage() {
         document.body.style.overflow = "";
     }
 
+    function openPatientPasswordModal() {
+        if (!patientPasswordModal) {
+            return;
+        }
+
+        if (patientPasswordFeedback) {
+            patientPasswordFeedback.textContent = "";
+        }
+        if (patientPasswordForm) {
+            patientPasswordForm.reset();
+        }
+        patientPasswordToggles.forEach(toggleButton => {
+            const targetId = String(toggleButton.getAttribute("data-password-target") || "").trim();
+            const targetInput = targetId ? document.getElementById(targetId) : null;
+            if (targetInput instanceof HTMLInputElement) {
+                targetInput.type = "password";
+            }
+            toggleButton.setAttribute("aria-pressed", "false");
+            const icon = toggleButton.querySelector("i");
+            if (icon) {
+                icon.className = "fa-regular fa-eye";
+            }
+        });
+
+        patientPasswordModal.hidden = false;
+        document.body.style.overflow = "hidden";
+        patientCurrentPassword?.focus();
+    }
+
+    function closePatientPasswordModal() {
+        if (!patientPasswordModal) {
+            return;
+        }
+
+        patientPasswordModal.hidden = true;
+        if (patientPasswordForm) {
+            patientPasswordForm.reset();
+        }
+        if (patientPasswordFeedback) {
+            patientPasswordFeedback.textContent = "";
+        }
+        if (!patientInfoModal || patientInfoModal.hidden) {
+            document.body.style.overflow = "";
+        }
+    }
+
     async function savePatientInfoFromModal() {
         const patient = activePatientRecord();
         if (!patient) {
@@ -2380,8 +2457,7 @@ function initializePatientsPage() {
             email: String(patientInfoEmail?.value || "").trim(),
             backupContact: String(patientInfoBackupContact?.value || "").trim(),
             strokeType: String(patientInfoStrokeType?.value || "").trim(),
-            affectedHand: String(patientInfoAffectedHand?.value || "").trim(),
-            password: String(patientInfoPassword?.value || "")
+            affectedHand: String(patientInfoAffectedHand?.value || "").trim()
         };
 
         const response = await fetch("api/patients/profile_manage.php", {
@@ -2412,6 +2488,45 @@ function initializePatientsPage() {
 
         setProfilePatient(patient.id);
         renderPatientTable();
+    }
+
+    async function savePatientPasswordFromModal() {
+        const patient = activePatientRecord();
+        if (!patient) {
+            throw new Error("No active patient selected.");
+        }
+
+        const patientDbId = Number(patient.dbId || 0);
+        if (!patientDbId) {
+            throw new Error("Invalid patient selected.");
+        }
+
+        const currentPassword = String(patientCurrentPassword?.value || "");
+        const newPassword = String(patientNewPassword?.value || "");
+        const confirmNewPassword = String(patientRepeatPassword?.value || "");
+
+        if (!currentPassword || !newPassword || !confirmNewPassword) {
+            throw new Error("Please complete all password fields.");
+        }
+
+        const response = await fetch("api/patients/profile_manage.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                patientId: patientDbId,
+                currentPassword,
+                newPassword,
+                confirmNewPassword
+            })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload?.ok) {
+            throw new Error(payload?.error || "Unable to update password.");
+        }
+
+        if (patientInfoPassword) {
+            patientInfoPassword.value = "••••••••";
+        }
     }
 
     async function saveClinicalData(patientDbId, { diagnosis, treatmentGoal, doctorNotes }, options = {}) {
@@ -2869,31 +2984,63 @@ function initializePatientsPage() {
     modalBackdrop?.addEventListener("click", closeModal);
     openPatientInfoModalButton?.addEventListener("click", openPatientInfoModal);
     closePatientInfoModalButton?.addEventListener("click", closePatientInfoModal);
-    cancelPatientInfoBtn?.addEventListener("click", closePatientInfoModal);
+    donePatientInfoBtn?.addEventListener("click", closePatientInfoModal);
     patientInfoModalBackdrop?.addEventListener("click", closePatientInfoModal);
+    closePatientPasswordModalButton?.addEventListener("click", closePatientPasswordModal);
+    cancelPatientPasswordBtn?.addEventListener("click", closePatientPasswordModal);
+    patientPasswordModalBackdrop?.addEventListener("click", closePatientPasswordModal);
+
+    patientPasswordForm?.addEventListener("submit", async event => {
+        event.preventDefault();
+        if (patientPasswordFeedback) {
+            patientPasswordFeedback.textContent = "Saving password...";
+        }
+
+        try {
+            await savePatientPasswordFromModal();
+            closePatientPasswordModal();
+        } catch (error) {
+            if (patientPasswordFeedback) {
+                patientPasswordFeedback.textContent = error instanceof Error ? error.message : "Unable to update password.";
+            }
+        }
+    });
+
+    patientPasswordToggles.forEach(toggleButton => {
+        toggleButton.addEventListener("click", () => {
+            const targetId = String(toggleButton.getAttribute("data-password-target") || "").trim();
+            if (!targetId) {
+                return;
+            }
+
+            const targetInput = document.getElementById(targetId);
+            if (!(targetInput instanceof HTMLInputElement)) {
+                return;
+            }
+
+            const show = targetInput.type === "password";
+            targetInput.type = show ? "text" : "password";
+            toggleButton.setAttribute("aria-pressed", show ? "true" : "false");
+
+            const icon = toggleButton.querySelector("i");
+            if (icon) {
+                icon.className = show ? "fa-regular fa-eye-slash" : "fa-regular fa-eye";
+            }
+        });
+    });
 
     patientInfoForm?.addEventListener("submit", event => {
         event.preventDefault();
-        if (patientInfoFeedback) {
-            patientInfoFeedback.textContent = "Saving patient information...";
-        }
-
-        savePatientInfoFromModal()
-            .then(() => {
-                if (patientInfoFeedback) {
-                    patientInfoFeedback.textContent = "Patient information saved.";
-                }
-                closePatientInfoModal();
-            })
-            .catch(error => {
-                if (patientInfoFeedback) {
-                    patientInfoFeedback.textContent = error instanceof Error ? error.message : "Unable to save patient information.";
-                }
-            });
     });
 
     patientInlineEditButtons.forEach(button => {
         button.addEventListener("click", () => {
+            const isPasswordTrigger = button.getAttribute("data-password-edit-trigger") === "true";
+            if (isPasswordTrigger) {
+                openPatientPasswordModal();
+                return;
+            }
+
             const targetId = String(button.getAttribute("data-inline-edit-target") || "").trim();
             if (!targetId) {
                 return;
@@ -2905,7 +3052,12 @@ function initializePatientsPage() {
             }
 
             const currentlyEditing = button.classList.contains("is-editing");
-            setInlineFieldEditing(field, button, !currentlyEditing);
+            if (!currentlyEditing) {
+                setInlineFieldEditing(field, button, true);
+                return;
+            }
+
+            void commitInlinePatientField(button, field);
         });
     });
 
@@ -2916,7 +3068,6 @@ function initializePatientsPage() {
         patientInfoAge,
         patientInfoEmail,
         patientInfoBackupContact,
-        patientInfoPassword,
         patientInfoStrokeType
     ].forEach(field => {
         field?.addEventListener("keydown", event => {
@@ -2932,7 +3083,7 @@ function initializePatientsPage() {
 
             if (button.classList.contains("is-editing")) {
                 event.preventDefault();
-                setInlineFieldEditing(field, button, false);
+                void commitInlinePatientField(button, field);
             }
         });
     });
@@ -3008,6 +3159,9 @@ function initializePatientsPage() {
     document.addEventListener("keydown", event => {
         if (event.key === "Escape" && modal && !modal.hidden) {
             closeModal();
+        }
+        if (event.key === "Escape" && patientPasswordModal && !patientPasswordModal.hidden) {
+            closePatientPasswordModal();
         }
         if (event.key === "Escape" && patientInfoModal && !patientInfoModal.hidden) {
             closePatientInfoModal();
@@ -6558,6 +6712,7 @@ function initializePatientSettingsPage() {
     let initialBackupContact = "";
     let initialUsername = "";
     let isPasswordEditing = false;
+    let profileSyncTimer = null;
 
     function setFeedback(message) {
         if (feedback) {
@@ -6624,6 +6779,53 @@ function initializePatientSettingsPage() {
             ageInput.value = String(parsedAge);
         } else {
             ageInput.value = "Not Provided";
+        }
+    }
+
+    function isInlineEditing(input) {
+        if (!input) {
+            return false;
+        }
+        const group = input.closest(".has-inline-edit");
+        return Boolean(group && group.classList.contains("is-editing"));
+    }
+
+    function applyPatientSettingsProfile(profile, allowEditableOverwrite = true) {
+        if (!profile || typeof profile !== "object") {
+            return;
+        }
+
+        setReadonlyValue(fullNameInput, profile.full_name, "Not Provided");
+        setReadonlyValue(dateOfBirthInput, profile.date_of_birth_display, "Not Provided");
+        setPatientAge(profile.age);
+        setReadonlyValue(genderInput, profile.gender, "Not Provided");
+        setMedicalInfo(profile);
+
+        const nextPhone = String(profile.phone || "").trim();
+        const nextBackup = String(profile.backup_contact || "").trim();
+        const nextUsername = String(profile.username || "").trim();
+
+        const canOverwritePhone = allowEditableOverwrite && !isInlineEditing(phoneInput);
+        const canOverwriteBackup = allowEditableOverwrite && !isInlineEditing(backupContactInput);
+
+        if (canOverwritePhone) {
+            initialPhone = nextPhone;
+            setEditableDisplay(phoneInput, initialPhone, "Not Provided");
+            setFieldEditing(phoneInput?.closest(".has-inline-edit"), phoneInput, phoneEditButton, false);
+        }
+
+        if (canOverwriteBackup) {
+            initialBackupContact = nextBackup;
+            setEditableDisplay(backupContactInput, initialBackupContact, "Not Provided");
+            setFieldEditing(backupContactInput?.closest(".has-inline-edit"), backupContactInput, backupEditButton, false);
+        }
+
+        if (allowEditableOverwrite) {
+            initialUsername = nextUsername;
+            setEditableDisplay(usernameInput, initialUsername, "Not Provided");
+            if (usernameInput) {
+                usernameInput.readOnly = true;
+            }
         }
     }
 
@@ -6941,27 +7143,31 @@ function initializePatientSettingsPage() {
                 throw new Error(payload?.error || "Unable to load patient profile.");
             }
 
-            const profile = payload.profile || {};
-            setReadonlyValue(fullNameInput, profile.full_name, "Not Provided");
-            setReadonlyValue(dateOfBirthInput, profile.date_of_birth_display, "Not Provided");
-            setPatientAge(profile.age);
-            setReadonlyValue(genderInput, profile.gender, "Not Provided");
-            setMedicalInfo(profile);
-
-            initialPhone = String(profile.phone || "").trim();
-            initialBackupContact = String(profile.backup_contact || "").trim();
-            initialUsername = String(profile.username || "").trim();
-
-            setEditableDisplay(phoneInput, initialPhone, "Not Provided");
-            setEditableDisplay(backupContactInput, initialBackupContact, "Not Provided");
-            setEditableDisplay(usernameInput, initialUsername, "Not Provided");
-
-            setFieldEditing(phoneInput?.closest(".has-inline-edit"), phoneInput, phoneEditButton, false);
-            setFieldEditing(backupContactInput?.closest(".has-inline-edit"), backupContactInput, backupEditButton, false);
-            usernameInput.readOnly = true;
+            applyPatientSettingsProfile(payload.profile || {}, true);
 
             setFeedback("");
             setSyncStatus(payload.syncStatus || "");
+
+            if (profileSyncTimer === null) {
+                profileSyncTimer = window.setInterval(() => {
+                    if (document.hidden || isPasswordEditing) {
+                        return;
+                    }
+
+                    fetch("api/patient/profile.php", { cache: "no-store" })
+                        .then(response => response.ok ? response.json() : null)
+                        .then(livePayload => {
+                            if (!livePayload?.ok || !livePayload?.profile) {
+                                return;
+                            }
+
+                            applyPatientSettingsProfile(livePayload.profile, true);
+                        })
+                        .catch(() => {
+                            // Keep current visible state until next successful poll.
+                        });
+                }, 15000);
+            }
         })
         .catch(() => {
             setFeedback("Unable to load profile settings.");
