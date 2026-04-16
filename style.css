@@ -7834,21 +7834,21 @@ body.dark-mode .exercise-plan-meta strong {
 
 /* Doctor settings viewport-only redesign */
 .settings-page .settings-content {
-  align-items: stretch;
-  justify-content: stretch;
+  align-items: flex-start;
+  justify-content: center;
   min-height: 100vh;
-  height: 100vh;
-  padding: 10px;
-  overflow: hidden;
+  height: auto;
+  padding: 12px 14px 24px;
+  overflow: auto;
   background: #f8fafc;
 }
 
 .settings-page .settings-shell {
-  width: 100%;
-  max-width: 100%;
-  height: 100%;
-  gap: 8px;
-  overflow: hidden;
+  width: min(1520px, 100%);
+  max-width: 1520px;
+  height: auto;
+  gap: 10px;
+  overflow: visible;
   font-family: "Inter", "Public Sans", "Segoe UI", sans-serif;
 }
 
@@ -7857,142 +7857,234 @@ body.dark-mode .exercise-plan-meta strong {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 2px 2px 0;
+  padding: 0;
+}
+
+.settings-page .settings-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-page .settings-edit-btn {
+  min-height: 42px;
+  border-radius: 8px;
+  border: 1px solid rgba(61, 122, 143, 0.45);
+  background: #ffffff;
+  color: #2f6072;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-page .settings-edit-btn.is-active {
+  border-color: #3d7a8f;
+  background: rgba(61, 122, 143, 0.14);
+  color: #1f5668;
 }
 
 .settings-page .settings-header-row h1 {
   margin: 0;
-  font-size: clamp(1.6rem, 1.15rem + 1vw, 2rem);
-  color: #173947;
+  font-size: clamp(2.05rem, 1.85rem + 0.5vw, 2.4rem);
+  color: #1c4a63;
 }
 
 .settings-page .settings-header-row .subheader {
-  margin: 2px 0 0;
-  color: #4f6d79;
+  margin: 1px 0 0;
+  color: #5b7a8d;
+  font-size: 1rem;
 }
 
 .settings-page .settings-top-logout {
-  min-height: 40px;
+  min-height: 42px;
   border-radius: 8px;
   border-width: 1px;
+  border-color: rgba(173, 58, 58, 0.5);
+  background: rgba(227, 92, 92, 0.08);
+  color: #8f2727;
   padding: 0 14px;
 }
 
 .settings-page .settings-card {
-  border: 1px solid #dbe6ec;
-  border-radius: 10px;
-  box-shadow: 0 10px 20px rgba(26, 73, 88, 0.08);
-  background: #ffffff;
-  padding: 8px;
-  gap: 8px;
-  height: min(100%, calc(100vh - 92px));
+  border: 0;
+  border-radius: 12px;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+  gap: 12px;
+  height: auto;
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: minmax(0, 1fr) auto auto;
-  overflow: hidden;
+  grid-template-rows: auto auto;
+  overflow: visible;
+}
+
+.settings-page .sidebar-footer .logout-btn,
+.settings-page .settings-top-logout {
+  display: none;
 }
 
 .settings-page .settings-viewport-grid {
-  min-height: 0;
+  min-height: auto;
   display: grid;
-  grid-template-columns: 148px minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
 }
 
 .settings-page .settings-mini-nav {
-  border: 1px solid #dbe6ec;
-  border-radius: 8px;
-  background: #ffffff;
-  padding: 8px;
-  display: grid;
-  grid-auto-rows: minmax(0, max-content);
-  gap: 8px;
-  align-content: start;
+  display: none;
 }
 
 .settings-page .settings-mini-nav-btn {
-  border: 1px solid #d3e1e8;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #325769;
-  font-weight: 700;
-  min-height: 44px;
-  padding: 0 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  display: none;
 }
 
 .settings-page .settings-mini-nav-btn.is-active,
 .settings-page .settings-mini-nav-btn:hover,
 .settings-page .settings-mini-nav-btn:focus-visible {
-  background: rgba(61, 122, 143, 0.1);
-  border-color: #3d7a8f;
-  color: #1f5668;
-  outline: none;
+  display: none;
 }
 
 .settings-page .settings-pane-grid {
-  min-height: 0;
+  min-height: auto;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  grid-template-areas:
+    "profile security"
+    "professional security";
+  gap: 18px;
+}
+
+.settings-page #settingsPaneProfile {
+  grid-area: profile;
+}
+
+.settings-page #settingsPaneProfessional {
+  grid-area: professional;
+}
+
+.settings-page #settingsPaneSecurity {
+  grid-area: security;
+}
+
+.settings-page .settings-profile-grid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.settings-page .settings-avatar-uploader {
+  gap: 10px;
+}
+
+.settings-page .settings-avatar-preview {
+  width: 126px;
+  height: 126px;
+  border-radius: 999px;
+}
+
+.settings-page .settings-avatar-preview i {
+  font-size: 2.35rem;
+}
+
+.settings-page .settings-profile-main-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.settings-page .settings-profile-main-fields .field-group {
+  margin: 0;
 }
 
 .settings-page .settings-section {
-  min-height: 0;
+  min-height: auto;
   margin: 0;
-  border-radius: 8px;
-  border: 1px solid #dbe6ec;
-  background: #ffffff;
-  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid #b7d3d8;
+  background: #c9d8d8;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 10px rgba(28, 70, 84, 0.05);
+  box-shadow: none;
 }
 
 .settings-page .settings-section.is-focused {
-  border-color: #3d7a8f;
-  box-shadow: 0 0 0 2px rgba(61, 122, 143, 0.15);
+  border-color: #9dc0c8;
+  box-shadow: none;
 }
 
 .settings-page .settings-section .section-head {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .settings-page .settings-section .section-head h2 {
-  font-size: 1.05rem;
+  font-size: 2.05rem;
+  color: #2b6f8d;
   margin: 0;
 }
 
+.settings-page .settings-section .section-badge {
+  background: rgba(61, 122, 143, 0.16);
+  color: #2b6f8d;
+}
+
 .settings-page .settings-section .field-grid {
-  gap: 8px;
+  gap: 12px 16px;
+}
+
+.settings-page .settings-section .field-grid-two {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.settings-page .settings-section .field-group-span-2 {
+  grid-column: span 4;
 }
 
 .settings-page .settings-section .field-group span {
-  font-size: 0.8rem;
+  font-size: 1rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
-  color: #4a6674;
-  margin-bottom: 4px;
+  letter-spacing: 0;
+  color: #2b6f8d;
+  margin-bottom: 6px;
 }
 
 .settings-page .settings-section .field-group input,
 .settings-page .settings-section .field-group select,
 .settings-page .settings-section .field-group textarea {
-  min-height: 38px;
-  border-radius: 8px;
-  border: 1px solid #dbe6ec;
-  background: #ffffff;
-  font-size: 0.93rem;
-  padding: 8px 10px;
+  min-height: 54px;
+  border-radius: 12px;
+  border: 1px solid #b7ccd7;
+  background: #dfe5ea;
+  color: #18465f;
+  font-size: 1.05rem;
+  font-weight: 600;
+  padding: 10px 14px;
   box-shadow: none;
 }
 
+.settings-page #settingsForm.is-locked .field-group input,
+.settings-page #settingsForm.is-locked .field-group select,
+.settings-page #settingsForm.is-locked .field-group textarea {
+  background: #e8eef2;
+  color: #496877;
+}
+
+.settings-page #settingsForm.is-locked .settings-avatar-uploader {
+  pointer-events: none;
+  opacity: 0.72;
+}
+
+.settings-page #settingsForm.is-locked .settings-password-toggle-wrap .doctor-btn,
+.settings-page #settingsForm.is-locked .settings-actions .doctor-btn,
+.settings-page #settingsForm.is-locked .settings-actions .sign-in-btn {
+  opacity: 0.55;
+}
+
 .settings-page .settings-section .field-group textarea {
-  min-height: 74px;
+  min-height: 72px;
   resize: none;
 }
 
@@ -8000,40 +8092,45 @@ body.dark-mode .exercise-plan-meta strong {
   margin-top: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 12px;
 }
 
 .settings-page .settings-password-toggle-wrap .doctor-btn {
-  min-height: 38px;
-  border-radius: 8px;
+  min-height: 48px;
+  border-radius: 12px;
   border-width: 1px;
+}
+
+.settings-page .settings-password-fields {
+  margin-top: 4px;
 }
 
 .settings-page .wizard-error {
   margin: 0;
-  min-height: 18px;
-  font-size: 0.84rem;
+  min-height: 20px;
+  font-size: 0.95rem;
   align-self: center;
+  color: #365f73;
 }
 
 .settings-page .settings-actions {
   margin: 0;
-  padding: 8px;
-  border-top: 1px solid #dbe6ec;
-  border-radius: 8px;
-  background: #ffffff;
+  padding: 10px 0 0;
+  border-top: none;
+  border-radius: 0;
+  background: transparent;
   display: grid;
-  grid-template-columns: 160px minmax(0, 1fr);
-  gap: 10px;
-  position: sticky;
-  bottom: 0;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 12px;
+  position: static;
 }
 
 .settings-page .settings-actions .doctor-btn,
 .settings-page .settings-actions .sign-in-btn {
-  min-height: 44px;
-  border-radius: 8px;
+  min-height: 56px;
+  border-radius: 12px;
   border-width: 1px;
+  font-size: 1.08rem;
 }
 
 .settings-page .settings-actions .sign-in-btn {
@@ -8048,12 +8145,18 @@ body.dark-mode .exercise-plan-meta strong {
 }
 
 @media (max-width: 1360px) {
-  .settings-page .settings-pane-grid {
+  .settings-page .settings-section .field-grid-two {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .settings-page #settingsPaneSecurity {
-    grid-column: 1 / -1;
+  .settings-page .settings-section .field-group-span-2 {
+    grid-column: span 2;
+  }
+
+  .settings-page .settings-section .field-group input,
+  .settings-page .settings-section .field-group select,
+  .settings-page .settings-section .field-group textarea {
+    font-size: 1rem;
   }
 }
 
@@ -8069,21 +8172,45 @@ body.dark-mode .exercise-plan-meta strong {
     min-height: 0;
   }
 
-  .settings-page .settings-viewport-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .settings-page .settings-mini-nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .settings-page .settings-pane-grid {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "profile"
+      "professional"
+      "security";
+  }
+
+  .settings-page .settings-profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-page .settings-avatar-preview {
+    width: 108px;
+    height: 108px;
+  }
+
+  .settings-page .settings-section .field-grid-two {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-page .settings-section .field-group-span-2 {
+    grid-column: span 1;
+  }
+
+  .settings-page .settings-section .field-group input,
+  .settings-page .settings-section .field-group select,
+  .settings-page .settings-section .field-group textarea {
+    font-size: 1rem;
   }
 
   .settings-page .settings-actions {
     grid-template-columns: 1fr;
     position: static;
+  }
+
+  .settings-page .settings-header-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }
 

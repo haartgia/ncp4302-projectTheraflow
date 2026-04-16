@@ -7248,8 +7248,10 @@ function initializeSettingsPage() {
     const hospitalInput = document.getElementById("settingsHospital");
     const bioInput = document.getElementById("settingsBio");
     const emailInput = document.getElementById("settingsEmail");
+    const notificationPreferenceInput = document.getElementById("settingsNotificationPreference");
     const togglePasswordButton = document.getElementById("settingsTogglePasswordBtn");
     const quickPasswordButton = document.getElementById("settingsQuickPasswordBtn");
+    const editButton = document.getElementById("settingsEditBtn");
     const passwordFields = document.getElementById("settingsPasswordFields");
     const currentPasswordInput = document.getElementById("settingsCurrentPassword");
     const newPasswordInput = document.getElementById("settingsNewPassword");
@@ -7306,6 +7308,106 @@ function initializeSettingsPage() {
 
     let draftProfile = { ...defaultProfile };
     let isPasswordEditing = false;
+    let isSettingsEditable = false;
+
+    function setControlEditable(control, enabled) {
+        if (!control) {
+            return;
+        }
+
+        const tagName = control.tagName;
+        if (tagName === "SELECT") {
+            control.disabled = !enabled;
+            return;
+        }
+
+        if (tagName === "TEXTAREA") {
+            control.readOnly = !enabled;
+            return;
+        }
+
+        if (tagName === "INPUT") {
+            const inputType = (control.type || "").toLowerCase();
+            if (inputType === "file") {
+                control.disabled = !enabled;
+                return;
+            }
+
+            control.readOnly = !enabled;
+        }
+    }
+
+    function syncEditButtonState() {
+        if (!editButton) {
+            return;
+        }
+
+        editButton.classList.toggle("is-active", isSettingsEditable);
+        const editLabel = editButton.querySelector("span");
+        if (editLabel) {
+            editLabel.textContent = isSettingsEditable ? "Save Changes" : "Edit Details";
+        }
+    }
+
+    function setSettingsEditable(enabled) {
+        isSettingsEditable = enabled;
+
+        const controls = [
+            displayNameInput,
+            titleInput,
+            specialtyInput,
+            hospitalInput,
+            bioInput,
+            emailInput,
+            notificationPreferenceInput,
+            currentPasswordInput,
+            newPasswordInput,
+            confirmPasswordInput,
+            avatarInput
+        ];
+
+        controls.forEach(control => setControlEditable(control, enabled));
+
+        if (togglePasswordButton) {
+            togglePasswordButton.disabled = !enabled;
+        }
+        if (quickPasswordButton) {
+            quickPasswordButton.disabled = !enabled;
+        }
+        if (cancelButton) {
+            cancelButton.disabled = !enabled;
+        }
+
+        if (!enabled) {
+            setPasswordEditing(false);
+        }
+
+        settingsForm?.classList.toggle("is-locked", !enabled);
+        syncEditButtonState();
+    }
+
+    function mergeProfileKeepingFilled(baseProfile, incomingProfile) {
+        const merged = { ...baseProfile };
+        const source = incomingProfile || {};
+
+        Object.keys(defaultProfile).forEach(key => {
+            const nextValue = source[key];
+
+            if (typeof nextValue === "string") {
+                const trimmed = nextValue.trim();
+                if (trimmed !== "") {
+                    merged[key] = nextValue;
+                }
+                return;
+            }
+
+            if (nextValue !== undefined && nextValue !== null) {
+                merged[key] = nextValue;
+            }
+        });
+
+        return merged;
+    }
 
     function getStoredProfile() {
         try {
@@ -7340,6 +7442,10 @@ function initializeSettingsPage() {
     }
 
     function setPasswordEditing(enabled) {
+        if (!isSettingsEditable && enabled) {
+            return;
+        }
+
         isPasswordEditing = enabled;
 
         if (passwordFields) {
@@ -7435,11 +7541,10 @@ function initializeSettingsPage() {
                 throw new Error(payload.error || "Could not load profile from server.");
             }
 
-            draftProfile = {
-                ...defaultProfile,
-                ...getStoredProfile(),
-                ...payload.profile
-            };
+            draftProfile = mergeProfileKeepingFilled(
+                { ...defaultProfile, ...getStoredProfile() },
+                payload.profile
+            );
 
             fillForm(draftProfile);
             localStorage.setItem(STORAGE_KEYS.doctorProfile, JSON.stringify(draftProfile));
@@ -7486,7 +7591,23 @@ function initializeSettingsPage() {
         draftProfile = getStoredProfile();
         fillForm(draftProfile);
         setPasswordEditing(false);
+        setSettingsEditable(false);
         setSettingsMessage("");
+    });
+
+    editButton?.addEventListener("click", () => {
+        if (!settingsForm) {
+            return;
+        }
+
+        if (!isSettingsEditable) {
+            setSettingsEditable(true);
+            setSettingsMessage("Edit mode enabled. Update fields then click Save Changes.");
+            displayNameInput?.focus();
+            return;
+        }
+
+        settingsForm.requestSubmit();
     });
 
     togglePasswordButton?.addEventListener("click", () => {
@@ -7506,6 +7627,11 @@ function initializeSettingsPage() {
     settingsForm?.addEventListener("submit", async event => {
         event.preventDefault();
         if (!(event.currentTarget instanceof HTMLFormElement)) {
+            return;
+        }
+
+        if (!isSettingsEditable) {
+            setSettingsMessage("Click Edit Details before saving changes.");
             return;
         }
 
@@ -7578,14 +7704,12 @@ function initializeSettingsPage() {
                 throw new Error(payload.error || "Unable to save settings.");
             }
 
-            draftProfile = {
-                ...nextProfile,
-                ...payload.profile
-            };
+            draftProfile = mergeProfileKeepingFilled(nextProfile, payload.profile);
 
             localStorage.setItem(STORAGE_KEYS.doctorProfile, JSON.stringify(draftProfile));
             fillForm(draftProfile);
             setPasswordEditing(false);
+            setSettingsEditable(false);
             setSettingsMessage("");
             showSuccessToast();
         } catch (error) {
@@ -7597,6 +7721,7 @@ function initializeSettingsPage() {
     draftProfile = getStoredProfile();
     fillForm(draftProfile);
     setPasswordEditing(false);
+    setSettingsEditable(false);
     initializeSettingsMiniNav();
     void loadProfileFromServer();
 }

@@ -73,10 +73,12 @@
                     <h1 id="settingsTitle">Doctor Settings</h1>
                     <p class="subheader">Manage your professional profile and account security.</p>
                 </div>
-                <button type="button" class="session-logout-btn settings-top-logout" data-logout-trigger="true" aria-label="Logout from current session">
-                    <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
-                    <span>Logout</span>
-                </button>
+                <div class="settings-header-actions">
+                    <button type="button" class="doctor-btn settings-edit-btn" id="settingsEditBtn">
+                        <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                        <span>Edit Details</span>
+                    </button>
+                </div>
             </div>
 
             <form class="settings-card registration-card" id="settingsForm" novalidate>
@@ -102,15 +104,22 @@
                                 <span class="section-badge"><i class="fa-regular fa-user"></i></span>
                                 <h2>Profile Overview</h2>
                             </div>
-                            <div class="field-grid field-grid-two">
-                                <label class="field-group required-field">
-                                    <span>Display Name</span>
-                                    <input type="text" id="settingsDisplayName" required>
+                            <div class="settings-profile-grid">
+                                <label class="settings-avatar-uploader" for="settingsAvatarInput">
+                                    <input type="file" id="settingsAvatarInput" accept="image/*" hidden>
+                                    <span class="settings-avatar-preview" id="settingsAvatarPreview" aria-hidden="true"><i class="fa-regular fa-user"></i></span>
+                                    <span class="settings-avatar-label">Profile Picture</span>
                                 </label>
-                                <label class="field-group required-field">
-                                    <span>Title</span>
-                                    <input type="text" id="settingsTitleInput" required>
-                                </label>
+                                <div class="settings-profile-main-fields">
+                                    <label class="field-group required-field">
+                                        <span>Display Name</span>
+                                        <input type="text" id="settingsDisplayName" required>
+                                    </label>
+                                    <label class="field-group required-field">
+                                        <span>License Number</span>
+                                        <input type="text" id="settingsTitleInput" required>
+                                    </label>
+                                </div>
                             </div>
                         </section>
 
@@ -184,11 +193,6 @@
                 </div>
 
                 <div class="wizard-error" id="settingsFormError" role="alert" aria-live="polite"></div>
-
-                <footer class="settings-actions wizard-actions">
-                    <button type="button" class="doctor-btn" id="settingsCancelBtn">Cancel</button>
-                    <button type="submit" class="sign-in-btn">Save Changes<span class="btn-spinner" aria-hidden="true"></span></button>
-                </footer>
             </form>
         </section>
     </main>
