@@ -4716,6 +4716,26 @@ function initializeExerciseHubPage() {
                 const phase = String(command?.payload?.phase || "");
                 const secondsRemaining = Number(command?.payload?.seconds_remaining || 0);
 
+                const phaseDurations = {
+                    suction: 5,
+                    pump: 5,
+                    deflate: 5
+                };
+
+                const totalSeconds = phaseDurations.suction + phaseDurations.pump + phaseDurations.deflate;
+
+                function setProgressFromPhase(activePhase, remaining) {
+                    const consumed = {
+                        suction: 0,
+                        pump: phaseDurations.suction,
+                        deflate: phaseDurations.suction + phaseDurations.pump
+                    };
+
+                    const elapsedInPhase = Math.max(0, phaseDurations[activePhase] - Math.max(0, remaining));
+                    const elapsedTotal = (consumed[activePhase] || 0) + elapsedInPhase;
+                    setCalibrationProgress((elapsedTotal / totalSeconds) * 100);
+                }
+
                 if (phase === "full_extension_hold") {
                     calibrationState.forEach(finger => {
                         finger.current = 0;
@@ -4736,6 +4756,36 @@ function initializeExerciseHubPage() {
                     return;
                 }
 
+                if (phase === "suction") {
+                    calibrationState.forEach(finger => {
+                        finger.current = 0;
+                    });
+                    renderCalibrationGrid();
+                    setProgressFromPhase("suction", secondsRemaining);
+                    setMsg(calibrationStatus, `Calibration (Auto) Phase 1/3: Opening hand with suction (${secondsRemaining}s remaining).`);
+                    return;
+                }
+
+                if (phase === "pump") {
+                    calibrationState.forEach(finger => {
+                        finger.current = 90;
+                    });
+                    renderCalibrationGrid();
+                    setProgressFromPhase("pump", secondsRemaining);
+                    setMsg(calibrationStatus, `Calibration (Auto) Phase 2/3: Closing hand with pump (${secondsRemaining}s remaining).`);
+                    return;
+                }
+
+                if (phase === "deflate") {
+                    calibrationState.forEach(finger => {
+                        finger.current = 0;
+                    });
+                    renderCalibrationGrid();
+                    setProgressFromPhase("deflate", secondsRemaining);
+                    setMsg(calibrationStatus, `Calibration (Auto) Phase 3/3: Deflating glove (${secondsRemaining}s remaining).`);
+                    return;
+                }
+
                 setMsg(calibrationStatus, "Calibration in progress on glove...");
                 return;
             }
@@ -4747,7 +4797,7 @@ function initializeExerciseHubPage() {
                     return;
                 }
 
-                setMsg(calibrationStatus, "Calibration running on the glove... keep following the glove prompts.");
+                setMsg(calibrationStatus, "Calibration running automatically on the glove actuators...");
                 syncCalibrationButtonState();
             }
         } catch {
@@ -5075,7 +5125,7 @@ function initializeExerciseHubPage() {
             stopCalibrationPolling();
             calibrationPollTimer = window.setInterval(() => {
                 void pollCalibrationUntilComplete();
-            }, 2000);
+            }, 1000);
             void pollCalibrationUntilComplete();
         } catch (err) {
             calibrationRequested = false;
@@ -7206,6 +7256,43 @@ function initializeSettingsPage() {
     const confirmPasswordInput = document.getElementById("settingsConfirmPassword");
     const successToast = document.getElementById("settingsSuccessToast");
     const settingsError = document.getElementById("settingsFormError");
+    const miniNavButtons = Array.from(document.querySelectorAll(".settings-mini-nav-btn"));
+
+    function initializeSettingsMiniNav() {
+        if (!miniNavButtons.length) {
+            return;
+        }
+
+        function activateButton(button) {
+            miniNavButtons.forEach(navButton => {
+                navButton.classList.toggle("is-active", navButton === button);
+            });
+
+            const targetId = button.getAttribute("data-target");
+            if (!targetId) {
+                return;
+            }
+
+            const pane = document.getElementById(targetId);
+            if (!pane) {
+                return;
+            }
+
+            const allPanes = Array.from(document.querySelectorAll(".settings-pane-grid .settings-section"));
+            allPanes.forEach(sectionPane => sectionPane.classList.remove("is-focused"));
+            pane.classList.add("is-focused");
+        }
+
+        miniNavButtons.forEach((button, index) => {
+            if (index === 0) {
+                activateButton(button);
+            }
+
+            button.addEventListener("click", () => {
+                activateButton(button);
+            });
+        });
+    }
 
     const defaultProfile = {
         displayName: "",
@@ -7510,6 +7597,7 @@ function initializeSettingsPage() {
     draftProfile = getStoredProfile();
     fillForm(draftProfile);
     setPasswordEditing(false);
+    initializeSettingsMiniNav();
     void loadProfileFromServer();
 }
 

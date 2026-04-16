@@ -1,6 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+(function () {
+    var raw = localStorage.getItem('theraflow.session') || sessionStorage.getItem('theraflow.session');
+    var session = null;
+    if (raw) {
+        try {
+            session = JSON.parse(raw);
+        } catch (e) {
+            session = null;
+        }
+    }
+
+    var authed = Boolean(session && session.authed === true);
+    var role = String((session && session.role) || '').toLowerCase();
+    if (!authed || role !== 'doctor') {
+        window.location.replace('login.html');
+    }
+}());
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Theraflow Settings</title>
@@ -50,124 +69,125 @@
     <main class="content settings-content">
         <section class="settings-shell" id="settingsPageRoot" aria-labelledby="settingsTitle">
             <div class="settings-header-row">
-                <h1 id="settingsTitle">Doctor Settings</h1>
-                <p class="subheader">Manage your professional profile and account security.</p>
+                <div>
+                    <h1 id="settingsTitle">Doctor Settings</h1>
+                    <p class="subheader">Manage your professional profile and account security.</p>
+                </div>
+                <button type="button" class="session-logout-btn settings-top-logout" data-logout-trigger="true" aria-label="Logout from current session">
+                    <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+                    <span>Logout</span>
+                </button>
             </div>
 
             <form class="settings-card registration-card" id="settingsForm" novalidate>
-                <section class="settings-section">
-                    <div class="section-head">
-                        <span class="section-badge"><i class="fa-regular fa-user"></i></span>
-                        <h2>Profile Overview</h2>
-                    </div>
-                    <div class="settings-profile-grid">
-                        <label class="settings-avatar-uploader" for="settingsAvatarInput">
-                            <span class="settings-avatar-preview" id="settingsAvatarPreview" aria-hidden="true">
-                                <i class="fa-regular fa-user"></i>
-                            </span>
-                            <span class="settings-avatar-label">Change Photo</span>
-                        </label>
-                        <input type="file" id="settingsAvatarInput" accept="image/*" class="sr-only">
-                        <div class="field-grid">
-                            <label class="field-group required-field">
-                                <span>Display Name</span>
-                                <input type="text" id="settingsDisplayName" required>
-                            </label>
-                            <label class="field-group required-field">
-                                <span>Title</span>
-                                <input type="text" id="settingsTitleInput" required>
-                            </label>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="settings-section">
-                    <div class="section-head">
-                        <span class="section-badge"><i class="fa-solid fa-stethoscope"></i></span>
-                        <h2>Professional Details</h2>
-                    </div>
-                    <div class="field-grid field-grid-two">
-                        <label class="field-group required-field">
-                            <span>Specialty</span>
-                            <select id="settingsSpecialty" required>
-                                <option value="Neurology">Neurology</option>
-                                <option value="PT">PT</option>
-                                <option value="Rehab">Rehab</option>
-                            </select>
-                        </label>
-                        <label class="field-group required-field">
-                            <span>Hospital Affiliation</span>
-                            <input type="text" id="settingsHospital" required>
-                        </label>
-                        <label class="field-group field-group-span-2">
-                            <span>Bio / Notes</span>
-                            <textarea id="settingsBio" placeholder="Write Your Public About Me For Patients..."></textarea>
-                        </label>
-                    </div>
-                </section>
-
-                <section class="settings-section">
-                    <div class="section-head">
-                        <span class="section-badge"><i class="fa-solid fa-shield-halved"></i></span>
-                        <h2>Security &amp; Account</h2>
-                    </div>
-                    <div class="field-grid field-grid-two">
-                        <label class="field-group required-field field-group-span-2">
-                            <span>Email Update</span>
-                            <input type="email" id="settingsEmail" required>
-                        </label>
-                        <div class="field-group field-group-span-2 settings-password-toggle-wrap">
-                            <button type="button" class="doctor-btn" id="settingsTogglePasswordBtn" aria-expanded="false" aria-controls="settingsPasswordFields">Change Password</button>
-                        </div>
-                        <div class="field-grid field-grid-two field-group-span-2 settings-password-fields is-hidden" id="settingsPasswordFields">
-                            <label class="field-group">
-                                <span>Current Password</span>
-                                <input type="password" id="settingsCurrentPassword">
-                            </label>
-                            <label class="field-group">
-                                <span>New Password</span>
-                                <input type="password" id="settingsNewPassword" minlength="6" pattern="(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}" title="Password must be at least 6 characters and include 1 uppercase letter, 1 number, and 1 special character.">
-                            </label>
-                            <label class="field-group field-group-span-2">
-                                <span>Confirm New Password</span>
-                                <input type="password" id="settingsConfirmPassword" minlength="6" pattern="(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}" title="Password must be at least 6 characters and include 1 uppercase letter, 1 number, and 1 special character.">
-                            </label>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="settings-section session-management-section">
-                    <div class="section-head">
-                        <span class="section-badge"><i class="fa-solid fa-mobile-screen-button"></i></span>
-                        <h2>Session Management</h2>
-                    </div>
-                    <div class="field-grid">
-                        <label class="field-group">
-                            <span>Notification Preferences</span>
-                            <select id="settingsNotificationPreference">
-                                <option value="important">Important Alerts Only</option>
-                                <option value="all">All Activity Notifications</option>
-                                <option value="off">Disable Notifications</option>
-                            </select>
-                        </label>
-                    </div>
-                    <div class="session-management-actions">
-                        <button type="button" class="doctor-btn" id="settingsQuickPasswordBtn">
-                            <i class="fa-solid fa-key" aria-hidden="true"></i>
-                            <span>Change Password</span>
+                <div class="settings-viewport-grid">
+                    <aside class="settings-mini-nav" aria-label="Settings categories">
+                        <button type="button" class="settings-mini-nav-btn is-active" data-target="settingsPaneProfile">
+                            <i class="fa-regular fa-user"></i>
+                            <span>Profile</span>
                         </button>
-                        <button type="button" class="session-logout-btn" data-logout-trigger="true" aria-label="Logout from current session">
-                            <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
-                            <span>Logout</span>
+                        <button type="button" class="settings-mini-nav-btn" data-target="settingsPaneProfessional">
+                            <i class="fa-solid fa-stethoscope"></i>
+                            <span>Professional</span>
                         </button>
+                        <button type="button" class="settings-mini-nav-btn" data-target="settingsPaneSecurity">
+                            <i class="fa-solid fa-shield-halved"></i>
+                            <span>Security</span>
+                        </button>
+                    </aside>
+
+                    <div class="settings-pane-grid">
+                        <section class="settings-section" id="settingsPaneProfile">
+                            <div class="section-head">
+                                <span class="section-badge"><i class="fa-regular fa-user"></i></span>
+                                <h2>Profile Overview</h2>
+                            </div>
+                            <div class="field-grid field-grid-two">
+                                <label class="field-group required-field">
+                                    <span>Display Name</span>
+                                    <input type="text" id="settingsDisplayName" required>
+                                </label>
+                                <label class="field-group required-field">
+                                    <span>Title</span>
+                                    <input type="text" id="settingsTitleInput" required>
+                                </label>
+                            </div>
+                        </section>
+
+                        <section class="settings-section" id="settingsPaneProfessional">
+                            <div class="section-head">
+                                <span class="section-badge"><i class="fa-solid fa-stethoscope"></i></span>
+                                <h2>Professional Details</h2>
+                            </div>
+                            <div class="field-grid field-grid-two">
+                                <label class="field-group required-field">
+                                    <span>Specialty</span>
+                                    <select id="settingsSpecialty" required>
+                                        <option value="Neurology">Neurology</option>
+                                        <option value="PT">PT</option>
+                                        <option value="Rehab">Rehab</option>
+                                    </select>
+                                </label>
+                                <label class="field-group required-field">
+                                    <span>Hospital Affiliation</span>
+                                    <input type="text" id="settingsHospital" required>
+                                </label>
+                                <label class="field-group field-group-span-2">
+                                    <span>Bio / Notes</span>
+                                    <textarea id="settingsBio" placeholder="Write Your Public About Me For Patients..."></textarea>
+                                </label>
+                            </div>
+                        </section>
+
+                        <section class="settings-section" id="settingsPaneSecurity">
+                            <div class="section-head">
+                                <span class="section-badge"><i class="fa-solid fa-shield-halved"></i></span>
+                                <h2>Security</h2>
+                            </div>
+                            <div class="field-grid field-grid-two">
+                                <label class="field-group required-field field-group-span-2">
+                                    <span>Email Update</span>
+                                    <input type="email" id="settingsEmail" required>
+                                </label>
+                                <label class="field-group field-group-span-2">
+                                    <span>Notification Preferences</span>
+                                    <select id="settingsNotificationPreference">
+                                        <option value="important">Important Alerts Only</option>
+                                        <option value="all">All Activity Notifications</option>
+                                        <option value="off">Disable Notifications</option>
+                                    </select>
+                                </label>
+                                <div class="field-group field-group-span-2 settings-password-toggle-wrap">
+                                    <button type="button" class="doctor-btn" id="settingsTogglePasswordBtn" aria-expanded="false" aria-controls="settingsPasswordFields">Change Password</button>
+                                    <button type="button" class="doctor-btn" id="settingsQuickPasswordBtn">
+                                        <i class="fa-solid fa-key" aria-hidden="true"></i>
+                                        <span>Quick Password Edit</span>
+                                    </button>
+                                </div>
+                                <div class="field-grid field-grid-two field-group-span-2 settings-password-fields is-hidden" id="settingsPasswordFields">
+                                    <label class="field-group">
+                                        <span>Current Password</span>
+                                        <input type="password" id="settingsCurrentPassword">
+                                    </label>
+                                    <label class="field-group">
+                                        <span>New Password</span>
+                                        <input type="password" id="settingsNewPassword" minlength="6" pattern="(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}" title="Password must be at least 6 characters and include 1 uppercase letter, 1 number, and 1 special character.">
+                                    </label>
+                                    <label class="field-group field-group-span-2">
+                                        <span>Confirm New Password</span>
+                                        <input type="password" id="settingsConfirmPassword" minlength="6" pattern="(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}" title="Password must be at least 6 characters and include 1 uppercase letter, 1 number, and 1 special character.">
+                                    </label>
+                                </div>
+                            </div>
+                        </section>
                     </div>
-                </section>
+                </div>
 
                 <div class="wizard-error" id="settingsFormError" role="alert" aria-live="polite"></div>
 
                 <footer class="settings-actions wizard-actions">
                     <button type="button" class="doctor-btn" id="settingsCancelBtn">Cancel</button>
-                    <button type="submit" class="sign-in-btn">Save Changes</button>
+                    <button type="submit" class="sign-in-btn">Save Changes<span class="btn-spinner" aria-hidden="true"></span></button>
                 </footer>
             </form>
         </section>

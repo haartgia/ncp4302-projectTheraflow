@@ -5,12 +5,19 @@
 const char* WIFI_SSID = "WIFI_NA_MABILIS";
 const char* WIFI_PASSWORD = "ivanpogi";
 const char* THERAFLOW_URL = "http://192.168.254.119/ncp4302-projectTheraflow/api/iot/sync_session.php";
-const char* THERAFLOW_TOKEN = ""; // Optional: match THERAFLOW_IOT_TOKEN on the server
+const char* THERAFLOW_TOKEN = "";
 
-const int FLEX_COUNT = 4; // Temporary: thumb sensor is not connected
+const int FLEX_COUNT = 4;
 const int flexPins[FLEX_COUNT] = {39, 34, 35, 32};
 const int gripPin = 33;
 const char* fingerNames[FLEX_COUNT] = {"Index", "Middle", "Ring", "Pinky"};
+
+const int suctionPump = 19;
+const int inflatePump = 23;
+const int valvePin = 27;
+const int CALIBRATE_SUCTION_SECONDS = 5;
+const int CALIBRATE_PUMP_SECONDS = 5;
+const int CALIBRATE_DEFLATE_SECONDS = 5;
 
 float smoothedAngles[FLEX_COUNT] = {0, 0, 0, 0};
 float smoothedGrip = 0;
@@ -34,6 +41,80 @@ bool sessionActive = false;
 int activeCalibrationCommandId = 0;
 int activeSessionCommandId = 0;
 
+void configureHttpClient(HTTPClient& http, const String& url) {
+  http.setConnectTimeout(5000);
+  http.setTimeout(7000);
+  http.begin(url);
+}
+
+void logHttpFailure(const char* label, int statusCode, const String& url) {
+  if (statusCode > 0) {
+    return;
+  }
+
+  Serial.print(label);
+  Serial.print(" failed with status ");
+  Serial.print(statusCode);
+  Serial.print(" (");
+  Serial.print(HTTPClient::errorToString(statusCode));
+  Serial.println(")");
+  Serial.print("URL: ");
+  Serial.println(url);
+}
+
+void probeTheraflowServer() {
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+
+  HTTPClient http;
+  String url = String(THERAFLOW_URL);
+  configureHttpClient(http, url);
+  int statusCode = http.GET();
+  if (statusCode > 0) {
+    Serial.print("Theraflow server reachable, probe status: ");
+    Serial.println(statusCode);
+  } else {
+    logHttpFailure("Theraflow server probe", statusCode, url);
+  }
+  http.end();
+}
+
+void setActuatorsOff() {
+  digitalWrite(inflatePump, HIGH);
+  digitalWrite(suctionPump, HIGH);
+  digitalWrite(valvePin, LOW);
+}
+
+void setInflateMode() {
+  // Pump mode (closed hands): route airflow and run pump pin 23.
+  digitalWrite(valvePin, HIGH);
+  digitalWrite(suctionPump, HIGH);
+  digitalWrite(inflatePump, LOW);
+}
+
+void setSuctionMode() {
+  // Suction mode (open hands): route suction path and run suction pin 19.
+  digitalWrite(inflatePump, HIGH);
+  digitalWrite(valvePin, HIGH);
+  digitalWrite(suctionPump, LOW);
+}
+
+void setDeflateMode() {
+  // Deflate mode: passive release path, no pump drive.
+  digitalWrite(inflatePump, HIGH);
+  digitalWrite(suctionPump, HIGH);
+  digitalWrite(valvePin, LOW);
+}
+
+void runPumpSecondHighIntensity() {
+  // Reassert full-pressure path continuously for a solid 1-second pump drive.
+  digitalWrite(valvePin, HIGH);
+  digitalWrite(suctionPump, HIGH);
+  digitalWrite(inflatePump, LOW);
+  delay(1000);
+}
+
 int readAverageFlex(int pin, int samples) {
   long sum = 0;
   for (int i = 0; i < samples; i++) {
@@ -41,6 +122,17 @@ int readAverageFlex(int pin, int samples) {
     delay(2);
   }
   return sum / samples;
+}
+
+void printFingerCalibrationData(const char* label, const int values[]) {
+  Serial.print("=== ");
+  Serial.print(label);
+  Serial.println(" ===");
+  for (int i = 0; i < FLEX_COUNT; i++) {
+    Serial.print(fingerNames[i]);
+    Serial.print(": ");
+    Serial.println(values[i]);
+  }
 }
 
 void connectWiFi() {
@@ -133,9 +225,10 @@ void sendCalibrationProgress(int commandId, const char* phase, int secondsRemain
   serializeJson(doc, body);
 
   HTTPClient http;
-  http.begin(commandUrl);
+  configureHttpClient(http, commandUrl);
   http.addHeader("Content-Type", "application/json");
-  http.POST(body);
+  int statusCode = http.POST(body);
+  logHttpFailure("Calibration progress update", statusCode, commandUrl);
   http.end();
 }
 
@@ -164,13 +257,15 @@ void syncReading(float gripPercent) {
   serializeJson(doc, body);
 
   HTTPClient http;
-  http.begin(THERAFLOW_URL);
+  String syncUrl = String(THERAFLOW_URL);
+  configureHttpClient(http, syncUrl);
   http.addHeader("Content-Type", "application/json");
   if (strlen(THERAFLOW_TOKEN) > 0) {
     http.addHeader("X-IOT-Token", THERAFLOW_TOKEN);
   }
 
   int statusCode = http.POST(body);
+  logHttpFailure("Sensor sync", statusCode, syncUrl);
   String response = http.getString();
   http.end();
 
@@ -207,13 +302,15 @@ void syncHeartbeat(const char* status, const char* note) {
   serializeJson(doc, body);
 
   HTTPClient http;
-  http.begin(THERAFLOW_URL);
+  String syncUrl = String(THERAFLOW_URL);
+  configureHttpClient(http, syncUrl);
   http.addHeader("Content-Type", "application/json");
   if (strlen(THERAFLOW_TOKEN) > 0) {
     http.addHeader("X-IOT-Token", THERAFLOW_TOKEN);
   }
 
   int statusCode = http.POST(body);
+  logHttpFailure("Heartbeat sync", statusCode, syncUrl);
   String response = http.getString();
   http.end();
 
@@ -235,8 +332,9 @@ bool requestCalibrationCommand() {
   commandUrl += "?patient_id=" + String(patientId) + "&claim=1";
 
   HTTPClient http;
-  http.begin(commandUrl);
+  configureHttpClient(http, commandUrl);
   int statusCode = http.GET();
+  logHttpFailure("Calibration command poll", statusCode, commandUrl);
 
   if (statusCode <= 0) {
     http.end();
@@ -299,9 +397,10 @@ void acknowledgeCalibrationComplete(int commandId) {
   serializeJson(doc, body);
 
   HTTPClient http;
-  http.begin(commandUrl);
+  configureHttpClient(http, commandUrl);
   http.addHeader("Content-Type", "application/json");
   int statusCode = http.POST(body);
+  logHttpFailure("Calibration complete ack", statusCode, commandUrl);
   String response = http.getString();
   http.end();
 
@@ -314,25 +413,59 @@ void performCalibrationFromWeb() {
   calibrationInProgress = true;
   Serial.println("Calibration requested from web. Starting calibration now...");
 
-  for (int sec = 5; sec >= 1; sec--) {
-    sendCalibrationProgress(activeCalibrationCommandId, "full_extension_hold", sec);
-    delay(1000);
+  Serial.println("SUCTION (OPEN HANDS)");
+  setSuctionMode();
+  for (int sec = CALIBRATE_SUCTION_SECONDS; sec >= 0; sec--) {
+    sendCalibrationProgress(activeCalibrationCommandId, "suction", sec);
+    if (sec > 0) {
+      delay(1000);
+    }
   }
 
   for (int i = 0; i < FLEX_COUNT; i++) {
     straightValues[i] = readAverageFlex(flexPins[i], 50);
   }
   gripMin = readAverageFlex(gripPin, 50);
+  printFingerCalibrationData("OPEN-HAND FLEX DATA", straightValues);
+  Serial.print("Grip OPEN data: ");
+  Serial.println(gripMin);
 
-  for (int sec = 5; sec >= 1; sec--) {
-    sendCalibrationProgress(activeCalibrationCommandId, "full_close_hold", sec);
-    delay(1000);
+  Serial.println("PUMP (CLOSE HANDS)");
+  setInflateMode();
+  for (int sec = CALIBRATE_PUMP_SECONDS; sec >= 0; sec--) {
+    sendCalibrationProgress(activeCalibrationCommandId, "pump", sec);
+    if (sec > 0) {
+      runPumpSecondHighIntensity();
+    }
   }
 
   for (int i = 0; i < FLEX_COUNT; i++) {
     bendValues[i] = readAverageFlex(flexPins[i], 50);
   }
   gripMax = readAverageFlex(gripPin, 50);
+  printFingerCalibrationData("CLOSED-HAND FLEX DATA", bendValues);
+  Serial.print("Grip CLOSED data: ");
+  Serial.println(gripMax);
+
+  Serial.println("=== FINGER CALIBRATION RANGE ===");
+  for (int i = 0; i < FLEX_COUNT; i++) {
+    Serial.print(fingerNames[i]);
+    Serial.print(": open=");
+    Serial.print(straightValues[i]);
+    Serial.print(", closed=");
+    Serial.println(bendValues[i]);
+  }
+
+  Serial.println("DEFLATE");
+  setDeflateMode();
+  for (int sec = CALIBRATE_DEFLATE_SECONDS; sec >= 0; sec--) {
+    sendCalibrationProgress(activeCalibrationCommandId, "deflate", sec);
+    if (sec > 0) {
+      delay(1000);
+    }
+  }
+
+  setActuatorsOff();
 
   Serial.println("=== Calibration Complete ===");
   Serial.println("-----------------------------------");
@@ -361,9 +494,10 @@ void acknowledgeSessionCommandComplete(int commandId) {
   serializeJson(doc, body);
 
   HTTPClient http;
-  http.begin(commandUrl);
+  configureHttpClient(http, commandUrl);
   http.addHeader("Content-Type", "application/json");
   int statusCode = http.POST(body);
+  logHttpFailure("Session command ack", statusCode, commandUrl);
   String response = http.getString();
   http.end();
 
@@ -375,7 +509,16 @@ void acknowledgeSessionCommandComplete(int commandId) {
 void setup() {
   Serial.begin(115200);
   delay(2000);
+
+  pinMode(inflatePump, OUTPUT);
+  pinMode(suctionPump, OUTPUT);
+  pinMode(valvePin, OUTPUT);
+  setActuatorsOff();
+
   connectWiFi();
+  Serial.print("Theraflow sync URL: ");
+  Serial.println(THERAFLOW_URL);
+  probeTheraflowServer();
   Serial.println("Waiting for calibration request from the web...");
   Serial.print("Polling commands for patient_id=");
   Serial.println(patientId);

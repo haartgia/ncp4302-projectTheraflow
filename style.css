@@ -6881,9 +6881,12 @@ body.exercise-hub-page #stepCalibrate .notes-save-feedback {
 
 .settings-content {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+  padding: 10px 12px;
 }
 /* ── Exercise Wizard ────────────────────────────────────────────────────── */
 .exercise-stepper-viewport {
@@ -7730,32 +7733,60 @@ body.dark-mode .exercise-plan-meta strong {
 }
 
 .settings-shell {
-  width: min(900px, 100%);
+  width: min(1160px, 100%);
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
+  overflow: hidden;
 }
 
 .settings-header-row h1 {
-  font-size: 2.2rem;
+  font-size: 1.95rem;
   line-height: 1.1;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .settings-card {
   width: 100%;
-  border-radius: 24px;
+  border-radius: 20px;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  overflow: hidden;
 }
 
 .settings-section {
   border: 1px solid rgba(77, 134, 156, 0.14);
-  border-radius: 18px;
-  padding: 18px;
+  border-radius: 14px;
+  padding: 12px;
   background: #fbfdfe;
 }
 
 .settings-section + .settings-section {
-  margin-top: 16px;
+  margin-top: 0;
+}
+
+.settings-card .wizard-error,
+.settings-card .settings-actions {
+  grid-column: 1 / -1;
+}
+
+.settings-section .section-head {
+  margin-bottom: 10px;
+}
+
+.settings-page .settings-section .field-group input,
+.settings-page .settings-section .field-group select,
+.settings-page .settings-section .field-group textarea {
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 0.96rem;
+}
+
+.settings-page .settings-section .field-group textarea {
+  min-height: 72px;
 }
 
 .settings-profile-grid {
@@ -7798,7 +7829,281 @@ body.dark-mode .exercise-plan-meta strong {
 }
 
 .settings-actions {
-  margin-top: 20px;
+  margin-top: 2px;
+}
+
+/* Doctor settings viewport-only redesign */
+.settings-page .settings-content {
+  align-items: stretch;
+  justify-content: stretch;
+  min-height: 100vh;
+  height: 100vh;
+  padding: 10px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.settings-page .settings-shell {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  gap: 8px;
+  overflow: hidden;
+  font-family: "Inter", "Public Sans", "Segoe UI", sans-serif;
+}
+
+.settings-page .settings-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 2px 0;
+}
+
+.settings-page .settings-header-row h1 {
+  margin: 0;
+  font-size: clamp(1.6rem, 1.15rem + 1vw, 2rem);
+  color: #173947;
+}
+
+.settings-page .settings-header-row .subheader {
+  margin: 2px 0 0;
+  color: #4f6d79;
+}
+
+.settings-page .settings-top-logout {
+  min-height: 40px;
+  border-radius: 8px;
+  border-width: 1px;
+  padding: 0 14px;
+}
+
+.settings-page .settings-card {
+  border: 1px solid #dbe6ec;
+  border-radius: 10px;
+  box-shadow: 0 10px 20px rgba(26, 73, 88, 0.08);
+  background: #ffffff;
+  padding: 8px;
+  gap: 8px;
+  height: min(100%, calc(100vh - 92px));
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  overflow: hidden;
+}
+
+.settings-page .settings-viewport-grid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.settings-page .settings-mini-nav {
+  border: 1px solid #dbe6ec;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 8px;
+  display: grid;
+  grid-auto-rows: minmax(0, max-content);
+  gap: 8px;
+  align-content: start;
+}
+
+.settings-page .settings-mini-nav-btn {
+  border: 1px solid #d3e1e8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #325769;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.settings-page .settings-mini-nav-btn.is-active,
+.settings-page .settings-mini-nav-btn:hover,
+.settings-page .settings-mini-nav-btn:focus-visible {
+  background: rgba(61, 122, 143, 0.1);
+  border-color: #3d7a8f;
+  color: #1f5668;
+  outline: none;
+}
+
+.settings-page .settings-pane-grid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.settings-page .settings-section {
+  min-height: 0;
+  margin: 0;
+  border-radius: 8px;
+  border: 1px solid #dbe6ec;
+  background: #ffffff;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 10px rgba(28, 70, 84, 0.05);
+}
+
+.settings-page .settings-section.is-focused {
+  border-color: #3d7a8f;
+  box-shadow: 0 0 0 2px rgba(61, 122, 143, 0.15);
+}
+
+.settings-page .settings-section .section-head {
+  margin-bottom: 8px;
+}
+
+.settings-page .settings-section .section-head h2 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.settings-page .settings-section .field-grid {
+  gap: 8px;
+}
+
+.settings-page .settings-section .field-group span {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #4a6674;
+  margin-bottom: 4px;
+}
+
+.settings-page .settings-section .field-group input,
+.settings-page .settings-section .field-group select,
+.settings-page .settings-section .field-group textarea {
+  min-height: 38px;
+  border-radius: 8px;
+  border: 1px solid #dbe6ec;
+  background: #ffffff;
+  font-size: 0.93rem;
+  padding: 8px 10px;
+  box-shadow: none;
+}
+
+.settings-page .settings-section .field-group textarea {
+  min-height: 74px;
+  resize: none;
+}
+
+.settings-page .settings-password-toggle-wrap {
+  margin-top: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.settings-page .settings-password-toggle-wrap .doctor-btn {
+  min-height: 38px;
+  border-radius: 8px;
+  border-width: 1px;
+}
+
+.settings-page .wizard-error {
+  margin: 0;
+  min-height: 18px;
+  font-size: 0.84rem;
+  align-self: center;
+}
+
+.settings-page .settings-actions {
+  margin: 0;
+  padding: 8px;
+  border-top: 1px solid #dbe6ec;
+  border-radius: 8px;
+  background: #ffffff;
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 10px;
+  position: sticky;
+  bottom: 0;
+}
+
+.settings-page .settings-actions .doctor-btn,
+.settings-page .settings-actions .sign-in-btn {
+  min-height: 44px;
+  border-radius: 8px;
+  border-width: 1px;
+}
+
+.settings-page .settings-actions .sign-in-btn {
+  background: #3d7a8f;
+  border-color: #3d7a8f;
+}
+
+.settings-page .settings-actions .sign-in-btn:hover,
+.settings-page .settings-actions .sign-in-btn:focus-visible {
+  background: #346c7f;
+  border-color: #346c7f;
+}
+
+@media (max-width: 1360px) {
+  .settings-page .settings-pane-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-page #settingsPaneSecurity {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 1180px) {
+  .settings-page .settings-content {
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+  }
+
+  .settings-page .settings-card {
+    height: auto;
+    min-height: 0;
+  }
+
+  .settings-page .settings-viewport-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-page .settings-mini-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .settings-page .settings-pane-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-page .settings-actions {
+    grid-template-columns: 1fr;
+    position: static;
+  }
+}
+
+@media (max-width: 1180px) {
+  .settings-content {
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+    padding: 16px;
+  }
+
+  .settings-shell {
+    height: auto;
+    overflow: visible;
+  }
+
+  .settings-card {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
 }
 
 .sign-in-btn:disabled {

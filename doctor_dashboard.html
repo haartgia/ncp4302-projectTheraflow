@@ -1,6 +1,25 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+(function () {
+    var raw = localStorage.getItem('theraflow.session') || sessionStorage.getItem('theraflow.session');
+    var session = null;
+    if (raw) {
+        try {
+            session = JSON.parse(raw);
+        } catch (e) {
+            session = null;
+        }
+    }
+
+    var authed = Boolean(session && session.authed === true);
+    var role = String((session && session.role) || '').toLowerCase();
+    if (!authed || role !== 'doctor') {
+        window.location.replace('login.html');
+    }
+}());
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Theraflow Doctor Dashboard</title>

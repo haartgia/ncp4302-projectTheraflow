@@ -4,8 +4,19 @@
 <script>
 // Run before page rendering to avoid flashing protected dashboard content.
 (function () {
-    var isLoggedIn = localStorage.getItem('isLoggedIn');
-    if (isLoggedIn !== 'true' && isLoggedIn !== '1') {
+    var raw = localStorage.getItem('theraflow.session') || sessionStorage.getItem('theraflow.session');
+    var session = null;
+    if (raw) {
+        try {
+            session = JSON.parse(raw);
+        } catch (e) {
+            session = null;
+        }
+    }
+
+    var authed = Boolean(session && session.authed === true);
+    var role = String((session && session.role) || '').toLowerCase();
+    if (!authed || role !== 'patient') {
         window.location.replace('login.html');
     }
 }());
