@@ -60,6 +60,67 @@ function buildDisplayName(array $userRow): string
     return trim((string) ($userRow['username'] ?? $userRow['email'] ?? 'Doctor'));
 }
 
+function pickDoctorValue(array $doctorRow, array $keys): string
+{
+    foreach ($keys as $key) {
+        if (array_key_exists($key, $doctorRow) && trim((string) $doctorRow[$key]) !== '') {
+            return trim((string) $doctorRow[$key]);
+        }
+    }
+
+    return '';
+}
+
+function ensureProfessionalNotesTable(PDO $pdo): ?string
+{
+    $tableName = 'doctor_professional_notes';
+
+    try {
+        $probe = $pdo->query('SELECT 1 FROM ' . $tableName . ' LIMIT 1');
+        if ($probe !== false) {
+            return $tableName;
+        }
+    } catch (Throwable $e) {
+        // Attempt to create the table if it does not exist yet.
+    }
+
+    try {
+        $pdo->exec(
+            'CREATE TABLE IF NOT EXISTS ' . $tableName . ' (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                user_id INT UNSIGNED NOT NULL,
+                note_text TEXT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_doctor_professional_notes_user_id (user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+        );
+        return $tableName;
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+function getProfessionalNote(PDO $pdo, ?string $notesTable, int $userId): string
+{
+    if ($notesTable === null) {
+        return '';
+    }
+
+    try {
+        $stmt = $pdo->prepare('SELECT note_text FROM ' . $notesTable . ' WHERE user_id = ? LIMIT 1');
+        $stmt->execute([$userId]);
+        $row = $stmt->fetch();
+        if (is_array($row) && isset($row['note_text'])) {
+            return trim((string) $row['note_text']);
+        }
+    } catch (Throwable $e) {
+        // Fallback to existing profile bio.
+    }
+
+    return '';
+}
+
 $usersTable = resolveTableName($pdo, ['users', 'theraflowusers_db.users', 'theraflow_db.users']);
 $doctorsTable = resolveTableName($pdo, ['doctors', 'theraflow_db.doctors', 'theraflowusers_db.doctors']);
 
@@ -75,6 +136,13 @@ $doctorsColumns = getTableColumns($pdo, $doctorsTable);
 $userIdColumn = in_array('user_id', $usersColumns, true) ? 'user_id' : (in_array('id', $usersColumns, true) ? 'id' : null);
 $userPasswordColumn = in_array('password', $usersColumns, true) ? 'password' : (in_array('password_hash', $usersColumns, true) ? 'password_hash' : null);
 $avatarColumn = in_array('avatar_url', $doctorsColumns, true) ? 'avatar_url' : (in_array('avatar', $doctorsColumns, true) ? 'avatar' : null);
+$contactColumn = null;
+foreach (['contact_number', 'contact_no', 'phone_number', 'phone', 'mobile'] as $candidate) {
+    if (in_array($candidate, $doctorsColumns, true)) {
+        $contactColumn = $candidate;
+        break;
+    }
+}
 
 if ($userIdColumn === null || $userPasswordColumn === null) {
     http_response_code(500);
@@ -94,6 +162,7 @@ if (!$userRow) {
 }
 
 $userEmail = trim((string) ($userRow['email'] ?? ''));
+$notesTable = ensureProfessionalNotesTable($pdo);
 
 $doctorRow = false;
 $usesLegacyDoctorSchema = in_array('user_id', $doctorsColumns, true) && in_array('full_name', $doctorsColumns, true);
@@ -116,10 +185,13 @@ if (!$doctorRow) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $storedProfessionalNote = getProfessionalNote($pdo, $notesTable, $userId);
+
     $profile = [
         'displayName' => $usesLegacyDoctorSchema
             ? (string) ($doctorRow['full_name'] ?? buildDisplayName($userRow))
             : (string) ($doctorRow['display_name'] ?? buildDisplayName($userRow)),
+        'username' => trim((string) ($userRow['username'] ?? '')),
         'title' => $usesLegacyDoctorSchema
             ? (string) ($doctorRow['license_number'] ?? 'Doctor')
             : (string) ($doctorRow['title'] ?? 'Doctor'),
@@ -127,7 +199,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         'hospital' => $usesLegacyDoctorSchema
             ? (string) ($doctorRow['affiliation'] ?? '')
             : (string) ($doctorRow['hospital'] ?? ''),
-        'bio' => (string) ($doctorRow['bio'] ?? ''),
+        'contactNumber' => pickDoctorValue($doctorRow, ['contact_number', 'contact_no', 'phone_number', 'phone', 'mobile']),
+        'yearsOfExperience' => pickDoctorValue($doctorRow, ['years_of_experience', 'experience_years', 'years_experience', 'years']),
+        'bio' => $storedProfessionalNote !== '' ? $storedProfessionalNote : (string) ($doctorRow['bio'] ?? ''),
         'email' => $userEmail,
         'avatarDataUrl' => $avatarColumn ? (string) ($doctorRow[$avatarColumn] ?? '') : ''
     ];
@@ -154,11 +228,13 @@ $specialty = trim((string) ($data['specialty'] ?? ''));
 $hospital = trim((string) ($data['hospital'] ?? ''));
 $bio = trim((string) ($data['bio'] ?? ''));
 $email = trim((string) ($data['email'] ?? ''));
+$contactNumber = trim((string) ($data['contactNumber'] ?? ''));
 $avatarDataUrl = trim((string) ($data['avatarDataUrl'] ?? ''));
 $currentPassword = (string) ($data['currentPassword'] ?? '');
 $newPassword = (string) ($data['newPassword'] ?? '');
+$noteOnly = filter_var($data['noteOnly'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
-if ($displayName === '' || $title === '' || $specialty === '' || $hospital === '' || $email === '') {
+if (!$noteOnly && ($displayName === '' || $title === '' || $specialty === '' || $hospital === '' || $email === '')) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Please complete all required profile fields']);
     exit;
@@ -187,8 +263,18 @@ if ($changingPassword) {
         exit;
     }
 
-    $storedHash = (string) ($userRow[$userPasswordColumn] ?? '');
-    if (!password_verify($currentPassword, $storedHash)) {
+    $storedPassword = (string) ($userRow[$userPasswordColumn] ?? '');
+    $passwordMatches = false;
+
+    if ($storedPassword !== '') {
+        $passwordMatches = password_verify($currentPassword, $storedPassword);
+        if (!$passwordMatches && hash_equals($storedPassword, $currentPassword)) {
+            // Backward compatibility for legacy plain-text entries.
+            $passwordMatches = true;
+        }
+    }
+
+    if (!$passwordMatches) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'Current password is incorrect']);
         exit;
@@ -198,16 +284,18 @@ if ($changingPassword) {
 try {
     $pdo->beginTransaction();
 
-    $emailDup = $pdo->prepare(
-        'SELECT ' . $userIdColumn . ' FROM ' . $usersTable . ' WHERE email = ? AND ' . $userIdColumn . ' <> ? LIMIT 1'
-    );
-    $emailDup->execute([$email, $userId]);
-    if ($emailDup->fetch()) {
-        throw new RuntimeException('Email is already used by another account');
-    }
+    if (!$noteOnly) {
+        $emailDup = $pdo->prepare(
+            'SELECT ' . $userIdColumn . ' FROM ' . $usersTable . ' WHERE email = ? AND ' . $userIdColumn . ' <> ? LIMIT 1'
+        );
+        $emailDup->execute([$email, $userId]);
+        if ($emailDup->fetch()) {
+            throw new RuntimeException('Email is already used by another account');
+        }
 
-    $updateUser = $pdo->prepare('UPDATE ' . $usersTable . ' SET email = ? WHERE ' . $userIdColumn . ' = ?');
-    $updateUser->execute([$email, $userId]);
+        $updateUser = $pdo->prepare('UPDATE ' . $usersTable . ' SET email = ? WHERE ' . $userIdColumn . ' = ?');
+        $updateUser->execute([$email, $userId]);
+    }
 
     if ($changingPassword) {
         $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
@@ -220,7 +308,7 @@ try {
         }
     }
 
-    if ($usesLegacyDoctorSchema) {
+    if (!$noteOnly && $usesLegacyDoctorSchema) {
         if (!empty($doctorRow['user_id'])) {
             $legacyColumns = [
                 'full_name = ?',
@@ -231,6 +319,10 @@ try {
                 'bio = ?'
             ];
             $legacyValues = [$displayName, $email, $specialty, $title, $hospital, $bio];
+            if ($contactColumn !== null) {
+                $legacyColumns[] = $contactColumn . ' = ?';
+                $legacyValues[] = $contactNumber;
+            }
             if ($avatarColumn) {
                 $legacyColumns[] = $avatarColumn . ' = ?';
                 $legacyValues[] = $avatarDataUrl;
@@ -241,7 +333,7 @@ try {
             );
             $updateDoctor->execute($legacyValues);
         }
-    } elseif ($usesStandaloneDoctorSchema && !empty($doctorRow['id'])) {
+    } elseif (!$noteOnly && $usesStandaloneDoctorSchema && !empty($doctorRow['id'])) {
         $standaloneColumns = [
             'display_name = ?',
             'title = ?',
@@ -251,6 +343,10 @@ try {
             'email = ?'
         ];
         $standaloneValues = [$displayName, $title, $specialty, $hospital, $bio, $email];
+        if ($contactColumn !== null) {
+            $standaloneColumns[] = $contactColumn . ' = ?';
+            $standaloneValues[] = $contactNumber;
+        }
         if ($avatarColumn) {
             $standaloneColumns[] = $avatarColumn . ' = ?';
             $standaloneValues[] = $avatarDataUrl;
@@ -262,17 +358,43 @@ try {
         $updateDoctor->execute($standaloneValues);
     }
 
+    if ($notesTable !== null) {
+        $saveNote = $pdo->prepare(
+            'INSERT INTO ' . $notesTable . ' (user_id, note_text) VALUES (?, ?) '
+            . 'ON DUPLICATE KEY UPDATE note_text = VALUES(note_text), updated_at = CURRENT_TIMESTAMP'
+        );
+        $saveNote->execute([$userId, $bio]);
+    }
+
     $pdo->commit();
+
+    $effectiveDisplayName = $noteOnly
+        ? ($usesLegacyDoctorSchema
+            ? (string) ($doctorRow['full_name'] ?? buildDisplayName($userRow))
+            : (string) ($doctorRow['display_name'] ?? buildDisplayName($userRow)))
+        : $displayName;
+    $effectiveTitle = $noteOnly
+        ? ($usesLegacyDoctorSchema ? (string) ($doctorRow['license_number'] ?? 'Doctor') : (string) ($doctorRow['title'] ?? 'Doctor'))
+        : $title;
+    $effectiveSpecialty = $noteOnly ? (string) ($doctorRow['specialty'] ?? '') : $specialty;
+    $effectiveHospital = $noteOnly
+        ? ($usesLegacyDoctorSchema ? (string) ($doctorRow['affiliation'] ?? '') : (string) ($doctorRow['hospital'] ?? ''))
+        : $hospital;
+    $effectiveEmail = $noteOnly ? $userEmail : $email;
+    $effectiveContact = $noteOnly ? pickDoctorValue((array) $doctorRow, ['contact_number', 'contact_no', 'phone_number', 'phone', 'mobile']) : $contactNumber;
 
     echo json_encode([
         'ok' => true,
         'profile' => [
-            'displayName' => $displayName,
-            'title' => $title,
-            'specialty' => $specialty,
-            'hospital' => $hospital,
+            'displayName' => $effectiveDisplayName,
+            'username' => trim((string) ($userRow['username'] ?? '')),
+            'title' => $effectiveTitle,
+            'specialty' => $effectiveSpecialty,
+            'hospital' => $effectiveHospital,
+            'contactNumber' => $effectiveContact,
+            'yearsOfExperience' => pickDoctorValue((array) $doctorRow, ['years_of_experience', 'experience_years', 'years_experience', 'years']),
             'bio' => $bio,
-            'email' => $email,
+            'email' => $effectiveEmail,
             'avatarDataUrl' => $avatarDataUrl
         ]
     ]);

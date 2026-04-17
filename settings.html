@@ -73,123 +73,133 @@
                     <h1 id="settingsTitle">Doctor Settings</h1>
                     <p class="subheader">Manage your professional profile and account security.</p>
                 </div>
-                <div class="settings-header-actions">
-                    <button type="button" class="doctor-btn settings-edit-btn" id="settingsEditBtn">
-                        <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
-                        <span>Edit Details</span>
-                    </button>
-                </div>
             </div>
 
             <form class="settings-card registration-card" id="settingsForm" novalidate>
-                <div class="settings-viewport-grid">
-                    <aside class="settings-mini-nav" aria-label="Settings categories">
-                        <button type="button" class="settings-mini-nav-btn is-active" data-target="settingsPaneProfile">
-                            <i class="fa-regular fa-user"></i>
-                            <span>Profile</span>
-                        </button>
-                        <button type="button" class="settings-mini-nav-btn" data-target="settingsPaneProfessional">
-                            <i class="fa-solid fa-stethoscope"></i>
-                            <span>Professional</span>
-                        </button>
-                        <button type="button" class="settings-mini-nav-btn" data-target="settingsPaneSecurity">
-                            <i class="fa-solid fa-shield-halved"></i>
-                            <span>Security</span>
-                        </button>
-                    </aside>
+                <div class="doctor-settings-v2">
+                    <section class="doctor-panel doctor-panel-profile" id="settingsPaneProfile">
+                        <div class="doctor-panel-head">
+                            <h2>Doctor Information</h2>
+                        </div>
+                        <div class="doctor-info-grid doctor-info-grid-top">
+                            <label class="field-group required-field has-field-edit">
+                                <span>Full Name</span>
+                                <input type="text" id="settingsDisplayName" required readonly>
+                                <button type="button" class="doctor-inline-edit-btn" data-inline-edit-target="settingsDisplayName" aria-label="Edit full name"><i class="fa-solid fa-pen"></i></button>
+                            </label>
+                            <label class="field-group required-field has-field-edit">
+                                <span>Specialty Focus</span>
+                                <select id="settingsSpecialty" required disabled>
+                                    <option value="Neurology">Neurology</option>
+                                    <option value="PT">PT</option>
+                                    <option value="Rehab">Rehab</option>
+                                </select>
+                                <button type="button" class="doctor-inline-edit-btn" data-inline-edit-target="settingsSpecialty" aria-label="Edit specialty focus"><i class="fa-solid fa-pen"></i></button>
+                            </label>
+                            <label class="field-group required-field has-field-edit">
+                                <span>License Number</span>
+                                <input type="text" id="settingsTitleInput" required readonly>
+                                <button type="button" class="doctor-inline-edit-btn" data-inline-edit-target="settingsTitleInput" aria-label="Edit license number"><i class="fa-solid fa-pen"></i></button>
+                            </label>
+                            <label class="field-group">
+                                <span>Years in Practice</span>
+                                <input type="text" id="doctorYearsExperience" readonly>
+                            </label>
+                        </div>
+                        <div class="doctor-info-grid doctor-info-grid-bottom">
+                            <label class="field-group required-field has-field-edit">
+                                <span>Hospital Affiliation</span>
+                                <input type="text" id="settingsHospital" required readonly>
+                                <button type="button" class="doctor-inline-edit-btn" data-inline-edit-target="settingsHospital" aria-label="Edit hospital affiliation"><i class="fa-solid fa-pen"></i></button>
+                            </label>
+                            <label class="field-group required-field has-field-edit">
+                                <span>Email Address</span>
+                                <input type="email" id="settingsEmail" required readonly>
+                                <button type="button" class="doctor-inline-edit-btn" data-inline-edit-target="settingsEmail" aria-label="Edit email address"><i class="fa-solid fa-pen"></i></button>
+                            </label>
+                            <label class="field-group has-field-edit">
+                                <span>Contact No.</span>
+                                <input type="text" id="doctorContactNumber" placeholder="Enter contact number" readonly>
+                                <button type="button" class="doctor-inline-edit-btn" data-inline-edit-target="doctorContactNumber" aria-label="Edit contact number"><i class="fa-solid fa-pen"></i></button>
+                            </label>
+                            <label class="field-group required-field field-group-span-full">
+                                <span>Username</span>
+                                <input type="text" id="doctorUsername" readonly>
+                            </label>
+                        </div>
+                    </section>
 
-                    <div class="settings-pane-grid">
-                        <section class="settings-section" id="settingsPaneProfile">
-                            <div class="section-head">
-                                <span class="section-badge"><i class="fa-regular fa-user"></i></span>
-                                <h2>Profile Overview</h2>
-                            </div>
-                            <div class="settings-profile-grid">
-                                <label class="settings-avatar-uploader" for="settingsAvatarInput">
-                                    <input type="file" id="settingsAvatarInput" accept="image/*" hidden>
-                                    <span class="settings-avatar-preview" id="settingsAvatarPreview" aria-hidden="true"><i class="fa-regular fa-user"></i></span>
-                                    <span class="settings-avatar-label">Profile Picture</span>
-                                </label>
-                                <div class="settings-profile-main-fields">
-                                    <label class="field-group required-field">
-                                        <span>Display Name</span>
-                                        <input type="text" id="settingsDisplayName" required>
-                                    </label>
-                                    <label class="field-group required-field">
-                                        <span>License Number</span>
-                                        <input type="text" id="settingsTitleInput" required>
-                                    </label>
-                                </div>
-                            </div>
-                        </section>
+                    <section class="doctor-panel doctor-panel-notes">
+                        <div class="doctor-panel-head doctor-panel-head-inline">
+                            <h3>Professional Notes</h3>
+                        </div>
+                        <label class="field-group field-group-span-full doctor-notes-direct-edit">
+                            <textarea id="settingsBio" placeholder="No bio provided yet." readonly></textarea>
+                        </label>
+                        <div class="doctor-notes-actions">
+                            <button type="button" class="doctor-btn" id="settingsNotesEditBtn">Edit</button>
+                            <button type="button" class="doctor-btn" id="settingsNotesSaveBtn" hidden>Save</button>
+                        </div>
+                    </section>
 
-                        <section class="settings-section" id="settingsPaneProfessional">
-                            <div class="section-head">
-                                <span class="section-badge"><i class="fa-solid fa-stethoscope"></i></span>
-                                <h2>Professional Details</h2>
-                            </div>
-                            <div class="field-grid field-grid-two">
-                                <label class="field-group required-field">
-                                    <span>Specialty</span>
-                                    <select id="settingsSpecialty" required>
-                                        <option value="Neurology">Neurology</option>
-                                        <option value="PT">PT</option>
-                                        <option value="Rehab">Rehab</option>
-                                    </select>
-                                </label>
-                                <label class="field-group required-field">
-                                    <span>Hospital Affiliation</span>
-                                    <input type="text" id="settingsHospital" required>
-                                </label>
-                                <label class="field-group field-group-span-2">
-                                    <span>Bio / Notes</span>
-                                    <textarea id="settingsBio" placeholder="Write Your Public About Me For Patients..."></textarea>
-                                </label>
-                            </div>
-                        </section>
-
-                        <section class="settings-section" id="settingsPaneSecurity">
-                            <div class="section-head">
-                                <span class="section-badge"><i class="fa-solid fa-shield-halved"></i></span>
-                                <h2>Security</h2>
-                            </div>
-                            <div class="field-grid field-grid-two">
-                                <label class="field-group required-field field-group-span-2">
-                                    <span>Email Update</span>
-                                    <input type="email" id="settingsEmail" required>
-                                </label>
-                                <label class="field-group field-group-span-2">
-                                    <span>Notification Preferences</span>
-                                    <select id="settingsNotificationPreference">
-                                        <option value="important">Important Alerts Only</option>
-                                        <option value="all">All Activity Notifications</option>
-                                        <option value="off">Disable Notifications</option>
-                                    </select>
-                                </label>
-                                <div class="field-group field-group-span-2 settings-password-toggle-wrap">
-                                    <button type="button" class="doctor-btn" id="settingsTogglePasswordBtn" aria-expanded="false" aria-controls="settingsPasswordFields">Change Password</button>
-                                    <button type="button" class="doctor-btn" id="settingsQuickPasswordBtn">
-                                        <i class="fa-solid fa-key" aria-hidden="true"></i>
-                                        <span>Quick Password Edit</span>
+                    <section class="doctor-panel doctor-panel-security">
+                        <div class="doctor-panel-head doctor-panel-head-inline">
+                            <h3>Account Security</h3>
+                        </div>
+                        <div class="doctor-info-grid doctor-security-grid">
+                            <label class="field-group">
+                                <span>Security Email</span>
+                                <input type="email" id="settingsSecurityEmail" readonly>
+                            </label>
+                            <label class="field-group">
+                                <span>Password</span>
+                                <input type="password" id="settingsPasswordMask" value="********" readonly>
+                            </label>
+                        </div>
+                        <div class="settings-password-toggle-wrap field-group-span-full">
+                            <button type="button" class="doctor-btn" id="settingsTogglePasswordBtn" aria-expanded="false">
+                                Change Password
+                            </button>
+                        </div>
+                        <div class="settings-password-fields is-hidden field-group-span-full" id="settingsPasswordFields">
+                            <div class="doctor-info-grid doctor-password-grid">
+                                <label class="field-group settings-password-field">
+                                    <span>Current Password</span>
+                                        <input type="password" id="settingsCurrentPassword" autocomplete="current-password" placeholder="Enter current password">
+                                    <button type="button" class="settings-password-visibility" data-password-target="settingsCurrentPassword" aria-label="Show current password" aria-pressed="false">
+                                        <i class="fa-regular fa-eye"></i>
                                     </button>
-                                </div>
-                                <div class="field-grid field-grid-two field-group-span-2 settings-password-fields is-hidden" id="settingsPasswordFields">
-                                    <label class="field-group">
-                                        <span>Current Password</span>
-                                        <input type="password" id="settingsCurrentPassword">
-                                    </label>
-                                    <label class="field-group">
-                                        <span>New Password</span>
-                                        <input type="password" id="settingsNewPassword" minlength="6" pattern="(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}" title="Password must be at least 6 characters and include 1 uppercase letter, 1 number, and 1 special character.">
-                                    </label>
-                                    <label class="field-group field-group-span-2">
-                                        <span>Confirm New Password</span>
-                                        <input type="password" id="settingsConfirmPassword" minlength="6" pattern="(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}" title="Password must be at least 6 characters and include 1 uppercase letter, 1 number, and 1 special character.">
-                                    </label>
-                                </div>
+                                </label>
+                                <label class="field-group settings-password-field">
+                                    <span>New Password</span>
+                                        <input type="password" id="settingsNewPassword" autocomplete="new-password" placeholder="Enter new password">
+                                    <button type="button" class="settings-password-visibility" data-password-target="settingsNewPassword" aria-label="Show new password" aria-pressed="false">
+                                        <i class="fa-regular fa-eye"></i>
+                                    </button>
+                                </label>
+                                <label class="field-group settings-password-field">
+                                    <span>Confirm Password</span>
+                                        <input type="password" id="settingsConfirmPassword" autocomplete="new-password" placeholder="Confirm new password">
+                                    <button type="button" class="settings-password-visibility" data-password-target="settingsConfirmPassword" aria-label="Show confirm password" aria-pressed="false">
+                                        <i class="fa-regular fa-eye"></i>
+                                    </button>
+                                </label>
                             </div>
-                        </section>
-                    </div>
+                            <div class="settings-password-actions">
+                                    <button type="button" class="doctor-btn settings-password-cancel-btn" id="settingsPasswordCancelBtn">Cancel Password Change</button>
+                                    <button type="button" class="doctor-btn settings-password-save-btn" id="settingsPasswordSaveBtn" disabled>Save Password Changes</button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="doctor-panel doctor-panel-files">
+                        <div class="doctor-panel-head doctor-panel-head-inline">
+                            <h3>Files / Documents</h3>
+                            <button type="button" class="doctor-btn doctor-files-btn" id="doctorFilesAddBtn">Add File</button>
+                            <input type="file" id="doctorFilesInput" accept="application/pdf,.pdf" hidden>
+                        </div>
+                        <ul class="doctor-files-list" id="doctorFilesList" aria-label="Doctor documents"></ul>
+                    </section>
                 </div>
 
                 <div class="wizard-error" id="settingsFormError" role="alert" aria-live="polite"></div>
@@ -201,6 +211,18 @@
 
 <div class="settings-toast" id="settingsSuccessToast" role="status" aria-live="polite" hidden>
     Profile updated successfully.
+</div>
+
+<div class="settings-modal" id="doctorFileDeleteModal" hidden aria-hidden="true">
+    <div class="settings-modal-backdrop" data-modal-close="doctorFileDeleteModal"></div>
+    <div class="settings-modal-card" role="dialog" aria-modal="true" aria-labelledby="doctorFileDeleteTitle">
+        <h3 id="doctorFileDeleteTitle">Delete PDF File?</h3>
+        <p id="doctorFileDeleteMessage">Are you sure you want to delete this file?</p>
+        <div class="settings-modal-actions">
+            <button type="button" class="doctor-btn" id="doctorFileDeleteCancelBtn">Cancel</button>
+            <button type="button" class="doctor-btn doctor-btn-danger" id="doctorFileDeleteConfirmBtn">Delete</button>
+        </div>
+    </div>
 </div>
 
 <script src="script.js"></script>

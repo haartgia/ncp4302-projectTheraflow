@@ -1253,6 +1253,9 @@ function initializeDoctorDashboard() {
     const quickOverviewEmpty = document.getElementById("dashboardQuickOverviewEmpty");
     const chartWrap = document.getElementById("doctorChartWrap");
     const metricButtons = document.querySelectorAll(".chart-metric-toggle .metric-btn");
+    const periodButtons = document.querySelectorAll(".chart-period-toggle .period-btn");
+    const showValuesToggle = document.getElementById("doctorChartShowValues");
+    const chartTitle = document.getElementById("doctorChartTitle");
     const chartSubtitle = document.getElementById("doctorChartSubtitle");
     const chartEmpty = document.getElementById("doctorChartEmpty");
     const patientSelectBtn = document.getElementById("patientSelectBtn");
@@ -1268,6 +1271,8 @@ function initializeDoctorDashboard() {
     let doctorChart = null;
     let cachedPayload = null;
     let activeMetric = "grip";
+    let activePeriod = "weekly";
+    let showChartValues = Boolean(showValuesToggle?.checked);
     let selectedPatientKey = "all";
     let patientOptions = [];
     let refreshTimer = null;
@@ -1320,6 +1325,18 @@ function initializeDoctorDashboard() {
         };
     }
 
+    function getChartByActivePeriod(payload) {
+        if (activePeriod === "daily") {
+            return payload?.dailyChart || payload?.weeklyChart || {};
+        }
+
+        if (activePeriod === "monthly") {
+            return payload?.monthlyChart || payload?.weeklyChart || {};
+        }
+
+        return payload?.weeklyChart || {};
+    }
+
     function renderWeeklyChart(chartData) {
         if (!doctorChartCanvas || typeof Chart === "undefined") {
             return;
@@ -1344,6 +1361,36 @@ function initializeDoctorDashboard() {
         }
         const yBounds = computeYAxisBounds(metricData);
 
+        const valueLabelPlugin = {
+            id: "doctorDashboardPointValueLabels",
+            afterDatasetsDraw(chartInstance) {
+                if (!showChartValues) {
+                    return;
+                }
+
+                const ctx = chartInstance.ctx;
+                const dataset = chartInstance.data?.datasets?.[0];
+                const points = chartInstance.getDatasetMeta(0)?.data || [];
+                const values = Array.isArray(dataset?.data) ? dataset.data : [];
+
+                ctx.save();
+                ctx.fillStyle = document.body.classList.contains("dark-mode") ? "#d9ebf3" : "#36505e";
+                ctx.font = "700 12px Inter, Public Sans, Segoe UI, sans-serif";
+                ctx.textAlign = "center";
+
+                points.forEach((point, index) => {
+                    const raw = Number(values[index]);
+                    if (!Number.isFinite(raw) || raw <= 0) {
+                        return;
+                    }
+
+                    ctx.fillText(raw.toFixed(1), point.x, point.y - 10);
+                });
+
+                ctx.restore();
+            }
+        };
+
         doctorChart = new Chart(doctorChartCanvas, {
             type: "line",
             data: {
@@ -1357,7 +1404,8 @@ function initializeDoctorDashboard() {
                         borderWidth: 2,
                         tension: 0.35,
                         fill: true,
-                        pointRadius: 3
+                        pointRadius: 4,
+                        pointHoverRadius: 5
                     }
                 ]
             },
@@ -1377,7 +1425,8 @@ function initializeDoctorDashboard() {
                         grid: { color: gridColor }
                     }
                 }
-            }
+            },
+            plugins: [valueLabelPlugin]
         });
     }
 
@@ -1440,9 +1489,19 @@ function initializeDoctorDashboard() {
     }
 
     function updateChartTitle() {
+        const periodTitleMap = {
+            daily: "Daily",
+            weekly: "Weekly",
+            monthly: "Monthly"
+        };
+
+        const periodLabel = periodTitleMap[activePeriod] || "Weekly";
         const activeLabel = patientOptions.find(item => item.key === selectedPatientKey)?.label || "All Patients (Avg)";
+        if (chartTitle) {
+            chartTitle.textContent = `Patient Therapy Progress (${periodLabel})`;
+        }
         if (chartSubtitle) {
-            chartSubtitle.textContent = `Weekly Progress: ${activeLabel}`;
+            chartSubtitle.textContent = `${periodLabel} Progress: ${activeLabel}`;
         }
     }
 
@@ -1507,8 +1566,8 @@ function initializeDoctorDashboard() {
             }
         }
 
-        renderWeeklyChart(payload.weeklyChart || {});
-    updateChartTitle();
+        renderWeeklyChart(getChartByActivePeriod(payload));
+        updateChartTitle();
 
         const trends = summary.trends || payload.trends || {};
         setTrend("trendTotalPatients", trends.totalPatients ?? summary.deltaTotalPatients);
@@ -1553,9 +1612,28 @@ function initializeDoctorDashboard() {
             button.classList.add("active");
             activeMetric = button.dataset.metric || "grip";
             if (cachedPayload) {
-                renderWeeklyChart(cachedPayload.weeklyChart || {});
+                renderWeeklyChart(getChartByActivePeriod(cachedPayload));
             }
         });
+    });
+
+    periodButtons?.forEach(button => {
+        button.addEventListener("click", () => {
+            periodButtons.forEach(btn => btn.classList.remove("active"));
+            button.classList.add("active");
+            activePeriod = button.dataset.period || "weekly";
+            updateChartTitle();
+            if (cachedPayload) {
+                renderWeeklyChart(getChartByActivePeriod(cachedPayload));
+            }
+        });
+    });
+
+    showValuesToggle?.addEventListener("change", () => {
+        showChartValues = Boolean(showValuesToggle.checked);
+        if (cachedPayload) {
+            renderWeeklyChart(getChartByActivePeriod(cachedPayload));
+        }
     });
 
     patientSelectBtn?.addEventListener("click", () => {
@@ -7247,18 +7325,37 @@ function initializeSettingsPage() {
     const specialtyInput = document.getElementById("settingsSpecialty");
     const hospitalInput = document.getElementById("settingsHospital");
     const bioInput = document.getElementById("settingsBio");
+    const notesPanel = document.querySelector(".doctor-panel-notes");
+    const notesEditButton = document.getElementById("settingsNotesEditBtn");
+    const notesSaveButton = document.getElementById("settingsNotesSaveBtn");
     const emailInput = document.getElementById("settingsEmail");
+    const securityEmailInput = document.getElementById("settingsSecurityEmail");
+    const passwordMaskInput = document.getElementById("settingsPasswordMask");
+    const doctorYearsExperienceInput = document.getElementById("doctorYearsExperience");
+    const doctorContactNumberInput = document.getElementById("doctorContactNumber");
+    const doctorUsernameInput = document.getElementById("doctorUsername");
     const notificationPreferenceInput = document.getElementById("settingsNotificationPreference");
     const togglePasswordButton = document.getElementById("settingsTogglePasswordBtn");
+    const passwordToggleWrap = togglePasswordButton?.closest(".settings-password-toggle-wrap") || null;
     const quickPasswordButton = document.getElementById("settingsQuickPasswordBtn");
-    const editButton = document.getElementById("settingsEditBtn");
     const passwordFields = document.getElementById("settingsPasswordFields");
     const currentPasswordInput = document.getElementById("settingsCurrentPassword");
     const newPasswordInput = document.getElementById("settingsNewPassword");
     const confirmPasswordInput = document.getElementById("settingsConfirmPassword");
+    const passwordVisibilityButtons = Array.from(document.querySelectorAll(".settings-password-visibility[data-password-target]"));
+    const passwordCancelButton = document.getElementById("settingsPasswordCancelBtn");
+    const passwordSaveButton = document.getElementById("settingsPasswordSaveBtn");
+    const doctorInlineEditButtons = Array.from(document.querySelectorAll(".doctor-inline-edit-btn[data-inline-edit-target]"));
     const successToast = document.getElementById("settingsSuccessToast");
     const settingsError = document.getElementById("settingsFormError");
     const miniNavButtons = Array.from(document.querySelectorAll(".settings-mini-nav-btn"));
+    const doctorFilesAddButton = document.getElementById("doctorFilesAddBtn");
+    const doctorFilesInput = document.getElementById("doctorFilesInput");
+    const doctorFilesList = document.getElementById("doctorFilesList");
+    const doctorFileDeleteModal = document.getElementById("doctorFileDeleteModal");
+    const doctorFileDeleteMessage = document.getElementById("doctorFileDeleteMessage");
+    const doctorFileDeleteCancelBtn = document.getElementById("doctorFileDeleteCancelBtn");
+    const doctorFileDeleteConfirmBtn = document.getElementById("doctorFileDeleteConfirmBtn");
 
     function initializeSettingsMiniNav() {
         if (!miniNavButtons.length) {
@@ -7298,9 +7395,12 @@ function initializeSettingsPage() {
 
     const defaultProfile = {
         displayName: "",
+        username: "",
         title: "",
         specialty: "Neurology",
         hospital: "",
+        contactNumber: "",
+        yearsOfExperience: "",
         bio: "",
         email: "",
         avatarDataUrl: ""
@@ -7308,65 +7408,432 @@ function initializeSettingsPage() {
 
     let draftProfile = { ...defaultProfile };
     let isPasswordEditing = false;
-    let isSettingsEditable = false;
+    let isSettingsEditable = true;
+    let isNotesEditing = false;
+    let isCurrentPasswordValid = false;
+    let currentPasswordValidationTimer = null;
+    let currentPasswordValidationToken = 0;
+    let pendingDeleteDocumentId = 0;
+    let pendingDeleteDocumentName = "";
 
-    function setControlEditable(control, enabled) {
-        if (!control) {
-            return;
+    function openDeleteModal(documentId, documentName) {
+        pendingDeleteDocumentId = Number(documentId) || 0;
+        pendingDeleteDocumentName = String(documentName || "this file");
+
+        if (doctorFileDeleteMessage) {
+            doctorFileDeleteMessage.textContent = `Are you sure you want to delete ${pendingDeleteDocumentName}?`;
         }
 
-        const tagName = control.tagName;
-        if (tagName === "SELECT") {
-            control.disabled = !enabled;
-            return;
-        }
-
-        if (tagName === "TEXTAREA") {
-            control.readOnly = !enabled;
-            return;
-        }
-
-        if (tagName === "INPUT") {
-            const inputType = (control.type || "").toLowerCase();
-            if (inputType === "file") {
-                control.disabled = !enabled;
-                return;
-            }
-
-            control.readOnly = !enabled;
+        if (doctorFileDeleteModal) {
+            doctorFileDeleteModal.hidden = false;
+            doctorFileDeleteModal.setAttribute("aria-hidden", "false");
         }
     }
 
-    function syncEditButtonState() {
-        if (!editButton) {
+    function closeDeleteModal() {
+        pendingDeleteDocumentId = 0;
+        pendingDeleteDocumentName = "";
+
+        if (doctorFileDeleteModal) {
+            doctorFileDeleteModal.hidden = true;
+            doctorFileDeleteModal.setAttribute("aria-hidden", "true");
+        }
+    }
+
+    function formatFileSize(sizeBytes) {
+        const bytes = Number(sizeBytes) || 0;
+        if (bytes < 1024) {
+            return `${bytes} B`;
+        }
+
+        const units = ["KB", "MB", "GB"];
+        let value = bytes / 1024;
+        let unitIndex = 0;
+        while (value >= 1024 && unitIndex < units.length - 1) {
+            value /= 1024;
+            unitIndex += 1;
+        }
+
+        return `${value.toFixed(value >= 100 ? 0 : 1)} ${units[unitIndex]}`;
+    }
+
+    function renderDoctorDocuments(documents) {
+        if (!(doctorFilesList instanceof HTMLUListElement)) {
             return;
         }
 
-        editButton.classList.toggle("is-active", isSettingsEditable);
-        const editLabel = editButton.querySelector("span");
-        if (editLabel) {
-            editLabel.textContent = isSettingsEditable ? "Save Changes" : "Edit Details";
+        doctorFilesList.innerHTML = "";
+        if (!Array.isArray(documents) || documents.length === 0) {
+            const emptyItem = document.createElement("li");
+            emptyItem.className = "doctor-files-empty";
+            emptyItem.innerHTML = '<i class="fa-regular fa-folder-open" aria-hidden="true"></i><span>No uploaded PDF files yet.</span>';
+            doctorFilesList.appendChild(emptyItem);
+            return;
         }
+
+        documents.forEach(documentEntry => {
+            const fileName = String(documentEntry?.name || "Untitled.pdf");
+            const fileUrl = String(documentEntry?.url || "");
+            const fileSize = formatFileSize(documentEntry?.sizeBytes);
+
+            const item = document.createElement("li");
+            const icon = document.createElement("i");
+            icon.className = "fa-regular fa-file-lines";
+            icon.setAttribute("aria-hidden", "true");
+
+            const content = document.createElement("span");
+            content.className = "doctor-file-entry";
+
+            if (fileUrl) {
+                const link = document.createElement("a");
+                link.href = fileUrl;
+                link.target = "_blank";
+                link.rel = "noopener noreferrer";
+                link.textContent = fileName;
+                content.appendChild(link);
+            } else {
+                const text = document.createElement("span");
+                text.textContent = fileName;
+                content.appendChild(text);
+            }
+
+            const meta = document.createElement("small");
+            meta.textContent = fileSize;
+            content.appendChild(meta);
+
+            const deleteButton = document.createElement("button");
+            deleteButton.type = "button";
+            deleteButton.className = "doctor-file-delete-btn";
+            deleteButton.setAttribute("aria-label", `Delete ${fileName}`);
+            deleteButton.innerHTML = '<i class="fa-regular fa-trash-can" aria-hidden="true"></i>';
+            deleteButton.addEventListener("click", () => {
+                openDeleteModal(documentEntry?.id, fileName);
+            });
+
+            item.appendChild(icon);
+            item.appendChild(content);
+            item.appendChild(deleteButton);
+            doctorFilesList.appendChild(item);
+        });
+    }
+
+    async function deleteDoctorDocument(documentId) {
+        const nextId = Number(documentId) || 0;
+        if (nextId <= 0) {
+            return;
+        }
+
+        setSettingsMessage("Deleting file...");
+
+        try {
+            const response = await fetch("api/doctor/documents.php", {
+                method: "DELETE",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                },
+                body: JSON.stringify({ documentId: nextId })
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.ok) {
+                throw new Error(payload.error || "Unable to delete file.");
+            }
+
+            closeDeleteModal();
+            await loadDoctorDocuments();
+            setSettingsMessage("");
+            showSuccessToast();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Unable to delete file.";
+            setSettingsMessage(message);
+        }
+    }
+
+    async function loadDoctorDocuments() {
+        if (!(doctorFilesList instanceof HTMLUListElement)) {
+            return;
+        }
+
+        try {
+            const response = await fetch("api/doctor/documents.php", {
+                method: "GET",
+                headers: {
+                    "Accept": "application/json"
+                }
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.ok) {
+                throw new Error(payload.error || "Unable to load files.");
+            }
+
+            renderDoctorDocuments(payload.documents || []);
+        } catch (error) {
+            renderDoctorDocuments([]);
+            const message = error instanceof Error ? error.message : "Unable to load files.";
+            setSettingsMessage(message);
+        }
+    }
+
+    async function uploadDoctorDocument(file) {
+        if (!(file instanceof File)) {
+            return;
+        }
+
+        const normalizedName = file.name.toLowerCase();
+        const isPdf = normalizedName.endsWith(".pdf") || file.type === "application/pdf";
+        if (!isPdf) {
+            setSettingsMessage("Only PDF files are allowed.");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("document", file);
+
+        setSettingsMessage("Uploading file...");
+
+        try {
+            const response = await fetch("api/doctor/documents.php", {
+                method: "POST",
+                headers: {
+                    "Accept": "application/json"
+                },
+                body: formData
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.ok) {
+                throw new Error(payload.error || "Unable to upload file.");
+            }
+
+            if (doctorFilesInput instanceof HTMLInputElement) {
+                doctorFilesInput.value = "";
+            }
+
+            await loadDoctorDocuments();
+            setSettingsMessage("");
+            showSuccessToast();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Unable to upload file.";
+            setSettingsMessage(message);
+        }
+    }
+
+    function setInlineDoctorFieldEditing(fieldElement, toggleButton, enabled) {
+        if (!fieldElement || !toggleButton) {
+            return;
+        }
+
+        const fieldGroup = fieldElement.closest(".has-field-edit");
+        if (fieldGroup) {
+            fieldGroup.classList.toggle("is-editing", enabled);
+        }
+
+        if (fieldElement instanceof HTMLSelectElement) {
+            fieldElement.disabled = !enabled;
+        } else {
+            fieldElement.readOnly = !enabled;
+        }
+
+        toggleButton.classList.toggle("is-editing", enabled);
+        toggleButton.setAttribute("aria-label", enabled ? "Done editing" : "Edit field");
+
+        const icon = toggleButton.querySelector("i");
+        if (icon) {
+            icon.className = enabled ? "fa-solid fa-check" : "fa-solid fa-pen";
+        }
+
+        if (enabled) {
+            fieldElement.focus();
+            if (fieldElement instanceof HTMLInputElement || fieldElement instanceof HTMLTextAreaElement) {
+                fieldElement.select?.();
+            }
+        }
+    }
+
+    function resetDoctorInlineEditStates() {
+        doctorInlineEditButtons.forEach(button => {
+            const targetId = String(button.getAttribute("data-inline-edit-target") || "").trim();
+            if (!targetId) {
+                return;
+            }
+
+            const field = document.getElementById(targetId);
+            if (!field || !(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) {
+                return;
+            }
+
+            setInlineDoctorFieldEditing(field, button, false);
+        });
+    }
+
+    function initializeDoctorInlineEditButtons() {
+        if (!doctorInlineEditButtons.length) {
+            return;
+        }
+
+        doctorInlineEditButtons.forEach(button => {
+            const targetId = String(button.getAttribute("data-inline-edit-target") || "").trim();
+            if (!targetId) {
+                return;
+            }
+
+            const field = document.getElementById(targetId);
+            if (!field || !(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) {
+                return;
+            }
+
+            field.addEventListener("mousedown", event => {
+                if (button.classList.contains("is-editing")) {
+                    return;
+                }
+
+                event.preventDefault();
+            });
+
+            field.addEventListener("focus", () => {
+                if (button.classList.contains("is-editing")) {
+                    return;
+                }
+
+                field.blur();
+            });
+
+            button.addEventListener("click", () => {
+                const isEditing = button.classList.contains("is-editing");
+                if (!isEditing) {
+                    setInlineDoctorFieldEditing(field, button, true);
+                    return;
+                }
+
+                setInlineDoctorFieldEditing(field, button, false);
+                const isPasswordField = ["settingsCurrentPassword", "settingsNewPassword", "settingsConfirmPassword"].includes(targetId);
+                if (!isPasswordField) {
+                    settingsForm?.requestSubmit();
+                }
+            });
+        });
+    }
+
+    function updatePasswordSaveButtonState() {
+        if (!passwordSaveButton) {
+            return;
+        }
+
+        const isMatch = updatePasswordMatchIndicator();
+        const canSave = isPasswordEditing
+            && Boolean(currentPasswordInput?.value.trim())
+            && Boolean(newPasswordInput?.value.trim())
+            && Boolean(confirmPasswordInput?.value.trim())
+            && isMatch
+            && isCurrentPasswordValid;
+
+        passwordSaveButton.disabled = !canSave;
+    }
+
+    function updateCurrentPasswordIndicator(isValid) {
+        if (!currentPasswordInput) {
+            return;
+        }
+
+        currentPasswordInput.classList.remove("is-match", "is-mismatch");
+        if (!isPasswordEditing || !currentPasswordInput.value.trim()) {
+            return;
+        }
+
+        currentPasswordInput.classList.add(isValid ? "is-match" : "is-mismatch");
+    }
+
+    async function validateCurrentPasswordLive() {
+        if (!isPasswordEditing || !currentPasswordInput) {
+            return;
+        }
+
+        const value = currentPasswordInput.value.trim();
+        if (!value) {
+            isCurrentPasswordValid = false;
+            updateCurrentPasswordIndicator(false);
+            updatePasswordSaveButtonState();
+            return;
+        }
+
+        const token = ++currentPasswordValidationToken;
+
+        try {
+            const response = await fetch("api/doctor/verify_password.php", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                },
+                body: JSON.stringify({ currentPassword: value })
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (token !== currentPasswordValidationToken) {
+                return;
+            }
+
+            isCurrentPasswordValid = Boolean(response.ok && payload?.ok && payload?.valid === true);
+            updateCurrentPasswordIndicator(isCurrentPasswordValid);
+            updatePasswordSaveButtonState();
+        } catch {
+            if (token !== currentPasswordValidationToken) {
+                return;
+            }
+
+            isCurrentPasswordValid = false;
+            updateCurrentPasswordIndicator(false);
+            updatePasswordSaveButtonState();
+        }
+    }
+
+    function updatePasswordMatchIndicator() {
+        if (!newPasswordInput || !confirmPasswordInput) {
+            return false;
+        }
+
+        confirmPasswordInput.classList.remove("is-match", "is-mismatch");
+
+        const newValue = newPasswordInput.value.trim();
+        const confirmValue = confirmPasswordInput.value.trim();
+        if (!isPasswordEditing || !newValue || !confirmValue) {
+            return false;
+        }
+
+        const isMatch = newValue === confirmValue;
+        confirmPasswordInput.classList.add(isMatch ? "is-match" : "is-mismatch");
+        return isMatch;
+    }
+
+    function lockNonEditableDoctorFields() {
+        const lockedControls = [doctorYearsExperienceInput, doctorUsernameInput, securityEmailInput, passwordMaskInput];
+        lockedControls.forEach(control => {
+            if (!(control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement)) {
+                return;
+            }
+
+            if (control instanceof HTMLSelectElement) {
+                control.disabled = true;
+            } else {
+                control.readOnly = true;
+            }
+
+            control.tabIndex = -1;
+
+            control.addEventListener("mousedown", event => {
+                event.preventDefault();
+            });
+
+            control.addEventListener("focus", () => {
+                control.blur();
+            });
+        });
     }
 
     function setSettingsEditable(enabled) {
         isSettingsEditable = enabled;
-
-        const controls = [
-            displayNameInput,
-            titleInput,
-            specialtyInput,
-            hospitalInput,
-            bioInput,
-            emailInput,
-            notificationPreferenceInput,
-            currentPasswordInput,
-            newPasswordInput,
-            confirmPasswordInput,
-            avatarInput
-        ];
-
-        controls.forEach(control => setControlEditable(control, enabled));
 
         if (togglePasswordButton) {
             togglePasswordButton.disabled = !enabled;
@@ -7383,7 +7850,9 @@ function initializeSettingsPage() {
         }
 
         settingsForm?.classList.toggle("is-locked", !enabled);
-        syncEditButtonState();
+        if (enabled) {
+            resetDoctorInlineEditStates();
+        }
     }
 
     function mergeProfileKeepingFilled(baseProfile, incomingProfile) {
@@ -7428,9 +7897,70 @@ function initializeSettingsPage() {
         }
     }
 
+    function setNotesEditing(enabled) {
+        isNotesEditing = enabled;
+
+        if (bioInput) {
+            bioInput.readOnly = !enabled;
+            if (enabled) {
+                bioInput.focus();
+                const length = bioInput.value.length;
+                bioInput.setSelectionRange(length, length);
+            }
+        }
+
+        notesPanel?.classList.toggle("is-editing", enabled);
+        if (notesEditButton) {
+            notesEditButton.hidden = enabled;
+        }
+        if (notesSaveButton) {
+            notesSaveButton.hidden = !enabled;
+            notesSaveButton.disabled = !enabled;
+        }
+    }
+
+    async function saveProfessionalNotes() {
+        if (!bioInput) {
+            return;
+        }
+
+        const nextBio = bioInput.value.trim();
+        setSettingsMessage("Saving notes...");
+
+        try {
+            const response = await fetch("api/doctor/settings.php", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                },
+                body: JSON.stringify({
+                    noteOnly: true,
+                    bio: nextBio
+                })
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.ok) {
+                throw new Error(payload.error || "Unable to save professional notes.");
+            }
+
+            draftProfile.bio = String(payload?.profile?.bio ?? nextBio);
+            bioInput.value = draftProfile.bio;
+            localStorage.setItem(STORAGE_KEYS.doctorProfile, JSON.stringify(draftProfile));
+            setNotesEditing(false);
+            setSettingsMessage("");
+            showSuccessToast();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Unable to save professional notes.";
+            setSettingsMessage(message);
+        }
+    }
+
     function clearPasswordFields() {
         if (currentPasswordInput) {
             currentPasswordInput.value = "";
+            currentPasswordInput.classList.remove("is-match", "is-mismatch");
         }
         if (newPasswordInput) {
             newPasswordInput.value = "";
@@ -7438,6 +7968,7 @@ function initializeSettingsPage() {
         if (confirmPasswordInput) {
             confirmPasswordInput.value = "";
             confirmPasswordInput.setCustomValidity("");
+            confirmPasswordInput.classList.remove("is-match", "is-mismatch");
         }
     }
 
@@ -7453,13 +7984,64 @@ function initializeSettingsPage() {
         }
 
         if (togglePasswordButton) {
-            togglePasswordButton.textContent = enabled ? "Cancel Password Change" : "Change Password";
+            togglePasswordButton.textContent = "Change Password";
             togglePasswordButton.setAttribute("aria-expanded", String(enabled));
+            togglePasswordButton.hidden = enabled;
         }
+        if (passwordToggleWrap) {
+            passwordToggleWrap.classList.toggle("is-hidden", enabled);
+            passwordToggleWrap.style.display = enabled ? "none" : "";
+        }
+
+        [currentPasswordInput, newPasswordInput, confirmPasswordInput].forEach(control => {
+            if (!control) {
+                return;
+            }
+
+            control.readOnly = !enabled;
+        });
 
         if (!enabled) {
             clearPasswordFields();
         }
+
+        isCurrentPasswordValid = false;
+        currentPasswordValidationToken += 1;
+        if (currentPasswordValidationTimer !== null) {
+            clearTimeout(currentPasswordValidationTimer);
+            currentPasswordValidationTimer = null;
+        }
+
+        updatePasswordSaveButtonState();
+    }
+
+    function initializePasswordVisibilityToggles() {
+        if (!passwordVisibilityButtons.length) {
+            return;
+        }
+
+        passwordVisibilityButtons.forEach(toggleButton => {
+            toggleButton.addEventListener("click", () => {
+                const targetId = String(toggleButton.getAttribute("data-password-target") || "").trim();
+                if (!targetId) {
+                    return;
+                }
+
+                const targetInput = document.getElementById(targetId);
+                if (!(targetInput instanceof HTMLInputElement)) {
+                    return;
+                }
+
+                const show = targetInput.type === "password";
+                targetInput.type = show ? "text" : "password";
+                toggleButton.setAttribute("aria-pressed", String(show));
+
+                const icon = toggleButton.querySelector("i");
+                if (icon) {
+                    icon.className = show ? "fa-regular fa-eye-slash" : "fa-regular fa-eye";
+                }
+            });
+        });
     }
 
     function ensureSpecialtyOption(value) {
@@ -7511,6 +8093,18 @@ function initializeSettingsPage() {
         }
         if (emailInput) {
             emailInput.value = profile.email;
+        }
+        if (securityEmailInput) {
+            securityEmailInput.value = profile.email;
+        }
+        if (doctorYearsExperienceInput) {
+            doctorYearsExperienceInput.value = profile.yearsOfExperience || "";
+        }
+        if (doctorContactNumberInput) {
+            doctorContactNumberInput.value = profile.contactNumber || "";
+        }
+        if (doctorUsernameInput) {
+            doctorUsernameInput.value = profile.username || "";
         }
         if (currentPasswordInput) {
             currentPasswordInput.value = "";
@@ -7587,27 +8181,50 @@ function initializeSettingsPage() {
         reader.readAsDataURL(selectedFile);
     });
 
+    doctorFilesAddButton?.addEventListener("click", () => {
+        doctorFilesInput?.click();
+    });
+
+    doctorFilesInput?.addEventListener("change", () => {
+        const selectedFile = doctorFilesInput.files?.[0];
+        if (!selectedFile) {
+            return;
+        }
+
+        void uploadDoctorDocument(selectedFile);
+    });
+
+    doctorFileDeleteCancelBtn?.addEventListener("click", () => {
+        closeDeleteModal();
+    });
+
+    doctorFileDeleteConfirmBtn?.addEventListener("click", () => {
+        void deleteDoctorDocument(pendingDeleteDocumentId);
+    });
+
+    doctorFileDeleteModal?.addEventListener("click", event => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
+
+        if (target.hasAttribute("data-modal-close")) {
+            closeDeleteModal();
+        }
+    });
+
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && doctorFileDeleteModal && !doctorFileDeleteModal.hidden) {
+            closeDeleteModal();
+        }
+    });
+
     cancelButton?.addEventListener("click", () => {
         draftProfile = getStoredProfile();
         fillForm(draftProfile);
         setPasswordEditing(false);
-        setSettingsEditable(false);
+        setSettingsEditable(true);
         setSettingsMessage("");
-    });
-
-    editButton?.addEventListener("click", () => {
-        if (!settingsForm) {
-            return;
-        }
-
-        if (!isSettingsEditable) {
-            setSettingsEditable(true);
-            setSettingsMessage("Edit mode enabled. Update fields then click Save Changes.");
-            displayNameInput?.focus();
-            return;
-        }
-
-        settingsForm.requestSubmit();
     });
 
     togglePasswordButton?.addEventListener("click", () => {
@@ -7624,14 +8241,48 @@ function initializeSettingsPage() {
         currentPasswordInput?.focus();
     });
 
-    settingsForm?.addEventListener("submit", async event => {
-        event.preventDefault();
-        if (!(event.currentTarget instanceof HTMLFormElement)) {
+    passwordSaveButton?.addEventListener("click", () => {
+        if (!settingsForm || passwordSaveButton.disabled) {
             return;
         }
 
-        if (!isSettingsEditable) {
-            setSettingsMessage("Click Edit Details before saving changes.");
+        settingsForm.requestSubmit();
+    });
+
+    passwordCancelButton?.addEventListener("click", () => {
+        setSettingsMessage("");
+        setPasswordEditing(false);
+    });
+
+    notesEditButton?.addEventListener("click", () => {
+        setSettingsMessage("");
+        setNotesEditing(true);
+    });
+
+    notesSaveButton?.addEventListener("click", () => {
+        void saveProfessionalNotes();
+    });
+
+    [currentPasswordInput, newPasswordInput, confirmPasswordInput].forEach(control => {
+        control?.addEventListener("input", () => {
+            if (control === currentPasswordInput) {
+                if (currentPasswordValidationTimer !== null) {
+                    clearTimeout(currentPasswordValidationTimer);
+                }
+
+                isCurrentPasswordValid = false;
+                updateCurrentPasswordIndicator(false);
+                currentPasswordValidationTimer = setTimeout(() => {
+                    void validateCurrentPasswordLive();
+                }, 280);
+            }
+            updatePasswordSaveButtonState();
+        });
+    });
+
+    settingsForm?.addEventListener("submit", async event => {
+        event.preventDefault();
+        if (!(event.currentTarget instanceof HTMLFormElement)) {
             return;
         }
 
@@ -7654,6 +8305,11 @@ function initializeSettingsPage() {
 
         if (hasPasswordInput && (!nextCurrent || !nextNew || !nextConfirm)) {
             setSettingsMessage("To change your password, fill current, new, and confirm password.");
+            return;
+        }
+
+        if (hasPasswordInput && !isCurrentPasswordValid) {
+            setSettingsMessage("Current password does not match your account password.");
             return;
         }
 
@@ -7681,7 +8337,10 @@ function initializeSettingsPage() {
             specialty: specialtyInput?.value || "",
             hospital: hospitalInput?.value.trim() || "",
             bio: bioInput?.value.trim() || "",
-            email: emailInput?.value.trim() || ""
+            email: emailInput?.value.trim() || "",
+            username: draftProfile.username || "",
+            contactNumber: doctorContactNumberInput?.value.trim() || "",
+            yearsOfExperience: draftProfile.yearsOfExperience || ""
         };
 
         setSettingsMessage("Saving changes...");
@@ -7709,7 +8368,8 @@ function initializeSettingsPage() {
             localStorage.setItem(STORAGE_KEYS.doctorProfile, JSON.stringify(draftProfile));
             fillForm(draftProfile);
             setPasswordEditing(false);
-            setSettingsEditable(false);
+            setSettingsEditable(true);
+            resetDoctorInlineEditStates();
             setSettingsMessage("");
             showSuccessToast();
         } catch (error) {
@@ -7721,9 +8381,15 @@ function initializeSettingsPage() {
     draftProfile = getStoredProfile();
     fillForm(draftProfile);
     setPasswordEditing(false);
-    setSettingsEditable(false);
+    setSettingsEditable(true);
+    setNotesEditing(false);
+    lockNonEditableDoctorFields();
     initializeSettingsMiniNav();
+    initializeDoctorInlineEditButtons();
+    initializePasswordVisibilityToggles();
+    updatePasswordSaveButtonState();
     void loadProfileFromServer();
+    void loadDoctorDocuments();
 }
 
 function initializeLogoutFlow() {

@@ -111,6 +111,15 @@
                                         <button class="metric-btn active" data-metric="grip">Grip Strength</button>
                                         <button class="metric-btn" data-metric="range">Range of Motion</button>
                                     </div>
+                                    <div class="chart-period-toggle" role="tablist" aria-label="Chart period toggle">
+                                        <button class="period-btn" data-period="daily">Daily</button>
+                                        <button class="period-btn active" data-period="weekly">Weekly</button>
+                                        <button class="period-btn" data-period="monthly">Monthly</button>
+                                    </div>
+                                    <label class="chart-show-values" for="doctorChartShowValues">
+                                        <input type="checkbox" id="doctorChartShowValues" checked>
+                                        <span>Show Values</span>
+                                    </label>
                                     <div class="chart-selector" id="patientSelect">
                                         <button class="selector-btn" id="patientSelectBtn" type="button">
                                             <span id="selectedPatientLabel">All Patients (Avg)</span>

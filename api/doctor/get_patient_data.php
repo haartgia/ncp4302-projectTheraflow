@@ -27,9 +27,38 @@ if ($requestedPatientId > 0 && !isset($patientIdLookup[$requestedPatientId])) {
 }
 
 $scopePatientIds = $requestedPatientId > 0 ? [$requestedPatientId] : $patientIds;
+
+$dailyLabels = [];
+$dailyGrip = [];
+$dailyRange = [];
+$dailyKeys = [];
+
+for ($i = 6; $i >= 0; $i--) {
+    $date = new DateTimeImmutable('-' . $i . ' day');
+    $key = $date->format('Y-m-d');
+    $dailyKeys[$key] = 6 - $i;
+    $dailyLabels[] = $date->format('M j');
+    $dailyGrip[] = 0;
+    $dailyRange[] = 0;
+}
+
 $weeklyLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 $weeklyGrip = [0, 0, 0, 0, 0, 0, 0];
 $weeklyRange = [0, 0, 0, 0, 0, 0, 0];
+
+$monthlyLabels = [];
+$monthlyGrip = [];
+$monthlyRange = [];
+$monthlyKeys = [];
+
+for ($i = 6; $i >= 0; $i--) {
+    $month = new DateTimeImmutable('first day of -' . $i . ' month');
+    $key = $month->format('Y-m');
+    $monthlyKeys[$key] = 6 - $i;
+    $monthlyLabels[] = $month->format('M Y');
+    $monthlyGrip[] = 0;
+    $monthlyRange[] = 0;
+}
 
 $sessionsToday = 0;
 $avgGrip = 0.0;
@@ -77,7 +106,7 @@ if (!empty($scopePatientIds)) {
     $weeklyStmt = $pdo->prepare(
         'SELECT WEEKDAY(recorded_at) AS wd, AVG(grip_strength) AS avg_grip, AVG(flexion_angle) AS avg_range
          FROM sensor_data
-         WHERE patient_id IN (' . $placeholders . ') AND recorded_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            WHERE patient_id IN (' . $placeholders . ') AND YEARWEEK(recorded_at, 1) = YEARWEEK(CURDATE(), 1)
          GROUP BY WEEKDAY(recorded_at)
          ORDER BY WEEKDAY(recorded_at)'
     );
@@ -88,6 +117,42 @@ if (!empty($scopePatientIds)) {
         if ($idx >= 0 && $idx <= 6) {
             $weeklyGrip[$idx] = round((float) ($row['avg_grip'] ?? 0), 2);
             $weeklyRange[$idx] = round((float) ($row['avg_range'] ?? 0), 2);
+        }
+    }
+
+    $dailyStmt = $pdo->prepare(
+        'SELECT DATE(recorded_at) AS d, AVG(grip_strength) AS avg_grip, AVG(flexion_angle) AS avg_range
+         FROM sensor_data
+         WHERE patient_id IN (' . $placeholders . ') AND recorded_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+         GROUP BY DATE(recorded_at)
+         ORDER BY DATE(recorded_at)'
+    );
+    $dailyStmt->execute($scopePatientIds);
+
+    foreach ($dailyStmt->fetchAll() as $row) {
+        $key = (string) ($row['d'] ?? '');
+        if ($key !== '' && array_key_exists($key, $dailyKeys)) {
+            $idx = (int) $dailyKeys[$key];
+            $dailyGrip[$idx] = round((float) ($row['avg_grip'] ?? 0), 2);
+            $dailyRange[$idx] = round((float) ($row['avg_range'] ?? 0), 2);
+        }
+    }
+
+    $monthlyStmt = $pdo->prepare(
+        'SELECT DATE_FORMAT(recorded_at, "%Y-%m") AS ym, AVG(grip_strength) AS avg_grip, AVG(flexion_angle) AS avg_range
+         FROM sensor_data
+         WHERE patient_id IN (' . $placeholders . ') AND recorded_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 6 MONTH), "%Y-%m-01")
+         GROUP BY DATE_FORMAT(recorded_at, "%Y-%m")
+         ORDER BY ym'
+    );
+    $monthlyStmt->execute($scopePatientIds);
+
+    foreach ($monthlyStmt->fetchAll() as $row) {
+        $key = (string) ($row['ym'] ?? '');
+        if ($key !== '' && array_key_exists($key, $monthlyKeys)) {
+            $idx = (int) $monthlyKeys[$key];
+            $monthlyGrip[$idx] = round((float) ($row['avg_grip'] ?? 0), 2);
+            $monthlyRange[$idx] = round((float) ($row['avg_range'] ?? 0), 2);
         }
     }
 }
@@ -118,9 +183,19 @@ echo json_encode([
         ];
     }, $patients), 0, 8),
     'recentActivity' => $recentActivity,
+    'dailyChart' => [
+        'labels' => $dailyLabels,
+        'avgGrip' => $dailyGrip,
+        'avgRange' => $dailyRange
+    ],
     'weeklyChart' => [
         'labels' => $weeklyLabels,
         'avgGrip' => $weeklyGrip,
         'avgRange' => $weeklyRange
+    ],
+    'monthlyChart' => [
+        'labels' => $monthlyLabels,
+        'avgGrip' => $monthlyGrip,
+        'avgRange' => $monthlyRange
     ]
 ]);

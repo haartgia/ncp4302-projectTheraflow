@@ -15,6 +15,8 @@ const char* fingerNames[FLEX_COUNT] = {"Index", "Middle", "Ring", "Pinky"};
 const int suctionPump = 19;
 const int inflatePump = 23;
 const int valvePin = 27;
+const int VALVE_SETTLE_MS = 120;
+const bool INVERT_VALVE_LOGIC = true;
 const int CALIBRATE_SUCTION_SECONDS = 5;
 const int CALIBRATE_PUMP_SECONDS = 5;
 const int CALIBRATE_DEFLATE_SECONDS = 5;
@@ -83,20 +85,33 @@ void probeTheraflowServer() {
 void setActuatorsOff() {
   digitalWrite(inflatePump, HIGH);
   digitalWrite(suctionPump, HIGH);
-  digitalWrite(valvePin, LOW);
+  // Keep valve in the default closed route when idle.
+  digitalWrite(valvePin, INVERT_VALVE_LOGIC ? HIGH : LOW);
+}
+
+void setValvePathOpen(bool openPath) {
+  // Default wiring expects HIGH=open, LOW=closed. Inverted wiring flips that.
+  int valveLevel = openPath ? HIGH : LOW;
+  if (INVERT_VALVE_LOGIC) {
+    valveLevel = openPath ? LOW : HIGH;
+  }
+  digitalWrite(valvePin, valveLevel);
 }
 
 void setInflateMode() {
-  // Pump mode (closed hands): route airflow and run pump pin 23.
-  digitalWrite(valvePin, HIGH);
+  // Pump mode (closed hands): close valve path before enabling pump.
+  setValvePathOpen(false);
+  delay(VALVE_SETTLE_MS);
   digitalWrite(suctionPump, HIGH);
   digitalWrite(inflatePump, LOW);
 }
 
 void setSuctionMode() {
-  // Suction mode (open hands): route suction path and run suction pin 19.
+  // Suction mode (open hands): open valve path before enabling suction pump.
+  digitalWrite(suctionPump, HIGH);
   digitalWrite(inflatePump, HIGH);
-  digitalWrite(valvePin, HIGH);
+  setValvePathOpen(true);
+  delay(VALVE_SETTLE_MS);
   digitalWrite(suctionPump, LOW);
 }
 
@@ -104,12 +119,13 @@ void setDeflateMode() {
   // Deflate mode: passive release path, no pump drive.
   digitalWrite(inflatePump, HIGH);
   digitalWrite(suctionPump, HIGH);
-  digitalWrite(valvePin, LOW);
+  setValvePathOpen(false);
 }
 
 void runPumpSecondHighIntensity() {
-  // Reassert full-pressure path continuously for a solid 1-second pump drive.
-  digitalWrite(valvePin, HIGH);
+  // Reassert full-pressure path and ensure valve is closed before pumping.
+  setValvePathOpen(false);
+  delay(VALVE_SETTLE_MS);
   digitalWrite(suctionPump, HIGH);
   digitalWrite(inflatePump, LOW);
   delay(1000);

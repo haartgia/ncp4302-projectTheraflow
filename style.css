@@ -1124,6 +1124,47 @@ body.dark-mode .calendar-widget-title {
   border-color: transparent;
 }
 
+.chart-period-toggle {
+  display: inline-flex;
+  gap: 6px;
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,0.1);
+  background: rgba(255,255,255,0.55);
+}
+
+.period-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 5px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.period-btn.active {
+  background: #4a86a8;
+  color: #ffffff;
+}
+
+.chart-show-values {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  user-select: none;
+}
+
+.chart-show-values input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: #4a86a8;
+}
+
 .doctor-chart-wrap { position: relative; min-height: 240px; }
 .doctor-chart-wrap.is-loading canvas { opacity: 0.05; }
 .skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.08) 100%); border-radius: 12px; }
@@ -1183,6 +1224,19 @@ body.dark-mode .calendar-widget-title {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+@media (max-width: 1024px) {
+  .doctor-chart-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .chart-controls {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
 }
 .selector-item {
   padding: 6px 8px;
@@ -2448,7 +2502,6 @@ body.dark-mode .calendar-widget-card {
   font-size: 2.15rem;
   line-height: 1.1;
   color: #1f5668;
-  margin-bottom: 22px;
 }
 
 .registration-form {
@@ -2462,6 +2515,10 @@ body.dark-mode .calendar-widget-card {
   color: #b14848;
   font-size: 0.9rem;
   font-weight: 600;
+}
+
+.registration-page .wizard-error:empty {
+  min-height: 0;
 }
 
 .wizard-stage {
@@ -2780,8 +2837,34 @@ body.dark-mode .calendar-widget-card {
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 18px;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.registration-page .wizard-nav .wizard-next,
+.registration-page .wizard-nav .wizard-create-account-btn {
+  margin-left: auto;
+}
+
+.registration-page .wizard-nav-text-btn {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid #4d869c;
+  background: #ffffff;
+  color: #2f6f86;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.registration-page .wizard-nav-text-btn:hover,
+.registration-page .wizard-nav-text-btn:focus-visible {
+  background: rgba(77, 134, 156, 0.12);
+  border-color: #3f778d;
+  color: #255e73;
+  outline: none;
 }
 
 .registration-page .wizard-nav-icon {
@@ -7834,22 +7917,29 @@ body.dark-mode .exercise-plan-meta strong {
 
 /* Doctor settings viewport-only redesign */
 .settings-page .settings-content {
-  align-items: flex-start;
-  justify-content: center;
+  align-items: center;
+  justify-content: flex-start;
   min-height: 100vh;
-  height: auto;
-  padding: 12px 14px 24px;
-  overflow: auto;
-  background: #f8fafc;
+  height: 100vh;
+  padding: 16px 22px 24px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: #ffffff;
 }
 
 .settings-page .settings-shell {
-  width: min(1520px, 100%);
-  max-width: 1520px;
+  width: min(1240px, 100%);
+  max-width: 1240px;
   height: auto;
   gap: 10px;
   overflow: visible;
+  margin: 0 auto;
   font-family: "Inter", "Public Sans", "Segoe UI", sans-serif;
+}
+
+.settings-page .settings-card.registration-card {
+  width: 100%;
+  max-width: none;
 }
 
 .settings-page .settings-header-row {
@@ -7887,12 +7977,12 @@ body.dark-mode .exercise-plan-meta strong {
 .settings-page .settings-header-row h1 {
   margin: 0;
   font-size: clamp(2.05rem, 1.85rem + 0.5vw, 2.4rem);
-  color: #1c4a63;
+  color: #1f4d67;
 }
 
 .settings-page .settings-header-row .subheader {
   margin: 1px 0 0;
-  color: #5b7a8d;
+  color: #4f7082;
   font-size: 1rem;
 }
 
@@ -7920,9 +8010,17 @@ body.dark-mode .exercise-plan-meta strong {
   overflow: visible;
 }
 
-.settings-page .sidebar-footer .logout-btn,
 .settings-page .settings-top-logout {
   display: none;
+}
+
+.settings-page .sidebar-footer .logout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
 }
 
 .settings-page .settings-viewport-grid {
@@ -7949,11 +8047,11 @@ body.dark-mode .exercise-plan-meta strong {
 .settings-page .settings-pane-grid {
   min-height: auto;
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
-    "profile security"
-    "professional security";
-  gap: 18px;
+    "profile"
+    "security";
+  gap: 14px;
 }
 
 .settings-page #settingsPaneProfile {
@@ -7961,7 +8059,7 @@ body.dark-mode .exercise-plan-meta strong {
 }
 
 .settings-page #settingsPaneProfessional {
-  grid-area: professional;
+  display: none;
 }
 
 .settings-page #settingsPaneSecurity {
@@ -7991,7 +8089,7 @@ body.dark-mode .exercise-plan-meta strong {
 
 .settings-page .settings-profile-main-fields {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -7999,12 +8097,21 @@ body.dark-mode .exercise-plan-meta strong {
   margin: 0;
 }
 
+.settings-page .settings-profile-main-fields .field-group-span-full {
+  grid-column: 1 / -1;
+}
+
+.settings-page .settings-combined-grid {
+  display: grid;
+  gap: 14px;
+}
+
 .settings-page .settings-section {
   min-height: auto;
   margin: 0;
   border-radius: 16px;
-  border: 1px solid #b7d3d8;
-  background: #c9d8d8;
+  border: 1px solid #c9dde2;
+  background: #ffffff;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -8056,20 +8163,663 @@ body.dark-mode .exercise-plan-meta strong {
 .settings-page .settings-section .field-group textarea {
   min-height: 54px;
   border-radius: 12px;
-  border: 1px solid #b7ccd7;
-  background: #dfe5ea;
-  color: #18465f;
+  border: 1px solid #c8d5de;
+  background: #f1f4f7;
+  color: #204f67;
   font-size: 1.05rem;
   font-weight: 600;
   padding: 10px 14px;
   box-shadow: none;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+/* Highlight editable controls only while inline edit mode is active. */
+.settings-page .field-group.has-field-edit.is-editing input:not([readonly]):not([type="file"]),
+.settings-page .field-group.has-field-edit.is-editing select:not([disabled]),
+.settings-page .field-group.has-field-edit.is-editing textarea:not([readonly]) {
+  border-color: #7faec0;
+  box-shadow: inset 0 0 0 2px rgba(77, 134, 156, 0.22);
+  background: #eef4f8;
+}
+
+/* Keep locked fields visually static even if they receive focus. */
+.settings-page .doctor-panel input[readonly]:focus,
+.settings-page .doctor-panel select:disabled:focus,
+.settings-page .doctor-panel textarea[readonly]:focus,
+.settings-page .doctor-panel .field-group.has-field-edit:not(.is-editing) input:focus,
+.settings-page .doctor-panel .field-group.has-field-edit:not(.is-editing) select:focus,
+.settings-page .doctor-panel .field-group.has-field-edit:not(.is-editing) textarea:focus {
+  box-shadow: none;
+  border-color: #c8d5de;
+  background: #f1f4f7;
+  outline: none;
+}
+
+/* Doctor settings dashboard layout (patient-card inspired). */
+.settings-page .settings-card.registration-card {
+  max-width: 1320px;
+  width: min(96vw, 1320px);
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-page .doctor-settings-v2 {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(300px, 1fr);
+  grid-template-areas:
+    "profile notes"
+    "security files";
+  gap: 18px;
+}
+
+.settings-page .doctor-panel {
+  background: #f9fbff;
+  border: 1px solid #d7e0ea;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 12px 32px rgba(15, 27, 45, 0.06);
+}
+
+.settings-page .doctor-panel-profile {
+  grid-area: profile;
+  align-self: start;
+}
+
+.settings-page .doctor-panel-notes {
+  grid-area: notes;
+  margin-top: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-page .doctor-panel-notes .doctor-notes-direct-edit {
+  flex: 1;
+  display: flex;
+}
+
+.settings-page .doctor-panel-notes .field-group textarea {
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  resize: none;
+}
+
+.settings-page .doctor-panel-notes.is-editing .field-group textarea {
+  border-color: #7faec0;
+  box-shadow: inset 0 0 0 2px rgba(77, 134, 156, 0.22);
+  background: #eef4f8;
+}
+
+.settings-page .doctor-notes-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.settings-page #settingsNotesEditBtn,
+.settings-page #settingsNotesSaveBtn {
+  min-height: 38px;
+  min-width: 100px;
+}
+
+.settings-page .doctor-panel-notes #settingsNotesSaveBtn {
+  display: none;
+}
+
+.settings-page .doctor-panel-notes.is-editing #settingsNotesEditBtn {
+  display: none;
+}
+
+.settings-page .doctor-panel-notes.is-editing #settingsNotesSaveBtn {
+  display: inline-flex;
+}
+
+.settings-page .doctor-panel-security {
+  grid-area: security;
+}
+
+.settings-page .doctor-panel-files {
+  grid-area: files;
+}
+
+.settings-page .doctor-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.settings-page .doctor-panel-head h2,
+.settings-page .doctor-panel-head h3 {
+  margin: 0;
+  color: #213347;
+  font-size: clamp(1.02rem, 0.98rem + 0.24vw, 1.2rem);
+  font-weight: 800;
+}
+
+.settings-page .doctor-panel-head-inline {
+  margin-bottom: 10px;
+}
+
+.settings-page .doctor-info-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-page .doctor-info-grid-top {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 10px;
+}
+
+.settings-page .doctor-info-grid-bottom {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.settings-page .doctor-security-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 16px;
+}
+
+.settings-page .doctor-panel-security .settings-password-toggle-wrap {
+  margin-top: 10px;
+}
+
+.settings-page .field-group-span-full {
+  grid-column: 1 / -1;
+}
+
+.settings-page .doctor-panel .field-group {
+  margin: 0;
+}
+
+.settings-page .doctor-panel .field-group > span {
+  color: #4f6276;
+  font-weight: 700;
+  font-size: 0.84rem;
+  letter-spacing: 0.01em;
+  margin-bottom: 7px;
+}
+
+.settings-page .doctor-panel .field-group input,
+.settings-page .doctor-panel .field-group select,
+.settings-page .doctor-panel .field-group textarea {
+  border: 1px solid #cdd9e6;
+  border-radius: 12px;
+  background: #f4f8fd;
+  color: #1f3244;
+  font-weight: 700;
+}
+
+.settings-page .doctor-panel:not(.doctor-panel-notes) .field-group textarea {
+  min-height: 182px;
+  resize: vertical;
+}
+
+.settings-page .doctor-btn {
+  border: 1px solid #b6c9dc;
+  background: #ffffff;
+  color: #2f4d6b;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.settings-page .doctor-btn:hover,
+.settings-page .doctor-btn:focus-visible {
+  background: #e7f0fb;
+  color: #1f3f5d;
+  border-color: #8bb3d6;
+}
+
+.settings-page .doctor-files-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.settings-page .doctor-files-list li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #d5e1ec;
+  border-radius: 11px;
+  background: #f3f7fc;
+  color: #334b62;
+  font-weight: 600;
+}
+
+.settings-page .doctor-files-list i {
+  color: #4a85bd;
+}
+
+.settings-page .doctor-file-entry {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-page .doctor-file-entry a,
+.settings-page .doctor-file-entry span {
+  color: #2c4760;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-page .doctor-file-entry a:hover,
+.settings-page .doctor-file-entry a:focus-visible {
+  text-decoration: underline;
+}
+
+.settings-page .doctor-file-entry small {
+  color: #6b8196;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.settings-page .doctor-files-list li.doctor-files-empty {
+  grid-template-columns: 18px minmax(0, 1fr);
+  color: #6d8298;
+  font-weight: 600;
+}
+
+.settings-page .doctor-file-delete-btn {
+  border: 1px solid #d45a5a;
+  background: #fff2f2;
+  color: #c13232;
+  border-radius: 9px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-page .doctor-file-delete-btn:hover,
+.settings-page .doctor-file-delete-btn:focus-visible {
+  background: #ffe4e4;
+  border-color: #bf4040;
+  color: #a92a2a;
+  outline: none;
+}
+
+.settings-page .doctor-btn-danger {
+  border-color: #cc4a4a;
+  background: #e55757;
+  color: #ffffff;
+}
+
+.settings-page .doctor-btn-danger:hover,
+.settings-page .doctor-btn-danger:focus-visible {
+  border-color: #b73b3b;
+  background: #cb4343;
+  color: #ffffff;
+}
+
+.settings-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+}
+
+.settings-modal[hidden] {
+  display: none;
+}
+
+.settings-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(13, 24, 36, 0.46);
+}
+
+.settings-modal-card {
+  position: relative;
+  z-index: 1;
+  width: min(92vw, 420px);
+  background: #ffffff;
+  border: 1px solid #d6e1eb;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 16px 48px rgba(10, 21, 35, 0.22);
+}
+
+.settings-modal-card h3 {
+  margin: 0;
+  color: #23394e;
+  font-size: 1.12rem;
+}
+
+.settings-modal-card p {
+  margin: 10px 0 0;
+  color: #53697f;
+  line-height: 1.45;
+}
+
+.settings-modal-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.settings-page .doctor-activity-kicker {
+  color: #6f849a;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.settings-page .doctor-activity-list {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-page .doctor-activity-item {
+  border: 1px solid #d3dfeb;
+  background: #f3f8fd;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.settings-page .doctor-activity-item h4 {
+  margin: 0 0 6px;
+  color: #243a52;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.settings-page .doctor-activity-item p {
+  margin: 0;
+  color: #54697e;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.settings-page .doctor-password-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.settings-page .doctor-panel .settings-password-toggle-wrap {
+  margin-top: 4px;
+}
+
+.settings-page .settings-password-toggle-wrap.is-hidden {
+  display: none;
+}
+
+.settings-page .doctor-panel .settings-password-fields {
+  margin-top: 2px;
+}
+
+.settings-page .settings-password-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-page .settings-password-cancel-btn {
+  min-height: 40px;
+  border-radius: 10px;
+  padding: 0 14px;
+  width: auto;
+  min-width: 190px;
+}
+
+.settings-page .settings-password-save-btn {
+  min-height: 40px;
+  border-radius: 10px;
+  padding: 0 14px;
+  width: auto;
+  min-width: 190px;
+  font-size: 0.92rem;
+}
+
+.settings-page .settings-password-field {
+  position: relative;
+}
+
+.settings-page .settings-password-field input {
+  padding-right: 42px;
+}
+
+.settings-page .settings-password-visibility {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  right: 12px;
+  bottom: 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #5d7f9a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.settings-page .settings-password-visibility:hover,
+.settings-page .settings-password-visibility:focus-visible {
+  background: rgba(77, 134, 156, 0.14);
+}
+
+.settings-page .settings-password-visibility i {
+  font-size: 0.9rem;
+}
+
+.settings-page #settingsConfirmPassword.is-match {
+  border-color: #56a66a;
+  box-shadow: inset 0 0 0 2px rgba(86, 166, 106, 0.18);
+  background: #edf8f0;
+}
+
+.settings-page #settingsConfirmPassword.is-mismatch {
+  border-color: #cc5e5e;
+  box-shadow: inset 0 0 0 2px rgba(204, 94, 94, 0.16);
+  background: #fff4f4;
+}
+
+.settings-page #settingsCurrentPassword.is-match {
+  border-color: #56a66a;
+  box-shadow: inset 0 0 0 2px rgba(86, 166, 106, 0.18);
+  background: #edf8f0;
+}
+
+.settings-page #settingsCurrentPassword.is-mismatch {
+  border-color: #cc5e5e;
+  box-shadow: inset 0 0 0 2px rgba(204, 94, 94, 0.16);
+  background: #fff4f4;
+}
+
+@media (max-width: 1220px) {
+  .settings-page .doctor-info-grid-top {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-page .doctor-info-grid-bottom {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-page .doctor-password-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .settings-page .doctor-settings-v2 {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "profile"
+      "notes"
+      "security"
+      "files";
+  }
+
+  .settings-page .doctor-panel {
+    padding: 15px;
+  }
+}
+
+@media (max-width: 680px) {
+  .settings-page .doctor-info-grid-top,
+  .settings-page .doctor-info-grid-bottom {
+    grid-template-columns: 1fr;
+  }
+}
+
+.settings-page .doctor-profile-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.settings-page .doctor-profile-fields-wrap {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-page #settingsPaneProfile .section-head h2 {
+  font-size: 1.82rem;
+  letter-spacing: 0.01em;
+}
+
+.settings-page #settingsPaneProfile .field-group > span {
+  font-size: 0.96rem;
+  font-weight: 650;
+  color: #2f6880;
+}
+
+.settings-page #settingsPaneProfile .field-group input,
+.settings-page #settingsPaneProfile .field-group select {
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.settings-page .doctor-profile-grid-top {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.settings-page .doctor-profile-grid-bottom {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.settings-page .doctor-practice-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 16px;
+  margin-bottom: 10px;
+}
+
+.settings-page .field-group-span-full {
+  grid-column: 1 / -1;
+}
+
+.settings-page .settings-security-grid {
+  margin-top: 2px;
+}
+
+.settings-page .has-field-edit {
+  position: relative;
+}
+
+.settings-page .has-field-edit input,
+.settings-page .has-field-edit select {
+  padding-right: 44px;
+}
+
+.settings-page .has-field-edit textarea {
+  padding-right: 44px;
+}
+
+.settings-page .doctor-panel .field-group.has-field-edit {
+  position: relative;
+}
+
+.settings-page .doctor-panel .field-group.has-field-edit:not(.is-editing) input,
+.settings-page .doctor-panel .field-group.has-field-edit:not(.is-editing) select,
+.settings-page .doctor-panel .field-group.has-field-edit:not(.is-editing) textarea {
+  pointer-events: none;
+  cursor: default;
+}
+
+.settings-page .doctor-panel input[readonly],
+.settings-page .doctor-panel select:disabled,
+.settings-page .doctor-panel textarea[readonly] {
+  pointer-events: none;
+  cursor: default;
+  caret-color: transparent;
+}
+
+.settings-page .doctor-panel .field-group.has-field-edit.is-editing input,
+.settings-page .doctor-panel .field-group.has-field-edit.is-editing select,
+.settings-page .doctor-panel .field-group.has-field-edit.is-editing textarea {
+  pointer-events: auto;
+}
+
+.settings-page .doctor-panel .doctor-notes-direct-edit textarea {
+  pointer-events: auto;
+  cursor: text;
+}
+
+.settings-page .settings-header-actions .settings-save-btn {
+  min-height: 46px;
+  padding: 0 14px;
+}
+
+.settings-page .doctor-inline-edit-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 12px;
+  border: none;
+  background: transparent;
+  color: #628295;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  pointer-events: auto;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.settings-page .doctor-inline-edit-btn:hover,
+.settings-page .doctor-inline-edit-btn:focus-visible {
+  background: rgba(77, 134, 156, 0.16);
+}
+
+.settings-page .doctor-inline-edit-btn.is-editing {
+  color: #2f9b72;
 }
 
 .settings-page #settingsForm.is-locked .field-group input,
 .settings-page #settingsForm.is-locked .field-group select,
 .settings-page #settingsForm.is-locked .field-group textarea {
-  background: #e8eef2;
-  color: #496877;
+  background: #f1f4f7;
+  color: #204f67;
 }
 
 .settings-page #settingsForm.is-locked .settings-avatar-uploader {
@@ -8099,6 +8849,19 @@ body.dark-mode .exercise-plan-meta strong {
   min-height: 48px;
   border-radius: 12px;
   border-width: 1px;
+}
+
+.settings-page #settingsTogglePasswordBtn {
+  background: #2f6f86;
+  color: #ffffff;
+  border-color: #2f6f86;
+  font-weight: 700;
+}
+
+.settings-page #settingsTogglePasswordBtn:hover,
+.settings-page #settingsTogglePasswordBtn:focus-visible {
+  background: #285f73;
+  border-color: #285f73;
 }
 
 .settings-page .settings-password-fields {
@@ -8165,6 +8928,22 @@ body.dark-mode .exercise-plan-meta strong {
     height: auto;
     min-height: 100vh;
     overflow: auto;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 10px 16px 18px;
+  }
+
+  .settings-page .doctor-profile-layout {
+    grid-template-columns: 1fr;
+  }
+  .settings-page .doctor-security-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-page .doctor-profile-grid-top,
+  .settings-page .doctor-profile-grid-bottom,
+  .settings-page .doctor-practice-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .settings-page .settings-card {
@@ -8181,6 +8960,10 @@ body.dark-mode .exercise-plan-meta strong {
   }
 
   .settings-page .settings-profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-page .settings-profile-main-fields {
     grid-template-columns: 1fr;
   }
 
@@ -8219,7 +9002,7 @@ body.dark-mode .exercise-plan-meta strong {
     height: auto;
     min-height: 100vh;
     overflow: auto;
-    padding: 16px;
+    padding: 10px 16px 18px;
   }
 
   .settings-shell {
@@ -8230,6 +9013,20 @@ body.dark-mode .exercise-plan-meta strong {
   .settings-card {
     grid-template-columns: 1fr;
     overflow: visible;
+  }
+}
+
+@media (max-width: 760px) {
+  .settings-page .settings-content {
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 8px 12px 14px;
+  }
+
+  .settings-page .doctor-profile-grid-top,
+  .settings-page .doctor-profile-grid-bottom,
+  .settings-page .doctor-practice-grid {
+    grid-template-columns: 1fr;
   }
 }
 
