@@ -1757,6 +1757,16 @@ function initializePatientsPage() {
     const profileGrip = document.getElementById("profileGrip");
     const profileFlexion = document.getElementById("profileFlexion");
     const profileRepetitions = document.getElementById("profileRepetitions");
+    const patientGripBest = document.getElementById("patientGripBest");
+    const patientFlexionBest = document.getElementById("patientFlexionBest");
+    const patientGripChartWrap = document.getElementById("patientGripChartWrap");
+    const patientFlexionChartWrap = document.getElementById("patientFlexionChartWrap");
+    const patientGripChartEmpty = document.getElementById("patientGripChartEmpty");
+    const patientFlexionChartEmpty = document.getElementById("patientFlexionChartEmpty");
+    const patientGripViewButtons = Array.from(document.querySelectorAll("#patientGripViewToggle [data-period]"));
+    const patientFlexionViewButtons = Array.from(document.querySelectorAll("#patientFlexionViewToggle [data-period]"));
+    const patientGripShowValues = document.getElementById("patientGripShowValues");
+    const patientFlexionShowValues = document.getElementById("patientFlexionShowValues");
     const planRepetitions = document.getElementById("planRepetitions");
     const planSessions = document.getElementById("planSessions");
     const planTemplateName = document.getElementById("planTemplateName");
@@ -1767,6 +1777,10 @@ function initializePatientsPage() {
     let addPatientStepIndex = 0;
     let gripChartInstance = null;
     let flexionChartInstance = null;
+    let activeGripView = "recent";
+    let activeFlexionView = "recent";
+    let showGripPointValues = Boolean(patientGripShowValues?.checked);
+    let showFlexionPointValues = Boolean(patientFlexionShowValues?.checked);
     let profileMetricsTimer = null;
     let patientTablePage = 1;
     const characterCounterUpdaters = [];
@@ -1811,6 +1825,42 @@ function initializePatientsPage() {
 
     function formatFlexion(value) {
         return `${Number(value || 0).toFixed(1)} deg`;
+    }
+
+    function setPatientChartControlsActive(buttons, activePeriod) {
+        buttons.forEach(button => {
+            const period = String(button.getAttribute("data-period") || "");
+            const isActive = period === activePeriod;
+            button.classList.toggle("active", isActive);
+            button.setAttribute("aria-selected", String(isActive));
+        });
+    }
+
+    function getPatientProgressSeries(patient, metricKey, period) {
+        const fallback = {
+            labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+            values: [0, 0, 0, 0, 0, 0, 0]
+        };
+
+        const progressCharts = patient?.progressCharts || {};
+        const periodData = progressCharts[period] || progressCharts.daily || {};
+        const labels = Array.isArray(periodData.labels) && periodData.labels.length
+            ? periodData.labels
+            : fallback.labels;
+        const rawValues = metricKey === "grip" ? periodData.grip : periodData.flexion;
+        const values = Array.isArray(rawValues) && rawValues.length
+            ? rawValues.map(value => Number(value || 0))
+            : fallback.values;
+
+        return { labels, values };
+    }
+
+    function setPatientChartEmptyState(chartWrap, emptyEl, values) {
+        const hasData = Array.isArray(values) && values.some(value => Number(value) > 0);
+        chartWrap?.classList.toggle("is-empty", !hasData);
+        if (emptyEl) {
+            emptyEl.hidden = hasData;
+        }
     }
 
     function exerciseTypeLabel(type) {
@@ -1915,7 +1965,13 @@ function initializePatientsPage() {
                 metrics: { grip: '0 N', flexion: '0 deg', repetitionsToday: '0' },
                 therapyPlan: { templateName: 'Default', duration: 0, repetitions: 0, sessionsPerDay: 0, exercises: [] },
                 notes: '',
-                chart: { grip: [0, 0, 0, 0, 0, 0, 0], flexion: [0, 0, 0, 0, 0, 0, 0] }
+                chart: { grip: [0, 0, 0, 0, 0, 0, 0], flexion: [0, 0, 0, 0, 0, 0, 0] },
+                best: { grip: 0, flexion: 0 },
+                progressCharts: {
+                    recent: { labels: ["S1"], grip: [0], flexion: [0] },
+                    daily: { labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], grip: [0, 0, 0, 0, 0, 0, 0], flexion: [0, 0, 0, 0, 0, 0, 0] },
+                    monthly: { labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"], grip: [0, 0, 0, 0, 0, 0], flexion: [0, 0, 0, 0, 0, 0] }
+                }
             }));
             activePatientId = patients[0]?.id || '';
             patientTablePage = 1;
@@ -2083,6 +2139,23 @@ function initializePatientsPage() {
             return;
         }
 
+        const gripSeries = getPatientProgressSeries(patient, "grip", activeGripView);
+        const flexionSeries = getPatientProgressSeries(patient, "flexion", activeFlexionView);
+        const bestGripValue = Number(patient?.best?.grip || 0);
+        const bestFlexionValue = Number(patient?.best?.flexion || 0);
+
+        if (patientGripBest) {
+            patientGripBest.textContent = bestGripValue > 0 ? `Best: ${bestGripValue.toFixed(1)} N` : "Best: -- N";
+        }
+        if (patientFlexionBest) {
+            patientFlexionBest.textContent = bestFlexionValue > 0 ? `Best: ${bestFlexionValue.toFixed(1)}\u00b0` : "Best: --\u00b0";
+        }
+
+        setPatientChartControlsActive(patientGripViewButtons, activeGripView);
+        setPatientChartControlsActive(patientFlexionViewButtons, activeFlexionView);
+        setPatientChartEmptyState(patientGripChartWrap, patientGripChartEmpty, gripSeries.values);
+        setPatientChartEmptyState(patientFlexionChartWrap, patientFlexionChartEmpty, flexionSeries.values);
+
         destroyProfileCharts();
 
         const axisColor = document.body.classList.contains("dark-mode") ? "#88a8b4" : "#5e7f8d";
@@ -2105,14 +2178,48 @@ function initializePatientsPage() {
             flexionGradient.addColorStop(1, "rgba(20,121,91,0.48)");
         }
 
+        function buildValueLabelPlugin(values, suffix, enabled) {
+            return {
+                id: `profileChartValueLabel-${suffix}`,
+                afterDatasetsDraw(chartInstance) {
+                    if (!enabled) {
+                        return;
+                    }
+
+                    const ctx = chartInstance.ctx;
+                    const points = chartInstance.getDatasetMeta(0)?.data || [];
+                    if (!points.length) {
+                        return;
+                    }
+
+                    ctx.save();
+                    ctx.fillStyle = document.body.classList.contains("dark-mode") ? "#d9ebf3" : "#36505e";
+                    ctx.font = "700 12px Poppins, Segoe UI, sans-serif";
+                    ctx.textAlign = "center";
+
+                    points.forEach((point, index) => {
+                        const raw = Number(values[index] || 0);
+                        if (!Number.isFinite(raw) || raw <= 0) {
+                            return;
+                        }
+
+                        const formatted = Number.isInteger(raw) ? String(raw) : raw.toFixed(1);
+                        ctx.fillText(formatted, point.x, point.y - 10);
+                    });
+
+                    ctx.restore();
+                }
+            };
+        }
+
         gripChartInstance = new Chart(gripCanvas, {
             type: "line",
             data: {
-                labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+                labels: gripSeries.labels,
                 datasets: [
                     {
                         label: "Force (N)",
-                        data: patient.chart.grip,
+                        data: gripSeries.values,
                         borderColor: "#0d5f73",
                         borderWidth: 3,
                         backgroundColor: gripGradient || "rgba(13,95,115,0.14)",
@@ -2134,7 +2241,10 @@ function initializePatientsPage() {
                     intersect: false
                 },
                 plugins: {
-                    legend: { display: false },
+                    legend: {
+                        display: true,
+                        labels: { color: axisColor }
+                    },
                     tooltip: {
                         displayColors: false,
                         backgroundColor: "rgba(15, 60, 73, 0.96)",
@@ -2155,24 +2265,28 @@ function initializePatientsPage() {
                         grid: { color: gridColor, drawBorder: false }
                     }
                 }
-            }
+            },
+            plugins: [buildValueLabelPlugin(gripSeries.values, "grip", showGripPointValues)]
         });
 
         flexionChartInstance = new Chart(flexionCanvas, {
-            type: "bar",
+            type: "line",
             data: {
-                labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+                labels: flexionSeries.labels,
                 datasets: [
                     {
-                        label: "Flexion (deg)",
-                        data: patient.chart.flexion,
+                        label: "Finger Movement (\u00b0)",
+                        data: flexionSeries.values,
                         backgroundColor: flexionGradient || "rgba(47,155,114,0.75)",
                         borderColor: "rgba(26, 121, 93, 0.95)",
-                        borderWidth: 1,
-                        borderRadius: 12,
-                        borderSkipped: false,
-                        barThickness: 28,
-                        maxBarThickness: 34
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
+                        pointBackgroundColor: "#ffffff",
+                        pointBorderWidth: 2,
+                        pointBorderColor: "rgba(26, 121, 93, 0.95)"
                     }
                 ]
             },
@@ -2180,7 +2294,10 @@ function initializePatientsPage() {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: false },
+                    legend: {
+                        display: true,
+                        labels: { color: axisColor }
+                    },
                     tooltip: {
                         displayColors: false,
                         backgroundColor: "rgba(19, 74, 58, 0.96)",
@@ -2193,7 +2310,7 @@ function initializePatientsPage() {
                 scales: {
                     x: {
                         ticks: { color: axisColor, font: { weight: "600" } },
-                        grid: { display: false, drawBorder: false }
+                        grid: { color: gridColor, drawBorder: false }
                     },
                     y: {
                         beginAtZero: true,
@@ -2201,7 +2318,8 @@ function initializePatientsPage() {
                         grid: { color: gridColor, drawBorder: false }
                     }
                 }
-            }
+            },
+            plugins: [buildValueLabelPlugin(flexionSeries.values, "flexion", showFlexionPointValues)]
         });
     }
 
@@ -2294,6 +2412,30 @@ function initializePatientsPage() {
                 grip: gripSeries,
                 flexion: flexionSeries
             };
+            patient.best = {
+                grip: Number(payload?.best?.grip || 0),
+                flexion: Number(payload?.best?.flexion || 0)
+            };
+            if (payload?.progressCharts && typeof payload.progressCharts === "object") {
+                const progressCharts = payload.progressCharts;
+                patient.progressCharts = {
+                    recent: {
+                        labels: Array.isArray(progressCharts?.recent?.labels) ? progressCharts.recent.labels : (patient.progressCharts?.recent?.labels || ["S1"]),
+                        grip: Array.isArray(progressCharts?.recent?.grip) ? progressCharts.recent.grip : (patient.progressCharts?.recent?.grip || [0]),
+                        flexion: Array.isArray(progressCharts?.recent?.flexion) ? progressCharts.recent.flexion : (patient.progressCharts?.recent?.flexion || [0])
+                    },
+                    daily: {
+                        labels: Array.isArray(progressCharts?.daily?.labels) ? progressCharts.daily.labels : (patient.progressCharts?.daily?.labels || ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+                        grip: Array.isArray(progressCharts?.daily?.grip) ? progressCharts.daily.grip : (patient.progressCharts?.daily?.grip || [0, 0, 0, 0, 0, 0, 0]),
+                        flexion: Array.isArray(progressCharts?.daily?.flexion) ? progressCharts.daily.flexion : (patient.progressCharts?.daily?.flexion || [0, 0, 0, 0, 0, 0, 0])
+                    },
+                    monthly: {
+                        labels: Array.isArray(progressCharts?.monthly?.labels) ? progressCharts.monthly.labels : (patient.progressCharts?.monthly?.labels || ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]),
+                        grip: Array.isArray(progressCharts?.monthly?.grip) ? progressCharts.monthly.grip : (patient.progressCharts?.monthly?.grip || [0, 0, 0, 0, 0, 0]),
+                        flexion: Array.isArray(progressCharts?.monthly?.flexion) ? progressCharts.monthly.flexion : (patient.progressCharts?.monthly?.flexion || [0, 0, 0, 0, 0, 0])
+                    }
+                };
+            }
 
             if (patient.id === activePatientId) {
                 if (profileGrip) profileGrip.textContent = patient.metrics.grip;
@@ -2694,6 +2836,47 @@ function initializePatientsPage() {
         }
     }
 
+    function rerenderActivePatientCharts() {
+        const patient = activePatientRecord();
+        if (!patient) {
+            return;
+        }
+
+        renderProfileCharts(patient);
+    }
+
+    function bindPatientChartPeriodControls(buttons, onChange) {
+        buttons.forEach(button => {
+            button.addEventListener("click", () => {
+                const nextPeriod = String(button.getAttribute("data-period") || "").trim().toLowerCase();
+                if (!["recent", "daily", "monthly"].includes(nextPeriod)) {
+                    return;
+                }
+
+                onChange(nextPeriod);
+                rerenderActivePatientCharts();
+            });
+        });
+    }
+
+    bindPatientChartPeriodControls(patientGripViewButtons, nextPeriod => {
+        activeGripView = nextPeriod;
+    });
+
+    bindPatientChartPeriodControls(patientFlexionViewButtons, nextPeriod => {
+        activeFlexionView = nextPeriod;
+    });
+
+    patientGripShowValues?.addEventListener("change", () => {
+        showGripPointValues = Boolean(patientGripShowValues.checked);
+        rerenderActivePatientCharts();
+    });
+
+    patientFlexionShowValues?.addEventListener("change", () => {
+        showFlexionPointValues = Boolean(patientFlexionShowValues.checked);
+        rerenderActivePatientCharts();
+    });
+
     function openModal() {
         if (!modal) {
             return;
@@ -2961,7 +3144,13 @@ function initializePatientsPage() {
                     metrics: { grip: "0 N", flexion: "0 deg", repetitionsToday: "0" },
                     therapyPlan: { templateName: "Default", duration: 0, repetitions: 0, sessionsPerDay: 0, exercises: [] },
                     notes: "",
-                    chart: { grip: [0, 0, 0, 0, 0, 0, 0], flexion: [0, 0, 0, 0, 0, 0, 0] }
+                    chart: { grip: [0, 0, 0, 0, 0, 0, 0], flexion: [0, 0, 0, 0, 0, 0, 0] },
+                    best: { grip: 0, flexion: 0 },
+                    progressCharts: {
+                        recent: { labels: ["S1"], grip: [0], flexion: [0] },
+                        daily: { labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], grip: [0, 0, 0, 0, 0, 0, 0], flexion: [0, 0, 0, 0, 0, 0, 0] },
+                        monthly: { labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"], grip: [0, 0, 0, 0, 0, 0], flexion: [0, 0, 0, 0, 0, 0] }
+                    }
                 };
 
                 patients = [patient, ...patients];
@@ -8044,18 +8233,47 @@ function initializeSettingsPage() {
         });
     }
 
+    function normalizeSpecialtySelection(rawValue) {
+        const source = String(rawValue || "").trim();
+        const compact = source.toLowerCase().replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+
+        if (!compact) {
+            return "Neurology";
+        }
+
+        if (compact === "neurology") {
+            return "Neurology";
+        }
+
+        if (compact === "pt" || compact === "physical therapy" || compact === "physicaltherapy") {
+            return "Physical Therapy";
+        }
+
+        if (compact === "rehab" || compact === "rehabilitation") {
+            return "Rehabilitation";
+        }
+
+        if (compact === "other") {
+            return "Other";
+        }
+
+        return source;
+    }
+
     function ensureSpecialtyOption(value) {
-        if (!specialtyInput || !value) {
+        if (!specialtyInput || !value || !(specialtyInput instanceof HTMLSelectElement)) {
             return;
         }
 
         const exists = Array.from(specialtyInput.options).some(option => option.value === value);
-        if (!exists) {
-            const dynamicOption = document.createElement("option");
-            dynamicOption.value = value;
-            dynamicOption.textContent = value;
-            specialtyInput.appendChild(dynamicOption);
+        if (exists) {
+            return;
         }
+
+        const dynamicOption = document.createElement("option");
+        dynamicOption.value = value;
+        dynamicOption.textContent = value;
+        specialtyInput.insertBefore(dynamicOption, specialtyInput.querySelector('option[value="Other"]') || null);
     }
 
     function updateAvatarPreview(avatarDataUrl) {
@@ -8082,8 +8300,9 @@ function initializeSettingsPage() {
             titleInput.value = profile.title;
         }
         if (specialtyInput) {
-            ensureSpecialtyOption(profile.specialty);
-            specialtyInput.value = profile.specialty;
+            const normalizedSpecialty = normalizeSpecialtySelection(profile.specialty);
+            ensureSpecialtyOption(normalizedSpecialty);
+            specialtyInput.value = normalizedSpecialty;
         }
         if (hospitalInput) {
             hospitalInput.value = profile.hospital;
@@ -8330,11 +8549,18 @@ function initializeSettingsPage() {
             confirmPasswordInput.setCustomValidity("");
         }
 
+        const specialtyValue = specialtyInput?.value.trim() || "";
+        if (!specialtyValue) {
+            setSettingsMessage("Please enter your specialty focus.");
+            specialtyInput?.focus();
+            return;
+        }
+
         const nextProfile = {
             ...draftProfile,
             displayName: displayNameInput?.value.trim() || "",
             title: titleInput?.value.trim() || "",
-            specialty: specialtyInput?.value || "",
+            specialty: specialtyValue,
             hospital: hospitalInput?.value.trim() || "",
             bio: bioInput?.value.trim() || "",
             email: emailInput?.value.trim() || "",

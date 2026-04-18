@@ -55,6 +55,34 @@ $usersColumns = getTableColumns($pdo, $usersTable);
 $doctorsColumns = getTableColumns($pdo, $doctorsTable);
 $usersIdColumn = in_array('user_id', $usersColumns, true) ? 'user_id' : (in_array('id', $usersColumns, true) ? 'id' : null);
 
+$doctorContactColumn = null;
+foreach (['contact_number', 'contact_no', 'phone_number', 'phone', 'mobile'] as $candidate) {
+    if (in_array($candidate, $doctorsColumns, true)) {
+        $doctorContactColumn = $candidate;
+        break;
+    }
+}
+
+$doctorYearsColumn = null;
+foreach (['years_experience', 'years_of_experience', 'experience_years', 'years_in_practice', 'years'] as $candidate) {
+    if (in_array($candidate, $doctorsColumns, true)) {
+        $doctorYearsColumn = $candidate;
+        break;
+    }
+}
+
+if ($doctorYearsColumn === null) {
+    try {
+        $pdo->exec('ALTER TABLE ' . $doctorsTable . ' ADD COLUMN years_experience INT NULL');
+        $doctorsColumns = getTableColumns($pdo, $doctorsTable);
+        if (in_array('years_experience', $doctorsColumns, true)) {
+            $doctorYearsColumn = 'years_experience';
+        }
+    } catch (Throwable $e) {
+        // Keep registration compatible even when schema cannot be altered.
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $check = trim((string) ($_GET['check'] ?? ''));
     $value = trim((string) ($_GET['value'] ?? ''));
@@ -93,8 +121,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             $exists = (bool) $dupMobile->fetch();
         }
 
-        if (!$exists && in_array('contact_number', $doctorsColumns, true)) {
-            $dupDoctorContact = $pdo->prepare('SELECT id FROM ' . $doctorsTable . ' WHERE contact_number = ? LIMIT 1');
+        if (!$exists && $doctorContactColumn !== null) {
+            $dupDoctorContact = $pdo->prepare('SELECT id FROM ' . $doctorsTable . ' WHERE ' . $doctorContactColumn . ' = ? LIMIT 1');
             $dupDoctorContact->execute([$normalizedContact]);
             $exists = (bool) $dupDoctorContact->fetch();
         }
@@ -250,8 +278,8 @@ try {
         }
     }
 
-    if (in_array('contact_number', $doctorsColumns, true)) {
-        $dupDoctorContact = $pdo->prepare('SELECT id FROM ' . $doctorsTable . ' WHERE contact_number = ? LIMIT 1');
+    if ($doctorContactColumn !== null) {
+        $dupDoctorContact = $pdo->prepare('SELECT id FROM ' . $doctorsTable . ' WHERE ' . $doctorContactColumn . ' = ? LIMIT 1');
         $dupDoctorContact->execute([$contactNumber]);
         if ($dupDoctorContact->fetch()) {
             throw new RuntimeException('Contact number already exists');
@@ -290,19 +318,25 @@ try {
             $bio
         ]);
     } else {
+        $standaloneColumns = ['display_name', 'title', 'specialty', 'hospital', 'bio', 'email', 'password_hash'];
+        $standaloneValues = [$fullName, $licenseNumber, $specialty, $affiliation, $bio, $email, $passwordHash];
+
+        if ($doctorContactColumn !== null) {
+            $standaloneColumns[] = $doctorContactColumn;
+            $standaloneValues[] = $contactNumber;
+        }
+
+        if ($doctorYearsColumn !== null) {
+            $standaloneColumns[] = $doctorYearsColumn;
+            $standaloneValues[] = $yearsOfExperience;
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($standaloneColumns), '?'));
         $insertDoctor = $pdo->prepare(
-            'INSERT INTO ' . $doctorsTable . ' (display_name, title, specialty, hospital, bio, email, password_hash)
-             VALUES (?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO ' . $doctorsTable
+            . ' (' . implode(', ', $standaloneColumns) . ') VALUES (' . $placeholders . ')'
         );
-        $insertDoctor->execute([
-            $fullName,
-            $licenseNumber,
-            $specialty,
-            $affiliation,
-            $bio,
-            $email,
-            $passwordHash
-        ]);
+        $insertDoctor->execute($standaloneValues);
     }
 
     $pdo->commit();

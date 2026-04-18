@@ -62,22 +62,151 @@ $latestStmt = $pdo->prepare(
 $latestStmt->execute([$patientId, 'Exercise Hub Session%']);
 $latest = $latestStmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
-$weekGrip = [0, 0, 0, 0, 0, 0, 0];
-$weekFlexion = [0, 0, 0, 0, 0, 0, 0];
-$weeklyStmt = $pdo->prepare(
-    'SELECT WEEKDAY(recorded_at) AS wd, AVG(grip_strength) AS avg_grip, AVG(flexion_angle) AS avg_flexion
-    FROM ' . $sensorTable . '
-    WHERE patient_id = ? AND note LIKE ? AND recorded_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-     GROUP BY WEEKDAY(recorded_at)
-     ORDER BY WEEKDAY(recorded_at)'
-);
-$weeklyStmt->execute([$patientId, 'Exercise Hub Session%']);
-foreach ($weeklyStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-    $idx = (int) ($row['wd'] ?? -1);
-    if ($idx >= 0 && $idx <= 6) {
-        $weekGrip[$idx] = round((float) ($row['avg_grip'] ?? 0), 2);
-        $weekFlexion[$idx] = round((float) ($row['avg_flexion'] ?? 0), 2);
+function roundMetricSeries(array $values): array
+{
+    return array_map(static function ($value): float {
+        return round((float) $value, 2);
+    }, $values);
+}
+
+function buildRecentSeries(array $rowsDescending, string $metricKey): array
+{
+    $slice = array_slice($rowsDescending, 0, 7);
+    $slice = array_reverse($slice);
+
+    if (!$slice) {
+        return [
+            'labels' => ['S1'],
+            'series' => [0.0]
+        ];
     }
+
+    $labels = [];
+    $series = [];
+    foreach ($slice as $index => $row) {
+        $labels[] = 'S' . ($index + 1);
+        $series[] = (float) ($row[$metricKey] ?? 0);
+    }
+
+    return [
+        'labels' => $labels,
+        'series' => roundMetricSeries($series)
+    ];
+}
+
+function buildDailySeries(array $rowsDescending, string $metricKey): array
+{
+    $labels = [];
+    $series = [];
+    $keys = [];
+    $sums = [];
+    $counts = [];
+
+    for ($i = 6; $i >= 0; $i -= 1) {
+        $date = new DateTimeImmutable('-' . $i . ' days');
+        $key = $date->format('Y-m-d');
+        $keys[] = $key;
+        $labels[] = $date->format('M j');
+        $sums[$key] = 0.0;
+        $counts[$key] = 0;
+    }
+
+    foreach ($rowsDescending as $row) {
+        $recordedAt = trim((string) ($row['recorded_at'] ?? ''));
+        if ($recordedAt === '') {
+            continue;
+        }
+
+        $rowKey = date('Y-m-d', strtotime($recordedAt));
+        if (!array_key_exists($rowKey, $sums)) {
+            continue;
+        }
+
+        $sums[$rowKey] += (float) ($row[$metricKey] ?? 0);
+        $counts[$rowKey] += 1;
+    }
+
+    foreach ($keys as $key) {
+        if (($counts[$key] ?? 0) > 0) {
+            $series[] = $sums[$key] / $counts[$key];
+        } else {
+            $series[] = 0.0;
+        }
+    }
+
+    return [
+        'labels' => $labels,
+        'series' => roundMetricSeries($series)
+    ];
+}
+
+function buildMonthlySeries(array $rowsDescending, string $metricKey): array
+{
+    $labels = [];
+    $series = [];
+    $keys = [];
+    $sums = [];
+    $counts = [];
+
+    for ($i = 5; $i >= 0; $i -= 1) {
+        $month = new DateTimeImmutable('first day of -' . $i . ' month');
+        $key = $month->format('Y-m');
+        $keys[] = $key;
+        $labels[] = $month->format('M Y');
+        $sums[$key] = 0.0;
+        $counts[$key] = 0;
+    }
+
+    foreach ($rowsDescending as $row) {
+        $recordedAt = trim((string) ($row['recorded_at'] ?? ''));
+        if ($recordedAt === '') {
+            continue;
+        }
+
+        $rowKey = date('Y-m', strtotime($recordedAt));
+        if (!array_key_exists($rowKey, $sums)) {
+            continue;
+        }
+
+        $sums[$rowKey] += (float) ($row[$metricKey] ?? 0);
+        $counts[$rowKey] += 1;
+    }
+
+    foreach ($keys as $key) {
+        if (($counts[$key] ?? 0) > 0) {
+            $series[] = $sums[$key] / $counts[$key];
+        } else {
+            $series[] = 0.0;
+        }
+    }
+
+    return [
+        'labels' => $labels,
+        'series' => roundMetricSeries($series)
+    ];
+}
+
+$trendRowsStmt = $pdo->prepare(
+    'SELECT grip_strength, flexion_angle, recorded_at
+    FROM ' . $sensorTable . '
+    WHERE patient_id = ? AND note LIKE ?
+    ORDER BY recorded_at DESC'
+);
+$trendRowsStmt->execute([$patientId, 'Exercise Hub Session%']);
+$trendRows = $trendRowsStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+$recentGripSeries = buildRecentSeries($trendRows, 'grip_strength');
+$recentFlexionSeries = buildRecentSeries($trendRows, 'flexion_angle');
+$dailyGripSeries = buildDailySeries($trendRows, 'grip_strength');
+$dailyFlexionSeries = buildDailySeries($trendRows, 'flexion_angle');
+$monthlyGripSeries = buildMonthlySeries($trendRows, 'grip_strength');
+$monthlyFlexionSeries = buildMonthlySeries($trendRows, 'flexion_angle');
+
+$bestGrip = 0.0;
+$bestFlexion = 0.0;
+foreach ($trendRows as $row) {
+    $bestGrip = max($bestGrip, (float) ($row['grip_strength'] ?? 0));
+    $bestFlexion = max($bestFlexion, (float) ($row['flexion_angle'] ?? 0));
 }
 
 $planStmt = $pdo->prepare(
@@ -137,10 +266,31 @@ echo json_encode([
         'avgFlexionAngle' => round((float) ($summary['avg_flexion'] ?? 0), 2),
         'repetitionsToday' => (int) ($summary['repetitions_today'] ?? 0)
     ],
+    'best' => [
+        'grip' => round($bestGrip, 2),
+        'flexion' => round($bestFlexion, 2)
+    ],
     'weeklyChart' => [
-        'labels' => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-        'grip' => $weekGrip,
-        'flexion' => $weekFlexion
+        'labels' => $dailyGripSeries['labels'],
+        'grip' => $dailyGripSeries['series'],
+        'flexion' => $dailyFlexionSeries['series']
+    ],
+    'progressCharts' => [
+        'recent' => [
+            'labels' => $recentGripSeries['labels'],
+            'grip' => $recentGripSeries['series'],
+            'flexion' => $recentFlexionSeries['series']
+        ],
+        'daily' => [
+            'labels' => $dailyGripSeries['labels'],
+            'grip' => $dailyGripSeries['series'],
+            'flexion' => $dailyFlexionSeries['series']
+        ],
+        'monthly' => [
+            'labels' => $monthlyGripSeries['labels'],
+            'grip' => $monthlyGripSeries['series'],
+            'flexion' => $monthlyFlexionSeries['series']
+        ]
     ],
     'plan' => [
         'template_name' => (string) ($plan['template_name'] ?? 'Default'),

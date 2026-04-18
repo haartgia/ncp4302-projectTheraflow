@@ -144,6 +144,26 @@ foreach (['contact_number', 'contact_no', 'phone_number', 'phone', 'mobile'] as 
     }
 }
 
+$yearsColumn = null;
+foreach (['years_experience', 'years_of_experience', 'experience_years', 'years_in_practice', 'years'] as $candidate) {
+    if (in_array($candidate, $doctorsColumns, true)) {
+        $yearsColumn = $candidate;
+        break;
+    }
+}
+
+if ($yearsColumn === null) {
+    try {
+        $pdo->exec('ALTER TABLE ' . $doctorsTable . ' ADD COLUMN years_experience INT NULL');
+        $doctorsColumns = getTableColumns($pdo, $doctorsTable);
+        if (in_array('years_experience', $doctorsColumns, true)) {
+            $yearsColumn = 'years_experience';
+        }
+    } catch (Throwable $e) {
+        // Keep endpoint functional even when schema changes are not permitted.
+    }
+}
+
 if ($userIdColumn === null || $userPasswordColumn === null) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => 'Users schema is incompatible']);
@@ -162,6 +182,7 @@ if (!$userRow) {
 }
 
 $userEmail = trim((string) ($userRow['email'] ?? ''));
+$userMobile = trim((string) ($userRow['mobile'] ?? ''));
 $notesTable = ensureProfessionalNotesTable($pdo);
 
 $doctorRow = false;
@@ -187,6 +208,11 @@ if (!$doctorRow) {
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $storedProfessionalNote = getProfessionalNote($pdo, $notesTable, $userId);
 
+    $doctorContact = pickDoctorValue($doctorRow, ['contact_number', 'contact_no', 'phone_number', 'phone', 'mobile']);
+    if ($doctorContact === '' && $userMobile !== '') {
+        $doctorContact = $userMobile;
+    }
+
     $profile = [
         'displayName' => $usesLegacyDoctorSchema
             ? (string) ($doctorRow['full_name'] ?? buildDisplayName($userRow))
@@ -199,8 +225,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         'hospital' => $usesLegacyDoctorSchema
             ? (string) ($doctorRow['affiliation'] ?? '')
             : (string) ($doctorRow['hospital'] ?? ''),
-        'contactNumber' => pickDoctorValue($doctorRow, ['contact_number', 'contact_no', 'phone_number', 'phone', 'mobile']),
-        'yearsOfExperience' => pickDoctorValue($doctorRow, ['years_of_experience', 'experience_years', 'years_experience', 'years']),
+        'contactNumber' => $doctorContact,
+        'yearsOfExperience' => pickDoctorValue($doctorRow, ['years_experience', 'years_of_experience', 'experience_years', 'years_in_practice', 'years']),
         'bio' => $storedProfessionalNote !== '' ? $storedProfessionalNote : (string) ($doctorRow['bio'] ?? ''),
         'email' => $userEmail,
         'avatarDataUrl' => $avatarColumn ? (string) ($doctorRow[$avatarColumn] ?? '') : ''
@@ -229,10 +255,17 @@ $hospital = trim((string) ($data['hospital'] ?? ''));
 $bio = trim((string) ($data['bio'] ?? ''));
 $email = trim((string) ($data['email'] ?? ''));
 $contactNumber = trim((string) ($data['contactNumber'] ?? ''));
+$yearsOfExperience = trim((string) ($data['yearsOfExperience'] ?? ''));
 $avatarDataUrl = trim((string) ($data['avatarDataUrl'] ?? ''));
 $currentPassword = (string) ($data['currentPassword'] ?? '');
 $newPassword = (string) ($data['newPassword'] ?? '');
 $noteOnly = filter_var($data['noteOnly'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+if (!$noteOnly && $yearsOfExperience !== '' && !ctype_digit($yearsOfExperience)) {
+    http_response_code(400);
+    echo json_encode(['ok' => false, 'error' => 'Years of experience must be a whole number']);
+    exit;
+}
 
 if (!$noteOnly && ($displayName === '' || $title === '' || $specialty === '' || $hospital === '' || $email === '')) {
     http_response_code(400);
@@ -323,6 +356,10 @@ try {
                 $legacyColumns[] = $contactColumn . ' = ?';
                 $legacyValues[] = $contactNumber;
             }
+            if ($yearsColumn !== null) {
+                $legacyColumns[] = $yearsColumn . ' = ?';
+                $legacyValues[] = $yearsOfExperience !== '' ? (int) $yearsOfExperience : null;
+            }
             if ($avatarColumn) {
                 $legacyColumns[] = $avatarColumn . ' = ?';
                 $legacyValues[] = $avatarDataUrl;
@@ -346,6 +383,10 @@ try {
         if ($contactColumn !== null) {
             $standaloneColumns[] = $contactColumn . ' = ?';
             $standaloneValues[] = $contactNumber;
+        }
+        if ($yearsColumn !== null) {
+            $standaloneColumns[] = $yearsColumn . ' = ?';
+            $standaloneValues[] = $yearsOfExperience !== '' ? (int) $yearsOfExperience : null;
         }
         if ($avatarColumn) {
             $standaloneColumns[] = $avatarColumn . ' = ?';
@@ -382,6 +423,12 @@ try {
         : $hospital;
     $effectiveEmail = $noteOnly ? $userEmail : $email;
     $effectiveContact = $noteOnly ? pickDoctorValue((array) $doctorRow, ['contact_number', 'contact_no', 'phone_number', 'phone', 'mobile']) : $contactNumber;
+    if ($effectiveContact === '' && $userMobile !== '') {
+        $effectiveContact = $userMobile;
+    }
+    $effectiveYears = $noteOnly
+        ? pickDoctorValue((array) $doctorRow, ['years_experience', 'years_of_experience', 'experience_years', 'years_in_practice', 'years'])
+        : $yearsOfExperience;
 
     echo json_encode([
         'ok' => true,
@@ -392,7 +439,7 @@ try {
             'specialty' => $effectiveSpecialty,
             'hospital' => $effectiveHospital,
             'contactNumber' => $effectiveContact,
-            'yearsOfExperience' => pickDoctorValue((array) $doctorRow, ['years_of_experience', 'experience_years', 'years_experience', 'years']),
+            'yearsOfExperience' => $effectiveYears,
             'bio' => $bio,
             'email' => $effectiveEmail,
             'avatarDataUrl' => $avatarDataUrl

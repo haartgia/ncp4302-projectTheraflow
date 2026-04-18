@@ -238,15 +238,51 @@
 
                 <div class="patients-graphs-grid">
                     <article class="widget widget-green graph-card">
-                        <h3 class="widget-title">Grip Strength Over Time</h3>
-                        <div class="chart-wrap">
+                        <div class="patient-progress-card-head">
+                            <div class="patient-progress-title-block">
+                                <h3 class="widget-title">Grip Strength Trend</h3>
+                                <p class="patient-progress-highlight" id="patientGripBest">Best: -- N</p>
+                                <p class="patient-progress-note">Shows your grip strength trend from completed sessions.</p>
+                            </div>
+                            <div class="patient-progress-controls">
+                                <div class="chart-period-toggle" id="patientGripViewToggle" role="tablist" aria-label="Grip chart period toggle">
+                                    <button type="button" class="period-btn active" data-period="recent" role="tab" aria-selected="true">Recent</button>
+                                    <button type="button" class="period-btn" data-period="daily" role="tab" aria-selected="false">Daily</button>
+                                    <button type="button" class="period-btn" data-period="monthly" role="tab" aria-selected="false">Monthly</button>
+                                </div>
+                                <label class="chart-show-values" for="patientGripShowValues">
+                                    <input type="checkbox" id="patientGripShowValues">
+                                    <span>Show Values</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="chart-wrap patient-progress-chart-wrap" id="patientGripChartWrap">
                             <canvas id="patientGripProgressChart"></canvas>
+                            <div class="chart-empty" id="patientGripChartEmpty" hidden>No sessions recorded for this period.</div>
                         </div>
                     </article>
                     <article class="widget widget-blue graph-card">
-                        <h3 class="widget-title">Finger Flexion Range</h3>
-                        <div class="chart-wrap">
+                        <div class="patient-progress-card-head">
+                            <div class="patient-progress-title-block">
+                                <h3 class="widget-title">Finger Movement Trend</h3>
+                                <p class="patient-progress-highlight" id="patientFlexionBest">Best: --&deg;</p>
+                                <p class="patient-progress-note">Shows your finger movement trend across completed sessions.</p>
+                            </div>
+                            <div class="patient-progress-controls">
+                                <div class="chart-period-toggle" id="patientFlexionViewToggle" role="tablist" aria-label="Finger movement chart period toggle">
+                                    <button type="button" class="period-btn active" data-period="recent" role="tab" aria-selected="true">Recent</button>
+                                    <button type="button" class="period-btn" data-period="daily" role="tab" aria-selected="false">Daily</button>
+                                    <button type="button" class="period-btn" data-period="monthly" role="tab" aria-selected="false">Monthly</button>
+                                </div>
+                                <label class="chart-show-values" for="patientFlexionShowValues">
+                                    <input type="checkbox" id="patientFlexionShowValues">
+                                    <span>Show Values</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="chart-wrap patient-progress-chart-wrap" id="patientFlexionChartWrap">
                             <canvas id="patientFlexionProgressChart"></canvas>
+                            <div class="chart-empty" id="patientFlexionChartEmpty" hidden>No sessions recorded for this period.</div>
                         </div>
                     </article>
                 </div>
