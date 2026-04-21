@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE TABLE IF NOT EXISTS diagnostic_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     patient_id INT NOT NULL,
+    stage_name VARCHAR(120) NULL,
     max_extension DECIMAL(6,2) DEFAULT 0,
     max_flexion DECIMAL(6,2) DEFAULT 0,
     peak_force DECIMAL(6,2) DEFAULT 0,

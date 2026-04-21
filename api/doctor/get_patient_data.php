@@ -5,9 +5,90 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../lib/doctor_data.php';
 
+function ensureDiagnosticLogsTable(PDO $pdo): void
+{
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS diagnostic_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            patient_id INT NOT NULL,
+            stage_name VARCHAR(120) NULL,
+            max_extension DECIMAL(6,2) DEFAULT 0,
+            max_flexion DECIMAL(6,2) DEFAULT 0,
+            peak_force DECIMAL(6,2) DEFAULT 0,
+            logged_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_diag_patient_id (patient_id),
+            INDEX idx_diag_logged_at (logged_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+    );
+
+    try {
+        $pdo->exec('ALTER TABLE diagnostic_logs ADD COLUMN stage_name VARCHAR(120) NULL AFTER patient_id');
+    } catch (Throwable $e) {
+        // Column already exists.
+    }
+}
+
+function parseActivityNote(string $note): array
+{
+    $parsed = [];
+    $parts = array_filter(array_map('trim', explode('|', $note)), static fn($part) => $part !== '');
+    foreach ($parts as $part) {
+        $eqPos = strpos($part, '=');
+        if ($eqPos === false) {
+            continue;
+        }
+        $key = strtolower(trim(substr($part, 0, $eqPos)));
+        $value = trim(substr($part, $eqPos + 1));
+        if ($key !== '' && $value !== '') {
+            $parsed[$key] = $value;
+        }
+    }
+
+    return $parsed;
+}
+
+function formatExerciseTypeLabel(string $rawType): string
+{
+    $normalized = strtolower(trim($rawType));
+    $normalized = str_replace(['-', ' '], '_', $normalized);
+
+    $map = [
+        'full_grip_hold' => 'Full Close',
+        'full_close' => 'Full Close',
+        'full_extension_hold' => 'Full Extension',
+        'full_extension' => 'Full Extension',
+        'open_close_hand' => 'Full Open-Close',
+        'full_open_close' => 'Full Open-Close',
+    ];
+
+    if (isset($map[$normalized])) {
+        return $map[$normalized];
+    }
+
+    if ($normalized === '') {
+        return 'Full Open-Close';
+    }
+
+    $segments = array_filter(explode('_', $normalized), static fn($segment) => $segment !== '');
+    $segments = array_map(static fn($segment) => ucfirst($segment), $segments);
+    return implode(' ', $segments);
+}
+
+function formatDurationLabel(int $durationSec): string
+{
+    if ($durationSec <= 0) {
+        return '--:-- min';
+    }
+
+    $mins = intdiv($durationSec, 60);
+    $secs = $durationSec % 60;
+    return sprintf('%02d:%02d min', $mins, $secs);
+}
+
 $doctorId = requireDoctorSessionOrExit();
 ensureSensorDataTable($pdo);
 ensureSessionsTable($pdo);
+ensureDiagnosticLogsTable($pdo);
 
 $patients = getDoctorPatients($pdo, $doctorId);
 $patientIds = array_map(static fn($p) => (int) ($p['id'] ?? 0), $patients);
@@ -92,16 +173,74 @@ if (!empty($scopePatientIds)) {
     $avgRangeStmt->execute($scopePatientIds);
     $avgRange = (float) (($avgRangeStmt->fetch()['avg_range'] ?? 0));
 
-    $recentActivityStmt = $pdo->prepare(
-        'SELECT p.name AS patient_name, sd.note, sd.recorded_at
+    $recentActivityEvents = [];
+
+    $exerciseActivityStmt = $pdo->prepare(
+        'SELECT p.name AS patient_name, sd.repetitions, sd.note, sd.recorded_at
          FROM sensor_data sd
          INNER JOIN patients p ON p.id = sd.patient_id
          WHERE sd.patient_id IN (' . $placeholders . ')
+           AND (sd.note LIKE ? OR sd.note LIKE ?)
          ORDER BY sd.recorded_at DESC
-         LIMIT 8'
+         LIMIT 20'
     );
-    $recentActivityStmt->execute($scopePatientIds);
-    $recentActivity = $recentActivityStmt->fetchAll();
+    $exerciseParams = array_merge($scopePatientIds, ['%Exercise Hub Session%', '%ExerciseType=%']);
+    $exerciseActivityStmt->execute($exerciseParams);
+    foreach ($exerciseActivityStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $parsedNote = parseActivityNote((string) ($row['note'] ?? ''));
+        $exerciseType = formatExerciseTypeLabel((string) ($parsedNote['exercisetype'] ?? $parsedNote['exercise_type'] ?? ''));
+        $durationSec = (int) ($parsedNote['durationsec'] ?? 0);
+        $reps = max(0, (int) ($row['repetitions'] ?? 0));
+
+        $recentActivityEvents[] = [
+            'patient_name' => (string) ($row['patient_name'] ?? ''),
+            'event_type' => 'exercise',
+            'activity_label' => 'Exercise: ' . $exerciseType,
+            'metrics_primary' => $reps . ' reps',
+            'metrics_secondary' => formatDurationLabel($durationSec),
+            'recorded_at' => (string) ($row['recorded_at'] ?? ''),
+            'badge_label' => 'Exercise',
+            'badge_variant' => 'exercise'
+        ];
+    }
+
+    $assessmentActivityStmt = $pdo->prepare(
+        'SELECT p.name AS patient_name, dl.stage_name, dl.max_flexion, dl.peak_force, dl.logged_at
+         FROM diagnostic_logs dl
+         INNER JOIN patients p ON p.id = dl.patient_id
+         WHERE dl.patient_id IN (' . $placeholders . ')
+         ORDER BY dl.logged_at DESC
+         LIMIT 20'
+    );
+    $assessmentActivityStmt->execute($scopePatientIds);
+    foreach ($assessmentActivityStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $stageName = trim((string) ($row['stage_name'] ?? ''));
+        if ($stageName === '') {
+            $stageName = 'Initial Baseline';
+        }
+
+        $bestFlexion = number_format((float) ($row['max_flexion'] ?? 0), 1, '.', '');
+        $peakForce = number_format((float) ($row['peak_force'] ?? 0), 1, '.', '');
+
+        $recentActivityEvents[] = [
+            'patient_name' => (string) ($row['patient_name'] ?? ''),
+            'event_type' => 'assessment',
+            'activity_label' => 'Assessment: ' . $stageName,
+            'metrics_primary' => 'Best Flexion: ' . $bestFlexion . '°',
+            'metrics_secondary' => 'Peak Force: ' . $peakForce . ' N',
+            'recorded_at' => (string) ($row['logged_at'] ?? ''),
+            'badge_label' => 'Assessment',
+            'badge_variant' => 'assessment'
+        ];
+    }
+
+    usort($recentActivityEvents, static function (array $a, array $b): int {
+        $timeA = strtotime((string) ($a['recorded_at'] ?? '')) ?: 0;
+        $timeB = strtotime((string) ($b['recorded_at'] ?? '')) ?: 0;
+        return $timeB <=> $timeA;
+    });
+
+    $recentActivity = array_slice($recentActivityEvents, 0, 8);
 
     $weeklyStmt = $pdo->prepare(
         'SELECT WEEKDAY(recorded_at) AS wd, AVG(grip_strength) AS avg_grip, AVG(flexion_angle) AS avg_range
