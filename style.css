@@ -3428,6 +3428,78 @@ body.auth-gated-home .calendar-dates {
   padding: 12px 14px;
 }
 
+.doctor-activity-table th,
+.doctor-activity-table td {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.doctor-activity-table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.doctor-activity-table tbody tr:hover {
+  background: rgba(13, 95, 115, 0.06);
+}
+
+.doctor-activity-table .activity-patient-cell {
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.doctor-activity-table .activity-summary-cell {
+  line-height: 1.2;
+}
+
+.doctor-activity-table .activity-primary {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text-color);
+}
+
+.doctor-activity-table .activity-secondary {
+  margin-top: 2px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.doctor-activity-table .activity-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+}
+
+.doctor-activity-table .activity-status-pill.is-success {
+  color: #1f6f3d;
+  background: rgba(84, 184, 126, 0.16);
+  border-color: rgba(84, 184, 126, 0.34);
+}
+
+.doctor-activity-table .activity-status-pill.is-failed {
+  color: #9a2f2f;
+  background: rgba(217, 100, 100, 0.16);
+  border-color: rgba(217, 100, 100, 0.32);
+}
+
+.doctor-activity-table .activity-status-pill.is-neutral {
+  color: #355d6a;
+  background: rgba(53, 93, 106, 0.11);
+  border-color: rgba(53, 93, 106, 0.24);
+}
+
+.doctor-activity-table .activity-time-cell {
+  font-size: 0.88rem;
+  color: #284956;
+  white-space: nowrap;
+}
+
 .doctor-table th {
   color: var(--text-muted);
   font-size: 0.82rem;
@@ -5235,6 +5307,8 @@ body.patients-page {
 .therapy-template-section {
   grid-area: templates;
   margin: 0;
+  align-self: start;
+  height: fit-content;
 }
 
 .therapy-plans-shell > .therapy-plans-grid {
@@ -5266,21 +5340,6 @@ body.patients-page {
   border: 1px solid rgba(77, 134, 156, 0.2);
   background: #ffffff;
   padding: 14px;
-}
-
-.therapy-template-card[data-template-id="level1"] {
-  border-left: 5px solid #2f9b72;
-  background: linear-gradient(180deg, rgba(47, 155, 114, 0.08) 0%, rgba(255, 255, 255, 0.96) 34%);
-}
-
-.therapy-template-card[data-template-id="level2"] {
-  border-left: 5px solid #d1892a;
-  background: linear-gradient(180deg, rgba(209, 137, 42, 0.08) 0%, rgba(255, 255, 255, 0.96) 34%);
-}
-
-.therapy-template-card[data-template-id="level3"] {
-  border-left: 5px solid #9d5ca8;
-  background: linear-gradient(180deg, rgba(157, 92, 168, 0.08) 0%, rgba(255, 255, 255, 0.96) 34%);
 }
 
 .therapy-template-head {
@@ -5376,10 +5435,9 @@ body.patients-page {
 }
 
 .therapy-template-card h3 {
-  font-size: 1.22rem;
-  color: #1e5265;
-  margin-bottom: 6px;
-  font-weight: 800;
+  font-size: 1rem;
+  color: var(--text);
+  margin-bottom: 8px;
 }
 
 .therapy-template-card p {
@@ -5389,7 +5447,10 @@ body.patients-page {
 }
 
 .therapy-template-card .template-plan-label {
-  display: none;
+  margin-top: 6px;
+  margin-bottom: 6px;
+  font-weight: 700;
+  color: #4e6774;
 }
 
 .therapy-template-card .template-plan-list {
@@ -5410,32 +5471,35 @@ body.patients-page {
   font-weight: 700;
   font-size: 1rem;
   color: #1f5668;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
-.therapy-template-card .template-plan-stats-inline {
+.therapy-template-card .template-plan-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.therapy-template-card .template-stat-chip {
+  background: #ecf5f8;
+  border: 1px solid rgba(77, 134, 156, 0.22);
+  border-radius: 999px;
+  padding: 6px 10px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  font-size: 0.9rem;
-  color: #486775;
 }
 
-.therapy-template-card .template-stat-pair {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  white-space: nowrap;
+.therapy-template-card .template-stat-chip span {
+  color: #557382;
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 
-.therapy-template-card .template-stat-divider {
-  color: #7a96a3;
-  font-weight: 700;
-}
-
-.therapy-template-card .template-stat-pair strong {
+.therapy-template-card .template-stat-chip strong {
   color: #1f5668;
-  font-size: 0.98rem;
+  font-size: 0.95rem;
 }
 
 .therapy-plans-grid {
@@ -5570,24 +5634,10 @@ body.patients-page {
 }
 
 .assignment-metric-list li {
-  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  padding-left: 12px;
-}
-
-.assignment-metric-list li::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgba(77, 134, 156, 0.55);
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
 }
 
 .assignment-metric-title {
@@ -5608,7 +5658,7 @@ body.patients-page {
 }
 
 .assignment-metric-list.assignment-metric-list-compact li::before {
-  left: 0;
+  content: none;
 }
 
 .assignment-metric-list.assignment-metric-list-compact .assignment-metric-value {
@@ -5864,7 +5914,7 @@ body.patients-page {
 }
 
 .template-editor-card {
-  width: min(560px, 100%);
+  width: min(640px, 100%);
 }
 
 .template-exercise-editor {
@@ -5875,7 +5925,7 @@ body.patients-page {
 
 .template-exercise-row {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr;
+  grid-template-columns: minmax(220px, 1.8fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
   align-items: end;
   padding: 10px;

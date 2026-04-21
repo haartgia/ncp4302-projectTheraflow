@@ -1529,6 +1529,91 @@ function initializeDoctorDashboard() {
         }
     }
 
+    function formatExerciseType(rawType) {
+        const normalized = String(rawType || "")
+            .trim()
+            .toLowerCase()
+            .replace(/[_\s]+/g, "_");
+        if (!normalized) {
+            return "Exercise Session";
+        }
+
+        return normalized
+            .split("_")
+            .map(segment => segment ? segment[0].toUpperCase() + segment.slice(1) : "")
+            .join("-");
+    }
+
+    function parseActivityNote(note) {
+        const text = String(note || "").trim();
+        const parts = text.split("|").map(part => part.trim()).filter(Boolean);
+        const parsed = {
+            exerciseType: "",
+            maxExtension: "",
+            status: ""
+        };
+
+        parts.forEach(part => {
+            const eqIndex = part.indexOf("=");
+            if (eqIndex === -1) {
+                return;
+            }
+
+            const key = part.slice(0, eqIndex).trim().toLowerCase();
+            const value = part.slice(eqIndex + 1).trim();
+            if (!value) {
+                return;
+            }
+
+            if (key === "exercisetype" || key === "exercise_type") {
+                parsed.exerciseType = value;
+                return;
+            }
+
+            if (key === "maxextension" || key === "max_extension") {
+                parsed.maxExtension = value;
+                return;
+            }
+
+            if (key === "status") {
+                parsed.status = value;
+            }
+        });
+
+        return parsed;
+    }
+
+    function formatActivityTimestamp(timestamp) {
+        const raw = String(timestamp || "").trim();
+        if (!raw) {
+            return "-";
+        }
+
+        const parsedDate = new Date(raw.includes("T") ? raw : raw.replace(" ", "T"));
+        if (Number.isNaN(parsedDate.getTime())) {
+            return raw;
+        }
+
+        return parsedDate.toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true
+        });
+    }
+
+    function getActivityStatusClass(status) {
+        const normalized = String(status || "").trim().toLowerCase();
+        if (normalized === "success") {
+            return "is-success";
+        }
+        if (normalized === "failed" || normalized === "error") {
+            return "is-failed";
+        }
+        return "is-neutral";
+    }
+
     function renderDashboard(payload) {
         cachedPayload = payload;
         syncPatientOptions(payload);
@@ -1541,13 +1626,24 @@ function initializeDoctorDashboard() {
         if (recentActivityBody) {
             const rows = Array.isArray(payload.recentActivity) ? payload.recentActivity : [];
             if (rows.length) {
-                recentActivityBody.innerHTML = rows.map(row => `
-                    <tr>
-                        <td>${safeText(row.patient_name)}</td>
-                        <td>${safeText(row.note, "Sensor reading recorded")}</td>
-                        <td>${safeText(row.recorded_at, "-")}</td>
-                    </tr>
-                `).join("");
+                recentActivityBody.innerHTML = rows.map(row => {
+                    const parsed = parseActivityNote(row.note);
+                    const exerciseTitle = formatExerciseType(parsed.exerciseType);
+                    const maxExtensionText = safeText(parsed.maxExtension || "0.0");
+                    const statusText = safeText(parsed.status || "Pending");
+                    const statusClass = getActivityStatusClass(parsed.status);
+                    return `
+                        <tr>
+                            <td class="activity-patient-cell">${safeText(row.patient_name)}</td>
+                            <td class="activity-summary-cell">
+                                <div class="activity-primary">${exerciseTitle}</div>
+                                <div class="activity-secondary">Max Extension: ${maxExtensionText}</div>
+                                <span class="activity-status-pill ${statusClass}">${statusText}</span>
+                            </td>
+                            <td class="activity-time-cell">${formatActivityTimestamp(row.recorded_at)}</td>
+                        </tr>
+                    `;
+                }).join("");
                 toggleEmptyState(recentActivityEmpty, false);
             } else {
                 recentActivityBody.innerHTML = "";
@@ -3954,10 +4050,9 @@ function initializeTherapyPlansPage() {
             return `
                 <div class="template-plan-item">
                     <div class="template-plan-exercise">Open-Close Exercise</div>
-                    <div class="template-plan-stats-inline">
-                        <span class="template-stat-pair"><strong>0</strong> Reps</span>
-                        <span class="template-stat-divider" aria-hidden="true">|</span>
-                        <span class="template-stat-pair"><strong>0</strong> Sessions</span>
+                    <div class="template-plan-stats">
+                        <div class="template-stat-chip"><span>Reps</span><strong>0</strong></div>
+                        <div class="template-stat-chip"><span>Sessions</span><strong>0</strong></div>
                     </div>
                 </div>
             `;
@@ -3971,10 +4066,9 @@ function initializeTherapyPlansPage() {
                 return `
                     <div class="template-plan-item">
                         <div class="template-plan-exercise">${label}</div>
-                        <div class="template-plan-stats-inline">
-                            <span class="template-stat-pair"><strong>${reps}</strong> Reps</span>
-                            <span class="template-stat-divider" aria-hidden="true">|</span>
-                            <span class="template-stat-pair"><strong>${sessions}</strong> Sessions</span>
+                        <div class="template-plan-stats">
+                            <div class="template-stat-chip"><span>Reps</span><strong>${reps}</strong></div>
+                            <div class="template-stat-chip"><span>Sessions</span><strong>${sessions}</strong></div>
                         </div>
                     </div>
                 `;
