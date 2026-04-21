@@ -2,25 +2,7 @@
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../db.php';
-
-function ensureCalibrationCommandTable(PDO $pdo): void
-{
-    $pdo->exec(
-        'CREATE TABLE IF NOT EXISTS iot_glove_commands (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            patient_id INT NOT NULL,
-            command VARCHAR(40) NOT NULL,
-            status VARCHAR(20) NOT NULL DEFAULT "pending",
-            payload JSON NULL,
-            requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            dispatched_at DATETIME NULL,
-            completed_at DATETIME NULL,
-            INDEX idx_iot_commands_patient_id (patient_id),
-            INDEX idx_iot_commands_status (status),
-            INDEX idx_iot_commands_requested_at (requested_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
-    );
-}
+require_once __DIR__ . '/../lib/iot_data.php';
 
 function requestPayload(): array
 {
@@ -85,18 +67,28 @@ if ($method === 'POST') {
             exit;
         }
 
+        $completionPayload = $payload;
+        if (!isset($completionPayload['calibration']) || !is_array($completionPayload['calibration'])) {
+            $completionPayload['calibration'] = calibrationProfileFromPayload($payload);
+        }
+
         $completeStmt = $pdo->prepare(
             'UPDATE iot_glove_commands
-             SET status = "completed", completed_at = NOW()
+             SET status = "completed", payload = ?, completed_at = NOW()
              WHERE id = ? AND patient_id = ?'
         );
-        $completeStmt->execute([$commandId, $patientId]);
+        $completeStmt->execute([
+            json_encode($completionPayload, JSON_UNESCAPED_SLASHES),
+            $commandId,
+            $patientId
+        ]);
 
         echo json_encode([
             'ok' => true,
             'command_id' => $commandId,
             'patient_id' => $patientId,
-            'status' => 'completed'
+            'status' => 'completed',
+            'payload' => $completionPayload
         ]);
         exit;
     }

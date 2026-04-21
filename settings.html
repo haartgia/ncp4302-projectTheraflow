@@ -113,7 +113,7 @@
                                 <input type="text" id="settingsHospital" required readonly>
                                 <button type="button" class="doctor-inline-edit-btn" data-inline-edit-target="settingsHospital" aria-label="Edit hospital affiliation"><i class="fa-solid fa-pen"></i></button>
                             </label>
-                            <label class="field-group required-field has-field-edit">
+                            <label class="field-group required-field has-field-edit field-group-email-wide">
                                 <span>Email Address</span>
                                 <input type="email" id="settingsEmail" required readonly>
                                 <button type="button" class="doctor-inline-edit-btn" data-inline-edit-target="settingsEmail" aria-label="Edit email address"><i class="fa-solid fa-pen"></i></button>
@@ -123,23 +123,6 @@
                                 <input type="text" id="doctorContactNumber" placeholder="Enter contact number" readonly>
                                 <button type="button" class="doctor-inline-edit-btn" data-inline-edit-target="doctorContactNumber" aria-label="Edit contact number"><i class="fa-solid fa-pen"></i></button>
                             </label>
-                            <label class="field-group required-field field-group-span-full">
-                                <span>Username</span>
-                                <input type="text" id="doctorUsername" readonly>
-                            </label>
-                        </div>
-                    </section>
-
-                    <section class="doctor-panel doctor-panel-notes">
-                        <div class="doctor-panel-head doctor-panel-head-inline">
-                            <h3>Professional Notes</h3>
-                        </div>
-                        <label class="field-group field-group-span-full doctor-notes-direct-edit">
-                            <textarea id="settingsBio" placeholder="No bio provided yet." readonly></textarea>
-                        </label>
-                        <div class="doctor-notes-actions">
-                            <button type="button" class="doctor-btn" id="settingsNotesEditBtn">Edit</button>
-                            <button type="button" class="doctor-btn" id="settingsNotesSaveBtn" hidden>Save</button>
                         </div>
                     </section>
 
@@ -148,6 +131,10 @@
                             <h3>Account Security</h3>
                         </div>
                         <div class="doctor-info-grid doctor-security-grid">
+                            <label class="field-group required-field field-group-span-full">
+                                <span>Username</span>
+                                <input type="text" id="doctorUsername" readonly>
+                            </label>
                             <label class="field-group">
                                 <span>Security Email</span>
                                 <input type="email" id="settingsSecurityEmail" readonly>

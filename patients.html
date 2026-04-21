@@ -205,20 +205,20 @@
                                 <label class="field-group field-group-span-2">
                                     <span>Diagnosis</span>
                                     <div class="input-with-counter">
-                                        <input type="text" id="clinicalDiagnosis" maxlength="50" placeholder="Diagnosis" />
+                                        <input type="text" id="clinicalDiagnosis" maxlength="50" placeholder="Diagnosis" readonly />
                                         <small class="char-counter" id="clinicalDiagnosisCounter" aria-live="polite">0/50</small>
                                     </div>
                                 </label>
                                 <label class="field-group field-group-span-2">
                                     <span>Treatment Goal</span>
                                     <div class="input-with-counter">
-                                        <input type="text" id="clinicalTreatmentGoal" maxlength="50" placeholder="Treatment goal" />
+                                        <input type="text" id="clinicalTreatmentGoal" maxlength="50" placeholder="Treatment goal" readonly />
                                         <small class="char-counter" id="clinicalTreatmentGoalCounter" aria-live="polite">0/50</small>
                                     </div>
                                 </label>
                             </div>
                             <div class="wizard-actions wizard-actions-end">
-                                <button type="button" class="sign-in-btn profile-action-btn" id="saveClinicalInfo">Save Medical Info</button>
+                                <button type="button" class="sign-in-btn profile-action-btn" id="saveClinicalInfo">Edit</button>
                             </div>
                             <p class="notes-save-feedback" id="clinicalSaveFeedback" aria-live="polite"></p>
                         </article>
@@ -228,10 +228,10 @@
                         <h3 class="widget-title">Doctor Notes</h3>
                         <label class="sr-only" for="doctorNotesInput">Doctor notes</label>
                         <div class="input-with-counter notes-input-wrap">
-                            <textarea id="doctorNotesInput" maxlength="200" placeholder="Write Therapy Comments And Recommendations..."></textarea>
+                            <textarea id="doctorNotesInput" maxlength="200" placeholder="Write Therapy Comments And Recommendations..." disabled></textarea>
                             <small class="char-counter" id="doctorNotesCounter" aria-live="polite">0/200</small>
                         </div>
-                        <button type="button" class="sign-in-btn notes-save-btn profile-action-btn" id="saveDoctorNotes">Save Notes</button>
+                        <button type="button" class="sign-in-btn notes-save-btn profile-action-btn" id="saveDoctorNotes">Edit Notes</button>
                         <p class="notes-save-feedback" id="notesSaveFeedback" aria-live="polite"></p>
                     </article>
                 </div>
@@ -258,7 +258,7 @@
                         </div>
                         <div class="chart-wrap patient-progress-chart-wrap" id="patientGripChartWrap">
                             <canvas id="patientGripProgressChart"></canvas>
-                            <div class="chart-empty" id="patientGripChartEmpty" hidden>No sessions recorded for this period.</div>
+                            <!-- Removed empty-state overlay text element -->
                         </div>
                     </article>
                     <article class="widget widget-blue graph-card">
@@ -282,7 +282,7 @@
                         </div>
                         <div class="chart-wrap patient-progress-chart-wrap" id="patientFlexionChartWrap">
                             <canvas id="patientFlexionProgressChart"></canvas>
-                            <div class="chart-empty" id="patientFlexionChartEmpty" hidden>No sessions recorded for this period.</div>
+                            <!-- Removed empty-state overlay text element -->
                         </div>
                     </article>
                 </div>
@@ -297,120 +297,142 @@
 <div class="patients-modal" id="patientInfoModal" role="dialog" aria-modal="true" aria-labelledby="patientInfoTitle" hidden>
     <div class="patients-modal-backdrop" id="patientInfoModalBackdrop"></div>
     <div class="patients-modal-card widget widget-blue patient-info-modal-card">
-        <button type="button" class="patients-modal-close" id="closePatientInfoModal" aria-label="Close patient information">
-            <i class="fa-solid fa-xmark"></i>
-        </button>
-        <h2 id="patientInfoTitle">Patient Information</h2>
         <form id="patientInfoForm" novalidate>
-            <div class="field-grid field-grid-two">
-                <label class="field-group required-field">
-                    <span>First Name</span>
-                    <div class="patient-inline-edit-wrap">
-                        <input type="text" id="patientInfoFirstName" required>
-                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoFirstName" aria-label="Edit first name">
-                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                        </button>
+            <div class="patient-info-shell">
+                <div class="patient-info-shell-header">
+                    <h2 id="patientInfoTitle">Patient Information</h2>
+                    <button type="button" class="patients-modal-close" id="closePatientInfoModal" aria-label="Close patient information">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <div class="patient-info-shell-body">
+                    <div class="patient-info-layout-grid">
+                        <section class="patient-info-panel patient-info-panel-core">
+                            <h3 class="patient-info-panel-title">Core Demographics &amp; Account</h3>
+
+                            <div class="field-grid field-grid-two patient-info-core-grid">
+                                <label class="field-group required-field">
+                                    <span>First Name</span>
+                                    <input type="text" id="patientInfoFirstName" required readonly>
+                                </label>
+                                <label class="field-group required-field">
+                                    <span>Last Name</span>
+                                    <input type="text" id="patientInfoLastName" required readonly>
+                                </label>
+                                <label class="field-group required-field">
+                                    <span>Date of Birth</span>
+                                    <input type="date" id="patientInfoDob" required readonly>
+                                </label>
+                                <label class="field-group required-field">
+                                    <span>Age</span>
+                                    <input type="number" id="patientInfoAge" min="0" max="130" required readonly>
+                                </label>
+                                <label class="field-group required-field field-group-span-2">
+                                    <span>Gender</span>
+                                    <select id="patientInfoGender" required disabled>
+                                        <option value="" selected disabled>Select gender</option>
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </label>
+                                <label class="field-group required-field">
+                                    <span>Username</span>
+                                    <input type="text" id="patientInfoUsername" readonly>
+                                </label>
+                                <label class="field-group">
+                                    <span>Password</span>
+                                    <input type="text" id="patientInfoPassword" value="••••••••" readonly>
+                                </label>
+                                <div class="field-group field-group-span-2 patient-password-inline-wrap">
+                                    <button type="button" class="doctor-btn patient-password-inline-trigger" id="openInlinePasswordPanelBtn" aria-expanded="false">Change Password</button>
+
+                                    <div class="patient-password-inline-panel" id="patientInlinePasswordPanel" hidden>
+                                        <label class="field-group required-field">
+                                            <span>Current Password</span>
+                                            <div class="patient-password-eye-wrap">
+                                                <input type="password" id="patientInlineCurrentPassword" autocomplete="current-password" spellcheck="false">
+                                                <button type="button" class="patient-password-eye-btn" data-password-target="patientInlineCurrentPassword" aria-label="Show current password" aria-pressed="false">
+                                                    <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                                                </button>
+                                            </div>
+                                        </label>
+
+                                        <label class="field-group required-field">
+                                            <span>New Password</span>
+                                            <div class="patient-password-eye-wrap">
+                                                <input type="password" id="patientInlineNewPassword" autocomplete="new-password" spellcheck="false">
+                                                <button type="button" class="patient-password-eye-btn" data-password-target="patientInlineNewPassword" aria-label="Show new password" aria-pressed="false">
+                                                    <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                                                </button>
+                                            </div>
+                                        </label>
+
+                                        <label class="field-group required-field">
+                                            <span>Confirm New Password</span>
+                                            <div class="patient-password-eye-wrap">
+                                                <input type="password" id="patientInlineConfirmPassword" autocomplete="new-password" spellcheck="false">
+                                                <button type="button" class="patient-password-eye-btn" data-password-target="patientInlineConfirmPassword" aria-label="Show confirm password" aria-pressed="false">
+                                                    <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                                                </button>
+                                            </div>
+                                        </label>
+
+                                        <div class="wizard-actions patient-inline-password-actions">
+                                            <button type="button" class="doctor-btn" id="cancelInlinePasswordBtn">Cancel</button>
+                                            <button type="button" class="sign-in-btn" id="saveInlinePasswordBtn">Update Password</button>
+                                        </div>
+                                        <p class="notes-save-feedback" id="patientInlinePasswordFeedback" aria-live="polite"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <div class="patient-info-sidebar-stack">
+                            <section class="patient-info-panel patient-info-panel-contact">
+                                <h3 class="patient-info-panel-title">Contact &amp; Outreach</h3>
+                                <div class="field-grid patient-info-sub-grid">
+                                    <label class="field-group required-field">
+                                        <span>Email Address</span>
+                                        <input type="email" id="patientInfoEmail" required readonly>
+                                    </label>
+                                    <label class="field-group">
+                                        <span>Backup Contact</span>
+                                        <input type="text" id="patientInfoBackupContact" placeholder="Phone or email" readonly>
+                                    </label>
+                                </div>
+                            </section>
+
+                            <section class="patient-info-panel patient-info-panel-clinical">
+                                <h3 class="patient-info-panel-title">Clinical Summary</h3>
+                                <div class="field-grid patient-info-sub-grid">
+                                    <label class="field-group required-field">
+                                        <span>Stroke Type</span>
+                                        <input type="text" id="patientInfoStrokeType" required readonly>
+                                    </label>
+                                    <label class="field-group required-field">
+                                        <span>Affected Hand</span>
+                                        <select id="patientInfoAffectedHand" required disabled>
+                                            <option value="" selected disabled>Select hand</option>
+                                            <option value="Left">Left</option>
+                                            <option value="Right">Right</option>
+                                        </select>
+                                    </label>
+                                </div>
+                            </section>
+                        </div>
                     </div>
-                </label>
-                <label class="field-group required-field">
-                    <span>Last Name</span>
-                    <div class="patient-inline-edit-wrap">
-                        <input type="text" id="patientInfoLastName" required>
-                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoLastName" aria-label="Edit last name">
-                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                        </button>
+                </div>
+
+                <div class="patient-info-shell-footer">
+                    <div class="wizard-actions patient-info-actions">
+                        <button type="button" class="doctor-btn" id="togglePatientInfoEditBtn">Edit Profile</button>
+                        <button type="button" class="sign-in-btn" id="donePatientInfoBtn">Done</button>
                     </div>
-                </label>
-                <label class="field-group required-field">
-                    <span>DOB</span>
-                    <div class="patient-inline-edit-wrap">
-                        <input type="date" id="patientInfoDob" required>
-                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoDob" aria-label="Edit date of birth">
-                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                </label>
-                <label class="field-group required-field">
-                    <span>Age</span>
-                    <div class="patient-inline-edit-wrap">
-                        <input type="number" id="patientInfoAge" min="0" max="130" required>
-                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoAge" aria-label="Edit age">
-                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                </label>
-                <label class="field-group required-field">
-                    <span>Gender</span>
-                    <div class="patient-inline-edit-wrap">
-                        <select id="patientInfoGender" required>
-                            <option value="" selected disabled>Select gender</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                            <option value="Other">Other</option>
-                        </select>
-                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoGender" aria-label="Edit gender">
-                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                </label>
-                <label class="field-group required-field">
-                    <span>Email Address</span>
-                    <div class="patient-inline-edit-wrap">
-                        <input type="email" id="patientInfoEmail" required>
-                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoEmail" aria-label="Edit email address">
-                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                </label>
-                <label class="field-group">
-                    <span>Backup Contact</span>
-                    <div class="patient-inline-edit-wrap">
-                        <input type="text" id="patientInfoBackupContact" placeholder="Phone or email">
-                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoBackupContact" aria-label="Edit backup contact">
-                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                </label>
-                <label class="field-group required-field">
-                    <span>Username</span>
-                    <input type="text" id="patientInfoUsername" readonly>
-                </label>
-                <label class="field-group">
-                    <span>Password</span>
-                    <div class="patient-inline-edit-wrap">
-                        <input type="text" id="patientInfoPassword" value="••••••••" readonly>
-                        <button type="button" class="patient-inline-edit-btn" data-password-edit-trigger="true" aria-label="Open change password dialog">
-                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                </label>
-                <label class="field-group required-field">
-                    <span>Stroke</span>
-                    <div class="patient-inline-edit-wrap">
-                        <input type="text" id="patientInfoStrokeType" required>
-                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoStrokeType" aria-label="Edit stroke type">
-                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                </label>
-                <label class="field-group required-field">
-                    <span>Affected Hand</span>
-                    <div class="patient-inline-edit-wrap">
-                        <select id="patientInfoAffectedHand" required>
-                            <option value="" selected disabled>Select hand</option>
-                            <option value="Left">Left</option>
-                            <option value="Right">Right</option>
-                        </select>
-                        <button type="button" class="patient-inline-edit-btn" data-inline-edit-target="patientInfoAffectedHand" aria-label="Edit affected hand">
-                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                        </button>
-                    </div>
-                </label>
+                    <p class="notes-save-feedback" id="patientInfoFeedback" aria-live="polite"></p>
+                </div>
             </div>
-            <div class="wizard-actions wizard-actions-end patient-info-actions">
-                <button type="button" class="sign-in-btn" id="donePatientInfoBtn">Done</button>
-            </div>
-            <p class="notes-save-feedback" id="patientInfoFeedback" aria-live="polite"></p>
         </form>
     </div>
 </div>
@@ -502,8 +524,8 @@
                         <input type="email" name="email" placeholder="Email Address" required>
                     </label>
                     <label class="field-group field-group-span-2">
-                        <span>Backup Contact (Phone or Email, Optional)</span>
-                        <input type="text" name="backupContact" placeholder="09123456789 or backup@email.com">
+                        <span>Backup Contact (Optional)</span>
+                        <input type="text" name="backupContact" placeholder="Phone or email">
                     </label>
                 </div>
             </div>
@@ -529,11 +551,16 @@
                     <label class="field-group required-field">
                         <span>Password</span>
                         <div class="registration-password-wrap">
-                            <input type="password" id="addPatientPassword" name="password" minlength="6" pattern="(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}" title="Password must be at least 6 characters and include 1 uppercase letter, 1 number, and 1 special character." required>
+                            <input type="password" id="addPatientPassword" name="password" minlength="6" pattern="(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{6,}" title="Password must be at least 6 characters and include 1 uppercase letter and 1 special character." required>
                             <button type="button" class="registration-password-toggle" data-password-target="addPatientPassword" aria-label="Show password" aria-pressed="false">
                                 <i class="fa-regular fa-eye" aria-hidden="true"></i>
                             </button>
                         </div>
+                        <ul class="add-patient-password-rules is-hidden" id="addPatientPasswordRules" aria-live="polite">
+                            <li id="addPatientRuleLength">Must be at least 6 characters.</li>
+                            <li id="addPatientRuleUpper">Must contain 1 uppercase letter.</li>
+                            <li id="addPatientRuleSpecial">Must contain 1 special character (e.g., @, #, !, $).</li>
+                        </ul>
                     </label>
                     <label class="field-group required-field field-group-span-2">
                         <span>Confirm Password</span>
@@ -548,14 +575,10 @@
             </div>
             <div class="wizard-actions wizard-actions-end">
                 <button type="button" class="doctor-btn add-patient-nav-btn" id="addPatientBackBtn" aria-label="Previous page">
-                    <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                    Back
                 </button>
-                <div class="add-patient-page-dots" id="addPatientPageDots" aria-label="Form page indicator">
-                    <span class="add-patient-page-dot is-active" data-page-dot="0" aria-hidden="true"></span>
-                    <span class="add-patient-page-dot" data-page-dot="1" aria-hidden="true"></span>
-                </div>
                 <button type="button" class="doctor-btn add-patient-nav-btn" id="addPatientNextBtn" aria-label="Next page">
-                    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                    Next
                 </button>
                 <button type="submit" class="sign-in-btn" id="addPatientSaveBtn" hidden>Save Patient</button>
             </div>

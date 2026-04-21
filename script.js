@@ -615,14 +615,19 @@ function initializePatientDashboardVisuals() {
             applyProgressRing(ring, ringPercent);
         });
 
-        const fingerPercent = Math.min(100, Math.round(completionPercent * 0.78));
+        const liveMovementDeg = Number(gloveState.sessionMovementDeg ?? gloveState.lastMovementDeg ?? NaN);
+        const hasLiveMovement = Number.isFinite(liveMovementDeg) && liveMovementDeg >= 0;
         const estimatedDuration = sessionMinutes > 0
             ? sessionMinutes
             : (sessionReps > 0 ? Math.max(1, Math.round(sessionReps / 8)) : 0);
 
         if (sessionReps > 0) {
             setMetricStatus("grip", "active", `${completionPercent}%`, "Grip performance updated today.");
-            setMetricStatus("finger", "active", `${fingerPercent}%`, "Movement quality updated today.");
+            if (hasLiveMovement) {
+                setMetricStatus("finger", "active", `${liveMovementDeg.toFixed(1)}°`, "Live finger movement from glove flexion.");
+            } else {
+                setMetricStatus("finger", "waiting", "Waiting for Data...", "Move your hand to capture finger movement.");
+            }
             setMetricStatus("repetitions", "active", String(sessionReps), `${Math.max(0, targetRepetitions - sessionReps)} reps remaining today.`);
             setMetricStatus("duration", "active", `${estimatedDuration} min`, "Session duration updated from activity.");
             return;
@@ -630,14 +635,22 @@ function initializePatientDashboardVisuals() {
 
         if (gloveConnected) {
             setMetricStatus("grip", "waiting", "Waiting for Data...", "Perform an exercise to update.");
-            setMetricStatus("finger", "waiting", "Waiting for Data...", "Perform an exercise to update.");
+            if (hasLiveMovement) {
+                setMetricStatus("finger", "active", `${liveMovementDeg.toFixed(1)}°`, "Latest finger movement from glove.");
+            } else {
+                setMetricStatus("finger", "waiting", "Waiting for Data...", "Perform an exercise to update.");
+            }
             setMetricStatus("repetitions", "waiting", "0", "Waiting for your first set today.");
             setMetricStatus("duration", "waiting", "0 min", "Waiting for your first session today.");
             return;
         }
 
         setMetricStatus("grip", "no-data", "--", "No data recorded today.");
-        setMetricStatus("finger", "no-data", "--", "No data recorded today.");
+        if (hasLiveMovement) {
+            setMetricStatus("finger", "active", `${liveMovementDeg.toFixed(1)}°`, "Latest recorded finger movement.");
+        } else {
+            setMetricStatus("finger", "no-data", "--", "No data recorded today.");
+        }
         setMetricStatus("repetitions", "no-data", "0", "No data recorded today.");
         setMetricStatus("duration", "no-data", "0 min", "No data recorded today.");
     }
@@ -1268,6 +1281,17 @@ function initializeDoctorDashboard() {
         return;
     }
 
+    const doctorHeaderDateEl = document.querySelector(".doctor-header-date");
+    if (doctorHeaderDateEl) {
+        const now = new Date();
+        doctorHeaderDateEl.textContent = now.toLocaleDateString("en-US", {
+            weekday: "long",
+            month: "long",
+            day: "numeric",
+            year: "numeric"
+        });
+    }
+
     let doctorChart = null;
     let cachedPayload = null;
     let activeMetric = "grip";
@@ -1538,23 +1562,23 @@ function initializeDoctorDashboard() {
                     const drop = Number(row.drop_percent || row.drop || 0);
                     const missed = !!row.missed_session;
                     const normalizedStatus = safeText(row.status, "Stable").toLowerCase();
-                    let trafficClass = "traffic-green";
+                    let statusClass = "status-stable";
 
-                    if (normalizedStatus.includes("stable")) {
-                        trafficClass = "traffic-green";
-                    } else if (normalizedStatus.includes("attention")) {
-                        trafficClass = "traffic-red";
-                    } else if (normalizedStatus.includes("improving")) {
-                        trafficClass = "traffic-yellow";
+                    if (normalizedStatus.includes("stable") || normalizedStatus.includes("recovered")) {
+                        statusClass = "status-stable";
+                    } else if (normalizedStatus.includes("at risk") || normalizedStatus.includes("risk") || normalizedStatus.includes("attention")) {
+                        statusClass = "status-at-risk";
+                    } else if (normalizedStatus.includes("improving") || normalizedStatus.includes("recovering")) {
+                        statusClass = "status-recovering";
                     } else if (!Number.isNaN(drop) && drop >= 20) {
-                        trafficClass = "traffic-red";
+                        statusClass = "status-at-risk";
                     } else if (missed) {
-                        trafficClass = "traffic-yellow";
+                        statusClass = "status-recovering";
                     }
                     return `
                         <tr>
                             <td>${safeText(row.name)}</td>
-                            <td><span class="status-traffic"><span class="traffic-dot ${trafficClass}" aria-hidden="true"></span>${safeText(row.status, "Stable")}</span></td>
+                            <td><span class="status-traffic ${statusClass}">${safeText(row.status, "Stable")}</span></td>
                             <td>${safeText(row.last_session, "N/A")}</td>
                         </tr>
                     `;
@@ -1708,6 +1732,12 @@ function initializePatientsPage() {
     const addPatientSaveButton = document.getElementById("addPatientSaveBtn");
     const addPatientAgeInput = addPatientForm?.querySelector('input[name="age"]') || null;
     const addPatientDobInput = addPatientForm?.querySelector('input[name="dateOfBirth"]') || null;
+    const addPatientPasswordInput = addPatientForm?.querySelector('#addPatientPassword') || null;
+    const addPatientConfirmPasswordInput = addPatientForm?.querySelector('#addPatientConfirmPassword') || null;
+    const addPatientPasswordRules = document.getElementById("addPatientPasswordRules");
+    const addPatientRuleLength = document.getElementById("addPatientRuleLength");
+    const addPatientRuleUpper = document.getElementById("addPatientRuleUpper");
+    const addPatientRuleSpecial = document.getElementById("addPatientRuleSpecial");
     const addPatientPasswordToggles = addPatientForm ? Array.from(addPatientForm.querySelectorAll('.registration-password-toggle[data-password-target]')) : [];
     const saveNotesButton = document.getElementById("saveDoctorNotes");
     const notesInput = document.getElementById("doctorNotesInput");
@@ -1718,12 +1748,14 @@ function initializePatientsPage() {
     const clinicalTreatmentGoalInput = document.getElementById("clinicalTreatmentGoal");
     const clinicalTreatmentGoalCounter = document.getElementById("clinicalTreatmentGoalCounter");
     const saveClinicalInfoButton = document.getElementById("saveClinicalInfo");
+    const patientMedicalCard = document.querySelector(".patient-medical-card");
     const clinicalSaveFeedback = document.getElementById("clinicalSaveFeedback");
     const openPatientInfoModalButton = document.getElementById("openPatientInfoModal");
     const patientInfoModal = document.getElementById("patientInfoModal");
     const patientInfoModalBackdrop = document.getElementById("patientInfoModalBackdrop");
     const closePatientInfoModalButton = document.getElementById("closePatientInfoModal");
     const donePatientInfoBtn = document.getElementById("donePatientInfoBtn");
+    const togglePatientInfoEditBtn = document.getElementById("togglePatientInfoEditBtn");
     const patientInfoForm = document.getElementById("patientInfoForm");
     const patientInfoFeedback = document.getElementById("patientInfoFeedback");
     const patientInfoFirstName = document.getElementById("patientInfoFirstName");
@@ -1735,9 +1767,18 @@ function initializePatientsPage() {
     const patientInfoBackupContact = document.getElementById("patientInfoBackupContact");
     const patientInfoUsername = document.getElementById("patientInfoUsername");
     const patientInfoPassword = document.getElementById("patientInfoPassword");
+    const openInlinePasswordPanelBtn = document.getElementById("openInlinePasswordPanelBtn");
+    const patientInlinePasswordPanel = document.getElementById("patientInlinePasswordPanel");
+    const patientInlineCurrentPassword = document.getElementById("patientInlineCurrentPassword");
+    const patientInlineNewPassword = document.getElementById("patientInlineNewPassword");
+    const patientInlineConfirmPassword = document.getElementById("patientInlineConfirmPassword");
+    const saveInlinePasswordBtn = document.getElementById("saveInlinePasswordBtn");
+    const cancelInlinePasswordBtn = document.getElementById("cancelInlinePasswordBtn");
+    const patientInlinePasswordFeedback = document.getElementById("patientInlinePasswordFeedback");
+    const patientInlinePasswordToggles = patientInlinePasswordPanel ? Array.from(patientInlinePasswordPanel.querySelectorAll('.patient-password-eye-btn[data-password-target]')) : [];
     const patientInfoStrokeType = document.getElementById("patientInfoStrokeType");
     const patientInfoAffectedHand = document.getElementById("patientInfoAffectedHand");
-    const patientInlineEditButtons = patientInfoModal ? Array.from(patientInfoModal.querySelectorAll(".patient-inline-edit-btn")) : [];
+    const patientInfoModalCard = patientInfoModal?.querySelector(".patient-info-modal-card") || null;
     const patientPasswordModal = document.getElementById("patientPasswordModal");
     const patientPasswordModalBackdrop = document.getElementById("patientPasswordModalBackdrop");
     const closePatientPasswordModalButton = document.getElementById("closePatientPasswordModal");
@@ -1781,8 +1822,12 @@ function initializePatientsPage() {
     let activeFlexionView = "recent";
     let showGripPointValues = Boolean(patientGripShowValues?.checked);
     let showFlexionPointValues = Boolean(patientFlexionShowValues?.checked);
+    let hasPlayedProfileChartEntryAnimation = false;
     let profileMetricsTimer = null;
     let patientTablePage = 1;
+    let isDoctorNotesEditing = false;
+    let isMedicalInfoEditing = false;
+    let isPatientInfoModalEditing = false;
     const characterCounterUpdaters = [];
     const STATUS_OPTIONS = ["Recovering", "At Risk", "Recovered"];
     const PATIENT_TABLE_PAGE_SIZE = 10;
@@ -1818,6 +1863,154 @@ function initializePatientsPage() {
     characterCounterUpdaters.push(bindCharacterCounter(clinicalTreatmentGoalInput, clinicalTreatmentGoalCounter, 50));
     characterCounterUpdaters.push(bindCharacterCounter(notesInput, notesCounter, 200));
     refreshCharacterCounters();
+
+    function setDoctorNotesEditing(enabled) {
+        isDoctorNotesEditing = Boolean(enabled);
+
+        if (notesInput) {
+            notesInput.disabled = !isDoctorNotesEditing;
+            if (isDoctorNotesEditing) {
+                notesInput.focus();
+                const nextLength = notesInput.value.length;
+                notesInput.setSelectionRange(nextLength, nextLength);
+            }
+        }
+
+        if (saveNotesButton) {
+            saveNotesButton.textContent = isDoctorNotesEditing ? "Save Notes" : "Edit Notes";
+            saveNotesButton.setAttribute("aria-label", isDoctorNotesEditing ? "Save Notes" : "Edit Notes");
+        }
+    }
+
+    function setPatientInfoModalEditing(enabled) {
+        isPatientInfoModalEditing = Boolean(enabled);
+
+        const editableControls = [
+            patientInfoFirstName,
+            patientInfoLastName,
+            patientInfoDob,
+            patientInfoAge,
+            patientInfoGender,
+            patientInfoEmail,
+            patientInfoBackupContact,
+            patientInfoStrokeType,
+            patientInfoAffectedHand
+        ];
+
+        editableControls.forEach(control => {
+            if (!control) {
+                return;
+            }
+
+            if (control instanceof HTMLSelectElement) {
+                control.disabled = !isPatientInfoModalEditing;
+            } else {
+                control.readOnly = !isPatientInfoModalEditing;
+            }
+        });
+
+        patientInfoModalCard?.classList.toggle("is-editing", isPatientInfoModalEditing);
+
+        if (togglePatientInfoEditBtn) {
+            togglePatientInfoEditBtn.textContent = isPatientInfoModalEditing ? "Save Changes" : "Edit Profile";
+            togglePatientInfoEditBtn.setAttribute("aria-label", isPatientInfoModalEditing ? "Save patient profile changes" : "Edit patient profile");
+        }
+    }
+
+    function resetInlinePasswordValidation() {
+        if (!patientInlineConfirmPassword || !patientInlineCurrentPassword) {
+            return;
+        }
+
+        patientInlineConfirmPassword.classList.remove("is-match", "is-mismatch");
+    }
+
+    function updateInlinePasswordValidation() {
+        if (!patientInlineNewPassword || !patientInlineConfirmPassword || !patientInlineCurrentPassword) {
+            return;
+        }
+
+        const nextPassword = String(patientInlineNewPassword.value || "");
+        const confirmPassword = String(patientInlineConfirmPassword.value || "");
+        const currentPassword = String(patientInlineCurrentPassword.value || "");
+        
+        // Validate confirm password against current password (turns green if it matches the current password)
+        patientInlineConfirmPassword.classList.remove("is-match", "is-mismatch");
+        if (confirmPassword) {
+            if (confirmPassword === currentPassword) {
+                patientInlineConfirmPassword.classList.add("is-match");
+            } else {
+                patientInlineConfirmPassword.classList.add("is-mismatch");
+            }
+        }
+        
+    }
+
+    function resetInlinePasswordPanel() {
+        if (patientInlineCurrentPassword) patientInlineCurrentPassword.value = "";
+        if (patientInlineNewPassword) patientInlineNewPassword.value = "";
+        if (patientInlineConfirmPassword) patientInlineConfirmPassword.value = "";
+        resetInlinePasswordValidation();
+
+        if (patientInlinePasswordFeedback) {
+            patientInlinePasswordFeedback.textContent = "";
+        }
+
+        patientInlinePasswordToggles.forEach(toggleButton => {
+            const targetId = String(toggleButton.getAttribute("data-password-target") || "").trim();
+            const targetInput = targetId ? document.getElementById(targetId) : null;
+            if (targetInput instanceof HTMLInputElement) {
+                targetInput.type = "password";
+            }
+
+            toggleButton.setAttribute("aria-pressed", "false");
+            const icon = toggleButton.querySelector("i");
+            if (icon) {
+                icon.className = "fa-regular fa-eye";
+            }
+        });
+    }
+
+    function setInlinePasswordPanelOpen(open) {
+        if (!patientInlinePasswordPanel) {
+            return;
+        }
+
+        const isOpen = Boolean(open);
+        patientInlinePasswordPanel.hidden = !isOpen;
+        openInlinePasswordPanelBtn?.setAttribute("aria-expanded", isOpen ? "true" : "false");
+
+        if (!isOpen) {
+            resetInlinePasswordPanel();
+            return;
+        }
+
+        patientInlineCurrentPassword?.focus();
+    }
+
+    function setMedicalInfoEditing(enabled) {
+        isMedicalInfoEditing = Boolean(enabled);
+
+        if (clinicalDiagnosisInput) {
+            clinicalDiagnosisInput.readOnly = !isMedicalInfoEditing;
+        }
+        if (clinicalTreatmentGoalInput) {
+            clinicalTreatmentGoalInput.readOnly = !isMedicalInfoEditing;
+        }
+
+        patientMedicalCard?.classList.toggle("is-editing", isMedicalInfoEditing);
+
+        if (saveClinicalInfoButton) {
+            saveClinicalInfoButton.textContent = isMedicalInfoEditing ? "Save" : "Edit";
+            saveClinicalInfoButton.setAttribute("aria-label", isMedicalInfoEditing ? "Save medical information" : "Edit medical information");
+        }
+
+        if (isMedicalInfoEditing) {
+            clinicalDiagnosisInput?.focus();
+            const end = clinicalDiagnosisInput?.value.length || 0;
+            clinicalDiagnosisInput?.setSelectionRange(end, end);
+        }
+    }
 
     function formatGrip(value) {
         return `${Number(value || 0).toFixed(1)} N`;
@@ -2158,6 +2351,21 @@ function initializePatientsPage() {
 
         destroyProfileCharts();
 
+        const shouldAnimateCharts = !hasPlayedProfileChartEntryAnimation;
+        const entryAnimation = shouldAnimateCharts
+            ? {
+                duration: 1000,
+                easing: "easeOutCubic"
+            }
+            : false;
+        const upwardAnimations = shouldAnimateCharts
+            ? {
+                y: {
+                    from: 0
+                }
+            }
+            : {};
+
         const axisColor = document.body.classList.contains("dark-mode") ? "#88a8b4" : "#5e7f8d";
         const gridColor = document.body.classList.contains("dark-mode") ? "rgba(136,168,180,0.2)" : "rgba(94,127,141,0.15)";
         const gripContext = gripCanvas.getContext("2d");
@@ -2236,6 +2444,8 @@ function initializePatientsPage() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: entryAnimation,
+                animations: upwardAnimations,
                 interaction: {
                     mode: "index",
                     intersect: false
@@ -2293,6 +2503,8 @@ function initializePatientsPage() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: entryAnimation,
+                animations: upwardAnimations,
                 plugins: {
                     legend: {
                         display: true,
@@ -2321,6 +2533,8 @@ function initializePatientsPage() {
             },
             plugins: [buildValueLabelPlugin(flexionSeries.values, "flexion", showFlexionPointValues)]
         });
+
+        hasPlayedProfileChartEntryAnimation = true;
     }
 
     function setProfilePatient(patientId) {
@@ -2363,6 +2577,7 @@ function initializePatientsPage() {
             notesInput.value = patient.notes || "";
         }
         refreshCharacterCounters();
+        setDoctorNotesEditing(false);
         if (notesFeedback) {
             notesFeedback.textContent = "";
         }
@@ -2370,6 +2585,7 @@ function initializePatientsPage() {
         if (clinicalSaveFeedback) {
             clinicalSaveFeedback.textContent = "";
         }
+        setMedicalInfoEditing(false);
         void loadClinicalData(patient.dbId || patient.id);
         void loadProfileMetrics(patient.dbId || patient.id, true);
 
@@ -2471,6 +2687,8 @@ function initializePatientsPage() {
             if (clinicalTreatmentGoalInput) clinicalTreatmentGoalInput.value = clinical.treatment_goal || "";
             if (notesInput) notesInput.value = clinical.doctor_notes || "";
             refreshCharacterCounters();
+            setDoctorNotesEditing(false);
+            setMedicalInfoEditing(false);
         } catch (err) {
             if (clinicalSaveFeedback) {
                 clinicalSaveFeedback.textContent = "Unable to load medical info.";
@@ -2513,67 +2731,6 @@ function initializePatientsPage() {
         if (patientInfoAffectedHand) patientInfoAffectedHand.value = String(details.affectedHand || "");
     }
 
-    function setInlineFieldEditing(fieldElement, toggleButton, isEditing) {
-        if (!fieldElement || !toggleButton) {
-            return;
-        }
-
-        if (fieldElement instanceof HTMLSelectElement) {
-            fieldElement.disabled = !isEditing;
-        } else {
-            fieldElement.readOnly = !isEditing;
-        }
-
-        toggleButton.classList.toggle("is-editing", isEditing);
-        toggleButton.setAttribute("aria-label", isEditing ? "Confirm changes" : "Edit field");
-        const icon = toggleButton.querySelector("i");
-        if (icon) {
-            icon.className = isEditing ? "fa-solid fa-check" : "fa-solid fa-pen";
-        }
-
-        if (isEditing) {
-            fieldElement.focus();
-            if (fieldElement instanceof HTMLInputElement || fieldElement instanceof HTMLTextAreaElement) {
-                fieldElement.select?.();
-            }
-        }
-    }
-
-    function resetInlineFieldEditStates() {
-        patientInlineEditButtons.forEach(button => {
-            const targetId = String(button.getAttribute("data-inline-edit-target") || "").trim();
-            if (!targetId) {
-                return;
-            }
-            const field = document.getElementById(targetId);
-            if (!field || !(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) {
-                return;
-            }
-            setInlineFieldEditing(field, button, false);
-        });
-    }
-
-    async function commitInlinePatientField(button, fieldElement) {
-        if (patientInfoFeedback) {
-            patientInfoFeedback.textContent = "Saving changes...";
-        }
-
-        button.disabled = true;
-        try {
-            await savePatientInfoFromModal();
-            setInlineFieldEditing(fieldElement, button, false);
-            if (patientInfoFeedback) {
-                patientInfoFeedback.textContent = "Saved.";
-            }
-        } catch (error) {
-            if (patientInfoFeedback) {
-                patientInfoFeedback.textContent = error instanceof Error ? error.message : "Unable to save patient information.";
-            }
-        } finally {
-            button.disabled = false;
-        }
-    }
-
     function openPatientInfoModal() {
         if (!patientInfoModal) {
             return;
@@ -2585,7 +2742,8 @@ function initializePatientsPage() {
 
         loadPatientInfoForModal()
             .then(() => {
-                resetInlineFieldEditStates();
+                setPatientInfoModalEditing(false);
+                setInlinePasswordPanelOpen(false);
                 patientInfoModal.hidden = false;
                 document.body.style.overflow = "hidden";
             })
@@ -2603,7 +2761,8 @@ function initializePatientsPage() {
         if (patientInfoForm) {
             patientInfoForm.reset();
         }
-        resetInlineFieldEditStates();
+        setPatientInfoModalEditing(false);
+        setInlinePasswordPanelOpen(false);
         if (patientInfoFeedback) {
             patientInfoFeedback.textContent = "";
         }
@@ -2711,6 +2870,18 @@ function initializePatientsPage() {
     }
 
     async function savePatientPasswordFromModal() {
+        const currentPassword = String(patientCurrentPassword?.value || "");
+        const newPassword = String(patientNewPassword?.value || "");
+        const confirmNewPassword = String(patientRepeatPassword?.value || "");
+
+        await savePatientPasswordWithValues({ currentPassword, newPassword, confirmNewPassword });
+
+        if (patientInfoPassword) {
+            patientInfoPassword.value = "••••••••";
+        }
+    }
+
+    async function savePatientPasswordWithValues({ currentPassword, newPassword, confirmNewPassword }) {
         const patient = activePatientRecord();
         if (!patient) {
             throw new Error("No active patient selected.");
@@ -2720,10 +2891,6 @@ function initializePatientsPage() {
         if (!patientDbId) {
             throw new Error("Invalid patient selected.");
         }
-
-        const currentPassword = String(patientCurrentPassword?.value || "");
-        const newPassword = String(patientNewPassword?.value || "");
-        const confirmNewPassword = String(patientRepeatPassword?.value || "");
 
         if (!currentPassword || !newPassword || !confirmNewPassword) {
             throw new Error("Please complete all password fields.");
@@ -2742,10 +2909,6 @@ function initializePatientsPage() {
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || !payload?.ok) {
             throw new Error(payload?.error || "Unable to update password.");
-        }
-
-        if (patientInfoPassword) {
-            patientInfoPassword.value = "••••••••";
         }
     }
 
@@ -2918,7 +3081,98 @@ function initializePatientsPage() {
         if (addPatientAgeInput) {
             addPatientAgeInput.value = "";
         }
+        if (addPatientPasswordInput) {
+            addPatientPasswordInput.setCustomValidity("");
+        }
+        addPatientPasswordRules?.classList.add("is-hidden");
+        addPatientRuleLength?.classList.remove("is-met");
+        addPatientRuleUpper?.classList.remove("is-met");
+        addPatientRuleSpecial?.classList.remove("is-met");
+        if (addPatientConfirmPasswordInput) {
+            addPatientConfirmPasswordInput.classList.remove("is-match", "is-mismatch");
+        }
         setAddPatientStep(0);
+    }
+
+    function areAddPatientPasswordRulesMet() {
+        if (!addPatientPasswordInput) {
+            return false;
+        }
+
+        const passwordValue = String(addPatientPasswordInput.value || "");
+        return passwordValue.length >= 6
+            && /[A-Z]/.test(passwordValue)
+            && /[^A-Za-z0-9]/.test(passwordValue);
+    }
+
+    function updateAddPatientPasswordRulesVisibility(forceShow = false) {
+        if (!addPatientPasswordRules) {
+            return;
+        }
+
+        const rulesMet = areAddPatientPasswordRulesMet();
+        const shouldShow = forceShow && !rulesMet;
+        addPatientPasswordRules.classList.toggle("is-hidden", !shouldShow);
+    }
+
+    function updateAddPatientPasswordRequirementValidation() {
+        if (!addPatientPasswordInput) {
+            return;
+        }
+
+        const passwordValue = String(addPatientPasswordInput.value || "");
+        const hasMinLength = passwordValue.length >= 6;
+        const hasUppercase = /[A-Z]/.test(passwordValue);
+        const hasSpecial = /[^A-Za-z0-9]/.test(passwordValue);
+        addPatientRuleLength?.classList.toggle("is-met", hasMinLength);
+        addPatientRuleUpper?.classList.toggle("is-met", hasUppercase);
+        addPatientRuleSpecial?.classList.toggle("is-met", hasSpecial);
+
+        const missing = [];
+
+        if (!hasMinLength) {
+            missing.push("at least 6 characters");
+        }
+        if (!hasUppercase) {
+            missing.push("1 uppercase letter");
+        }
+        if (!hasSpecial) {
+            missing.push("1 special character");
+        }
+
+        if (!missing.length) {
+            addPatientPasswordInput.setCustomValidity("");
+            updateAddPatientPasswordRulesVisibility(false);
+            return;
+        }
+
+        const message = `Password still needs: ${missing.join(", ")}.`;
+        addPatientPasswordInput.setCustomValidity(message);
+
+        if (document.activeElement === addPatientPasswordInput) {
+            updateAddPatientPasswordRulesVisibility(true);
+        }
+    }
+
+    function updateAddPatientConfirmPasswordValidation() {
+        if (!addPatientPasswordInput || !addPatientConfirmPasswordInput) {
+            return;
+        }
+
+        const passwordValue = String(addPatientPasswordInput.value || "");
+        const confirmValue = String(addPatientConfirmPasswordInput.value || "");
+        addPatientConfirmPasswordInput.classList.remove("is-match", "is-mismatch");
+
+        if (!confirmValue) {
+            return;
+        }
+
+        if (passwordValue === confirmValue) {
+            addPatientConfirmPasswordInput.classList.add("is-match");
+            return;
+        }
+
+        addPatientConfirmPasswordInput.classList.add("is-mismatch");
     }
 
     function setAddPatientStep(stepIndex) {
@@ -3252,6 +3506,98 @@ function initializePatientsPage() {
     openPatientInfoModalButton?.addEventListener("click", openPatientInfoModal);
     closePatientInfoModalButton?.addEventListener("click", closePatientInfoModal);
     donePatientInfoBtn?.addEventListener("click", closePatientInfoModal);
+    togglePatientInfoEditBtn?.addEventListener("click", async () => {
+        if (!isPatientInfoModalEditing) {
+            if (patientInfoFeedback) {
+                patientInfoFeedback.textContent = "";
+            }
+            setPatientInfoModalEditing(true);
+            patientInfoFirstName?.focus();
+            return;
+        }
+
+        togglePatientInfoEditBtn.disabled = true;
+        try {
+            await savePatientInfoFromModal();
+            setPatientInfoModalEditing(false);
+            if (patientInfoFeedback) {
+                patientInfoFeedback.textContent = "Changes saved.";
+            }
+        } catch (error) {
+            if (patientInfoFeedback) {
+                patientInfoFeedback.textContent = error instanceof Error ? error.message : "Unable to save patient information.";
+            }
+        } finally {
+            togglePatientInfoEditBtn.disabled = false;
+        }
+    });
+    openInlinePasswordPanelBtn?.addEventListener("click", () => {
+        const isOpen = Boolean(patientInlinePasswordPanel && !patientInlinePasswordPanel.hidden);
+        setInlinePasswordPanelOpen(!isOpen);
+    });
+    cancelInlinePasswordBtn?.addEventListener("click", () => {
+        setInlinePasswordPanelOpen(false);
+    });
+    saveInlinePasswordBtn?.addEventListener("click", async () => {
+        if (patientInlinePasswordFeedback) {
+            patientInlinePasswordFeedback.textContent = "Updating password...";
+        }
+
+        const currentPassword = String(patientInlineCurrentPassword?.value || "");
+        const newPassword = String(patientInlineNewPassword?.value || "");
+        const confirmNewPassword = String(patientInlineConfirmPassword?.value || "");
+
+        if (confirmNewPassword !== newPassword) {
+            updateInlinePasswordValidation();
+            if (patientInlinePasswordFeedback) {
+                patientInlinePasswordFeedback.textContent = "New password and confirm password must match.";
+            }
+            return;
+        }
+
+        saveInlinePasswordBtn.disabled = true;
+        try {
+            await savePatientPasswordWithValues({ currentPassword, newPassword, confirmNewPassword });
+            if (patientInfoPassword) {
+                patientInfoPassword.value = "••••••••";
+            }
+            if (patientInlinePasswordFeedback) {
+                patientInlinePasswordFeedback.textContent = "Password updated.";
+            }
+            setInlinePasswordPanelOpen(false);
+        } catch (error) {
+            if (patientInlinePasswordFeedback) {
+                patientInlinePasswordFeedback.textContent = error instanceof Error ? error.message : "Unable to update password.";
+            }
+        } finally {
+            saveInlinePasswordBtn.disabled = false;
+        }
+    });
+    patientInlinePasswordToggles.forEach(toggleButton => {
+        toggleButton.addEventListener("click", () => {
+            const targetId = String(toggleButton.getAttribute("data-password-target") || "").trim();
+            if (!targetId) {
+                return;
+            }
+
+            const targetInput = document.getElementById(targetId);
+            if (!(targetInput instanceof HTMLInputElement)) {
+                return;
+            }
+
+            const show = targetInput.type === "password";
+            targetInput.type = show ? "text" : "password";
+            toggleButton.setAttribute("aria-pressed", show ? "true" : "false");
+
+            const icon = toggleButton.querySelector("i");
+            if (icon) {
+                icon.className = show ? "fa-regular fa-eye-slash" : "fa-regular fa-eye";
+            }
+        });
+    });
+    patientInlineCurrentPassword?.addEventListener("input", updateInlinePasswordValidation);
+    patientInlineNewPassword?.addEventListener("input", updateInlinePasswordValidation);
+    patientInlineConfirmPassword?.addEventListener("input", updateInlinePasswordValidation);
     patientInfoModalBackdrop?.addEventListener("click", closePatientInfoModal);
     closePatientPasswordModalButton?.addEventListener("click", closePatientPasswordModal);
     cancelPatientPasswordBtn?.addEventListener("click", closePatientPasswordModal);
@@ -3298,61 +3644,6 @@ function initializePatientsPage() {
 
     patientInfoForm?.addEventListener("submit", event => {
         event.preventDefault();
-    });
-
-    patientInlineEditButtons.forEach(button => {
-        button.addEventListener("click", () => {
-            const isPasswordTrigger = button.getAttribute("data-password-edit-trigger") === "true";
-            if (isPasswordTrigger) {
-                openPatientPasswordModal();
-                return;
-            }
-
-            const targetId = String(button.getAttribute("data-inline-edit-target") || "").trim();
-            if (!targetId) {
-                return;
-            }
-
-            const field = document.getElementById(targetId);
-            if (!field || !(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) {
-                return;
-            }
-
-            const currentlyEditing = button.classList.contains("is-editing");
-            if (!currentlyEditing) {
-                setInlineFieldEditing(field, button, true);
-                return;
-            }
-
-            void commitInlinePatientField(button, field);
-        });
-    });
-
-    [
-        patientInfoFirstName,
-        patientInfoLastName,
-        patientInfoDob,
-        patientInfoAge,
-        patientInfoEmail,
-        patientInfoBackupContact,
-        patientInfoStrokeType
-    ].forEach(field => {
-        field?.addEventListener("keydown", event => {
-            if (event.key !== "Enter") {
-                return;
-            }
-
-            const targetId = field.id;
-            const button = patientInfoModal ? patientInfoModal.querySelector(`.patient-inline-edit-btn[data-inline-edit-target="${targetId}"]`) : null;
-            if (!(button instanceof HTMLButtonElement)) {
-                return;
-            }
-
-            if (button.classList.contains("is-editing")) {
-                event.preventDefault();
-                void commitInlinePatientField(button, field);
-            }
-        });
     });
 
     addPatientForm?.addEventListener("submit", event => {
@@ -3411,6 +3702,20 @@ function initializePatientsPage() {
     });
     addPatientDobInput?.addEventListener("change", syncAgeFromDob);
     addPatientDobInput?.addEventListener("blur", syncAgeFromDob);
+    addPatientPasswordInput?.addEventListener("focus", () => {
+        updateAddPatientPasswordRequirementValidation();
+        updateAddPatientPasswordRulesVisibility(true);
+    });
+    addPatientPasswordInput?.addEventListener("click", () => {
+        updateAddPatientPasswordRequirementValidation();
+        updateAddPatientPasswordRulesVisibility(true);
+    });
+    addPatientPasswordInput?.addEventListener("blur", () => {
+        updateAddPatientPasswordRulesVisibility(false);
+    });
+    addPatientPasswordInput?.addEventListener("input", updateAddPatientPasswordRequirementValidation);
+    addPatientPasswordInput?.addEventListener("input", updateAddPatientConfirmPasswordValidation);
+    addPatientConfirmPasswordInput?.addEventListener("input", updateAddPatientConfirmPasswordValidation);
 
     addPatientNextButton?.addEventListener("click", () => {
         if (!validateAddPatientStep(addPatientStepIndex)) {
@@ -3452,8 +3757,23 @@ function initializePatientsPage() {
     });
 
     saveNotesButton?.addEventListener("click", async () => {
+        if (!notesInput) {
+            return;
+        }
+
+        if (!isDoctorNotesEditing) {
+            if (notesFeedback) {
+                notesFeedback.textContent = "";
+            }
+            setDoctorNotesEditing(true);
+            return;
+        }
+
         const patient = patients.find(entry => entry.id === activePatientId);
-        if (!patient || !notesInput) {
+        if (!patient) {
+            if (notesFeedback) {
+                notesFeedback.textContent = "Select a patient first before saving notes.";
+            }
             return;
         }
 
@@ -3464,6 +3784,7 @@ function initializePatientsPage() {
             return;
         }
 
+        saveNotesButton.disabled = true;
         patient.notes = notesInput.value.trim();
         const diagnosis = clinicalDiagnosisInput?.value.trim() || "";
         const treatmentGoal = clinicalTreatmentGoalInput?.value.trim() || "";
@@ -3473,12 +3794,24 @@ function initializePatientsPage() {
             doctorNotes: patient.notes
         }, { showClinicalFeedback: false });
 
+        saveNotesButton.disabled = false;
         if (notesFeedback) {
             notesFeedback.textContent = saved ? "Notes saved." : "Unable to save notes.";
+        }
+        if (saved) {
+            setDoctorNotesEditing(false);
         }
     });
 
     saveClinicalInfoButton?.addEventListener("click", async () => {
+        if (!isMedicalInfoEditing) {
+            if (clinicalSaveFeedback) {
+                clinicalSaveFeedback.textContent = "";
+            }
+            setMedicalInfoEditing(true);
+            return;
+        }
+
         const patient = patients.find(entry => entry.id === activePatientId);
         if (!patient) {
             return;
@@ -3495,10 +3828,17 @@ function initializePatientsPage() {
             return;
         }
 
-        await saveClinicalData(patient.dbId || patient.id, { diagnosis, treatmentGoal, doctorNotes });
+        saveClinicalInfoButton.disabled = true;
+        const saved = await saveClinicalData(patient.dbId || patient.id, { diagnosis, treatmentGoal, doctorNotes });
+        saveClinicalInfoButton.disabled = false;
+        if (saved) {
+            setMedicalInfoEditing(false);
+        }
     });
 
     renderPatientTable();
+    setDoctorNotesEditing(false);
+    setMedicalInfoEditing(false);
 }
 
 function initializeTherapyPlansPage() {
@@ -3508,10 +3848,14 @@ function initializeTherapyPlansPage() {
     }
 
     const assignmentsBody = document.getElementById("therapyAssignmentsBody");
+    const openAssignPlanModalBtn = document.getElementById("openAssignPlanModalBtn");
     const assignPatientSelect = document.getElementById("assignPatientSelect");
     const assignTemplateSelect = document.getElementById("assignTemplateSelect");
     const applyTemplateBtn = document.getElementById("applyTemplateBtn");
     const assignFeedback = document.getElementById("assignTemplateFeedback");
+    const assignPopup = document.getElementById("therapyAssignPopup");
+    const assignBackdrop = document.getElementById("therapyAssignBackdrop");
+    const closeAssignPlanModalBtn = document.getElementById("closeAssignPlanModal");
     const assignmentsPagination = document.getElementById("therapyAssignmentsPagination");
     const assignmentsPrevBtn = document.getElementById("therapyAssignmentsPrevBtn");
     const assignmentsNextBtn = document.getElementById("therapyAssignmentsNextBtn");
@@ -3610,9 +3954,10 @@ function initializeTherapyPlansPage() {
             return `
                 <div class="template-plan-item">
                     <div class="template-plan-exercise">Open-Close Exercise</div>
-                    <div class="template-plan-stats">
-                        <div class="template-stat-chip"><span>Reps</span><strong>0</strong></div>
-                        <div class="template-stat-chip"><span>Sessions</span><strong>0</strong></div>
+                    <div class="template-plan-stats-inline">
+                        <span class="template-stat-pair"><strong>0</strong> Reps</span>
+                        <span class="template-stat-divider" aria-hidden="true">|</span>
+                        <span class="template-stat-pair"><strong>0</strong> Sessions</span>
                     </div>
                 </div>
             `;
@@ -3626,9 +3971,10 @@ function initializeTherapyPlansPage() {
                 return `
                     <div class="template-plan-item">
                         <div class="template-plan-exercise">${label}</div>
-                        <div class="template-plan-stats">
-                            <div class="template-stat-chip"><span>Reps</span><strong>${reps}</strong></div>
-                            <div class="template-stat-chip"><span>Sessions</span><strong>${sessions}</strong></div>
+                        <div class="template-plan-stats-inline">
+                            <span class="template-stat-pair"><strong>${reps}</strong> Reps</span>
+                            <span class="template-stat-divider" aria-hidden="true">|</span>
+                            <span class="template-stat-pair"><strong>${sessions}</strong> Sessions</span>
                         </div>
                     </div>
                 `;
@@ -3949,6 +4295,25 @@ function initializeTherapyPlansPage() {
         document.body.style.overflow = "";
     }
 
+    function openAssignPlanModal() {
+        if (!assignPopup) {
+            return;
+        }
+
+        assignPopup.hidden = false;
+        document.body.style.overflow = "hidden";
+        assignPatientSelect?.focus();
+    }
+
+    function closeAssignPlanModal() {
+        if (!assignPopup) {
+            return;
+        }
+
+        assignPopup.hidden = true;
+        document.body.style.overflow = "";
+    }
+
     function addTemplateExerciseRow() {
         if (templateRowCount >= 3) {
             return;
@@ -4090,6 +4455,7 @@ function initializeTherapyPlansPage() {
             const hasPagination = assignments.length > ASSIGNMENTS_PAGE_SIZE;
             assignmentsPagination.hidden = !hasPagination;
             assignmentsPrevBtn.disabled = assignmentsPage <= 1;
+            assignmentsPrevBtn.style.visibility = assignmentsPage <= 1 ? "hidden" : "visible";
             assignmentsNextBtn.disabled = assignmentsPage >= totalPages;
             assignmentsPageLabel.textContent = `Page ${assignmentsPage} of ${totalPages}`;
         }
@@ -4212,8 +4578,7 @@ function initializeTherapyPlansPage() {
     assignmentsBody?.addEventListener("click", event => {
         const ctaButton = event.target instanceof HTMLElement ? event.target.closest("#assignmentEmptyCta") : null;
         if (ctaButton) {
-            assignPatientSelect?.focus();
-            assignPatientSelect?.scrollIntoView({ behavior: "smooth", block: "center" });
+            openAssignPlanModal();
             return;
         }
 
@@ -4318,6 +4683,10 @@ function initializeTherapyPlansPage() {
     templateRows.forEach(row => {
         row.exercise?.addEventListener("change", updateExerciseOptionAvailability);
     });
+
+    openAssignPlanModalBtn?.addEventListener("click", openAssignPlanModal);
+    closeAssignPlanModalBtn?.addEventListener("click", closeAssignPlanModal);
+    assignBackdrop?.addEventListener("click", closeAssignPlanModal);
 
     templateAddExerciseBtn?.addEventListener("click", addTemplateExerciseRow);
     removeTemplateExercise2Btn?.addEventListener("click", () => removeTemplateExerciseRow(1));
@@ -4461,6 +4830,9 @@ function initializeTherapyPlansPage() {
     });
 
     document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && assignPopup && !assignPopup.hidden) {
+            closeAssignPlanModal();
+        }
         if (event.key === "Escape" && editPopup && !editPopup.hidden) {
             closeEditPopup();
         }
@@ -4705,7 +5077,9 @@ function initializeExerciseHubPage() {
     const testMovementEl    = document.getElementById("hubTestMovement");
     const testForceEl       = document.getElementById("hubTestForce");
     const testTimeEl        = document.getElementById("hubTestTime");
+    const testForceDialEl   = document.getElementById("hubTestForceDial");
     const testRingProgressEl = document.getElementById("hubTestRingProgress");
+    const testFingerGaugeCells = Array.from(document.querySelectorAll("#hubTestFingerGauges .test-gauge-cell"));
     const startTestBtn      = document.getElementById("hubStartTestBtn");
     const stopTestBtn       = document.getElementById("hubStopTestBtn");
     const testStatus        = document.getElementById("hubTestStatus");
@@ -4750,7 +5124,7 @@ function initializeExerciseHubPage() {
     // ── State ─────────────────────────────────────────────────────────────────
     let gloveConnected = false;
     let currentPatientId = null;
-    const fingerNames = ["Index", "Middle", "Ring", "Pinky"];
+    const fingerNames = ["Thumb", "Index", "Middle", "Ring", "Pinky"];
     const calibrationState = fingerNames.map(name => ({ name, zero: null, max: null, current: 0 }));
     const diagResults = { maxExtension: 0, maxFlexion: 0, peakForce: 0 };
     let planTargetReps = 120;
@@ -4861,6 +5235,121 @@ function initializeExerciseHubPage() {
         patientIdHint.hidden = true;
     }
 
+    function toNumericArray(value) {
+        if (!Array.isArray(value)) return [];
+        return value.filter(item => Number.isFinite(Number(item))).map(item => Number(item));
+    }
+
+    function averageOf(values) {
+        const numbers = toNumericArray(values);
+        if (!numbers.length) {
+            return null;
+        }
+
+        return numbers.reduce((sum, value) => sum + value, 0) / numbers.length;
+    }
+
+    function classifyLiveMovement(movementDeg, profile) {
+        const straightValues = toNumericArray(profile?.straight_values || profile?.straightValues || profile?.open_values || profile?.openValues);
+        const bendValues = toNumericArray(profile?.bend_values || profile?.bendValues || profile?.closed_values || profile?.closedValues);
+        const openReference = averageOf(straightValues);
+        const closeReference = averageOf(bendValues);
+
+        const hasReferences = Number.isFinite(openReference) && Number.isFinite(closeReference) && closeReference !== openReference;
+        const openDeg = hasReferences ? openReference : 0;
+        const closeDeg = hasReferences ? closeReference : 90;
+        const span = Math.max(1, closeDeg - openDeg);
+        const normalizedDeg = Math.max(0, Math.min(90, ((movementDeg - openDeg) / span) * 90));
+        const openThreshold = openDeg + (span * 0.15);
+        const closeThreshold = openDeg + (span * 0.85);
+
+        let phase = "middle";
+        if (movementDeg <= openThreshold) {
+            phase = "open";
+        } else if (movementDeg >= closeThreshold) {
+            phase = "close";
+        }
+
+        return {
+            phase,
+            normalizedDeg,
+            openReference,
+            closeReference
+        };
+    }
+
+    function applyCalibrationProfile(profile) {
+        if (!profile || typeof profile !== "object") {
+            return false;
+        }
+
+        const straightValues = toNumericArray(profile.straight_values || profile.straightValues || profile.open_values || profile.openValues);
+        const bendValues = toNumericArray(profile.bend_values || profile.bendValues || profile.closed_values || profile.closedValues);
+
+        if (!straightValues.length && !bendValues.length) {
+            return false;
+        }
+
+        calibrationState.forEach((finger, index) => {
+            if (Number.isFinite(straightValues[index])) {
+                finger.zero = straightValues[index];
+            }
+            if (Number.isFinite(bendValues[index])) {
+                finger.max = bendValues[index];
+            }
+            if (finger.max !== null) {
+                finger.current = Number(finger.max);
+            } else if (finger.zero !== null) {
+                finger.current = Number(finger.zero);
+            }
+        });
+
+        renderCalibrationGrid();
+
+        try {
+            const gloveData = JSON.parse(localStorage.getItem("theraflow_glove") || "{}");
+            gloveData.calibrationProfile = {
+                straight_values: straightValues,
+                bend_values: bendValues,
+                grip_min: Number.isFinite(Number(profile.grip_min ?? profile.gripMin)) ? Number(profile.grip_min ?? profile.gripMin) : null,
+                grip_max: Number.isFinite(Number(profile.grip_max ?? profile.gripMax)) ? Number(profile.grip_max ?? profile.gripMax) : null,
+                finger_names: Array.isArray(profile.finger_names) ? profile.finger_names : fingerNames
+            };
+            localStorage.setItem("theraflow_glove", JSON.stringify(gloveData));
+        } catch {
+            // Storage may be unavailable.
+        }
+
+        return true;
+    }
+
+    async function loadLatestCalibrationProfile() {
+        if (!currentPatientId) {
+            return null;
+        }
+
+        try {
+            const response = await fetch("api/patient/exercise_session.php", {
+                method: "GET",
+                credentials: "same-origin",
+                cache: "no-store"
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload?.ok) {
+                return null;
+            }
+
+            if (payload?.calibrationProfile) {
+                applyCalibrationProfile(payload.calibrationProfile);
+            }
+
+            return payload.calibrationProfile || null;
+        } catch {
+            return null;
+        }
+    }
+
     async function loadPatientContext() {
         try {
             const response = await fetch("api/patient/profile_details.php", { cache: "no-store" });
@@ -4875,6 +5364,7 @@ function initializeExerciseHubPage() {
         }
 
         renderPatientIdHint();
+        void loadLatestCalibrationProfile();
         return currentPatientId;
     }
 
@@ -4965,11 +5455,7 @@ function initializeExerciseHubPage() {
                 calibrationRequested = false;
                 calibrationComplete = true;
                 syncCalibrationButtonState();
-                calibrationState.forEach(finger => {
-                    if (finger.zero === null) finger.zero = 0;
-                    if (finger.max === null) finger.max = 90;
-                    finger.current = 90;
-                });
+                applyCalibrationProfile(command?.payload?.calibration || command?.payload || {});
                 renderCalibrationGrid();
                 setCalibrationProgress(100);
                 setMsg(calibrationStatus, "Calibration complete. You can continue to Step 3.");
@@ -5072,14 +5558,6 @@ function initializeExerciseHubPage() {
         }
     }
 
-    function pseudoRandom(min, max) {
-        return Number((Math.random() * (max - min) + min).toFixed(1));
-    }
-
-    async function readGloveValue(min, max) {
-        return pseudoRandom(min, max);
-    }
-
     async function fetchLatestGloveReading() {
         const response = await fetch("api/patient/exercise_session.php", {
             method: "GET",
@@ -5094,14 +5572,23 @@ function initializeExerciseHubPage() {
 
         const row = payload?.lastReading;
         if (!row) {
+            if (payload?.calibrationProfile) {
+                applyCalibrationProfile(payload.calibrationProfile);
+            }
             return null;
+        }
+
+        if (payload?.calibrationProfile) {
+            applyCalibrationProfile(payload.calibrationProfile);
         }
 
         return {
             id: Number(row.id || 0),
             force: Number(row.grip_strength || 0),
             movement: Number(row.flexion_angle || 0),
-            recordedAt: String(row.recorded_at || row.recordedAt || "")
+            recordedAt: String(row.recorded_at || row.recordedAt || ""),
+            calibrationProfile: payload?.calibrationProfile || null,
+            fingerAngles: row.finger_angles && typeof row.finger_angles === "object" ? row.finger_angles : null
         };
     }
 
@@ -5165,6 +5652,50 @@ function initializeExerciseHubPage() {
         testRingProgressEl.style.strokeDashoffset = `${(circumference * (1 - progress)).toFixed(2)}`;
     }
 
+    function normalizeFingerAnglesForBars(fingerAngles, fallbackMovement) {
+        const fallback = Number.isFinite(Number(fallbackMovement)) ? Number(fallbackMovement) : 0;
+        const source = fingerAngles && typeof fingerAngles === "object" ? fingerAngles : {};
+
+        const mapValue = key => {
+            const direct = Number(source[key]);
+            if (Number.isFinite(direct)) {
+                return Math.max(0, Math.min(90, direct));
+            }
+            return Math.max(0, Math.min(90, fallback));
+        };
+
+        return {
+            thumb: mapValue("thumb"),
+            index: mapValue("index"),
+            middle: mapValue("middle"),
+            ring: mapValue("ring"),
+            pinky: mapValue("pinky")
+        };
+    }
+
+    function updateTestFingerGauges(fingerAngles, fallbackMovement) {
+        if (!testFingerGaugeCells.length) {
+            return;
+        }
+
+        const normalized = normalizeFingerAnglesForBars(fingerAngles, fallbackMovement);
+
+        testFingerGaugeCells.forEach(cell => {
+            const key = String(cell.getAttribute("data-finger") || "").toLowerCase();
+            const value = Number(normalized[key] ?? 0);
+            const percent = Math.max(0, Math.min(100, (value / 90) * 100));
+            const fill = cell.querySelector(".test-gauge-fill");
+            const label = cell.querySelector(".test-gauge-value");
+
+            if (fill instanceof HTMLElement) {
+                fill.style.height = `${percent.toFixed(1)}%`;
+            }
+            if (label instanceof HTMLElement) {
+                label.textContent = `${value.toFixed(1)}°`;
+            }
+        });
+    }
+
     function canAccessStep(stepNumber) {
         if (stepNumber <= 1) return true;
         if (stepNumber === 2) return gloveConnected;
@@ -5220,6 +5751,10 @@ function initializeExerciseHubPage() {
     }
 
     function goToStep(stepNumber) {
+        if (stepNumber < 1 || stepNumber > 5) {
+            return;
+        }
+
         if (currentStep === 3 && stepNumber !== 3 && testState.isRunning) {
             if (testState.intervalId) {
                 clearInterval(testState.intervalId);
@@ -5311,13 +5846,13 @@ function initializeExerciseHubPage() {
 
     function updateCalibrationPrompt() {
         if (calibrationPhase === "zero") {
-            setMsg(calibrationStatus, "Keep hand still — reading baseline for all 4 fingers…");
+            setMsg(calibrationStatus, "Keep hand still — reading baseline for all 5 fingers…");
             setMsg(calibrationPrompt, "Rest your hand flat and relaxed. The system will capture the 0° baseline.");
             if (calibrateBtn) calibrateBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Capture Zero Point';
             return;
         }
 
-        setMsg(calibrationStatus, "Make a firm fist — capturing maximum flex for all 4 fingers…");
+        setMsg(calibrationStatus, "Make a firm fist — capturing maximum flex for all 5 fingers…");
         setMsg(calibrationPrompt, "Close your hand into a fist to capture the maximum flex baseline.");
         if (calibrateBtn) calibrateBtn.innerHTML = '<i class="fa-solid fa-hand-fist"></i> Capture Max Flex';
     }
@@ -5362,13 +5897,16 @@ function initializeExerciseHubPage() {
         if (testMovementEl) testMovementEl.textContent = "0.0°";
         if (testForceEl) testForceEl.textContent = "0.0 N";
         if (testTimeEl) testTimeEl.textContent = "0:00";
+        if (testForceDialEl) {
+            testForceDialEl.style.setProperty("--dial-angle", "-120deg");
+        }
         updateTestProgressRing(0);
         setMsg(testStatus, "Ready to test glove data.");
 
         renderCalibrationGrid();
         updateCalibrationPrompt();
         setCalibrationProgress(0);
-        setMsg(calibrationStatus, "0/4 fingers calibrated. Values cleared.");
+        setMsg(calibrationStatus, "0/5 fingers calibrated. Values cleared.");
         setMsg(diagStatus, "Calibration reset. Complete Step 2 again to continue.");
         goToStep(2);
         updateStepNavigationState();
@@ -5441,9 +5979,6 @@ function initializeExerciseHubPage() {
             return;
         }
 
-        const OPEN_THRESHOLD_DEG = 10;
-        const CLOSE_THRESHOLD_DEG = 80;
-
         testState.intervalId = setInterval(async () => {
             let reading = null;
             try {
@@ -5471,8 +6006,8 @@ function initializeExerciseHubPage() {
 
             const force = reading.force;
             const movement = reading.movement;
-
-            const nextPhase = movement <= OPEN_THRESHOLD_DEG ? "open" : movement >= CLOSE_THRESHOLD_DEG ? "close" : "";
+            const movementState = classifyLiveMovement(movement, reading.calibrationProfile);
+            const nextPhase = movementState.phase === "open" ? "open" : movementState.phase === "close" ? "close" : "";
             if (nextPhase === "close" && testState.motionPhase === "open") {
                 testState.reps += 1;
                 testState.motionPhase = "close";
@@ -5489,17 +6024,34 @@ function initializeExerciseHubPage() {
             const elapsed = testState.startTime ? Math.floor((Date.now() - testState.startTime) / 1000) : 0;
             const mm = Math.floor(elapsed / 60);
             const ss = String(elapsed % 60).padStart(2, "0");
+            const movementLabel = movementState.phase === "open" ? "OPEN" : movementState.phase === "close" ? "CLOSED" : "MID";
+            const displayedMovement = movementState.phase === "middle" ? movement : movementState.normalizedDeg;
+            updateTestFingerGauges(reading.fingerAngles, displayedMovement);
 
             if (testRepsEl) testRepsEl.textContent = String(testState.reps);
-            if (testMovementEl) testMovementEl.textContent = `${movement.toFixed(1)}°`;
+            if (testMovementEl) testMovementEl.textContent = `${movementLabel} ${displayedMovement.toFixed(1)}°`;
             if (testForceEl) testForceEl.textContent = `${avgForce.toFixed(1)} N`;
             if (testTimeEl) testTimeEl.textContent = `${mm}:${ss}`;
+            if (testForceDialEl) {
+                const cappedForce = Math.max(0, Math.min(60, Number(avgForce) || 0));
+                const dialAngle = -120 + ((cappedForce / 60) * 240);
+                testForceDialEl.style.setProperty("--dial-angle", `${dialAngle.toFixed(1)}deg`);
+            }
             updateTestProgressRing(testState.reps);
+            setMsg(testStatus, `Live capture: ${movementLabel.toLowerCase()} hand (${displayedMovement.toFixed(1)}°). Keep moving your hand.`);
+
+            try {
+                const gloveData = JSON.parse(localStorage.getItem("theraflow_glove") || "{}");
+                gloveData.sessionMovementDeg = Number(displayedMovement.toFixed(1));
+                gloveData.lastMovementDeg = Number(displayedMovement.toFixed(1));
+                gloveData.livePhase = movementState.phase;
+                gloveData.sessionForce = avgForce.toFixed(1);
+                localStorage.setItem("theraflow_glove", JSON.stringify(gloveData));
+            } catch { /* storage may be blocked */ }
 
             if (!testCompleted && testState.sampleCount > 0) {
                 testCompleted = true;
                 updateStepNavigationState();
-                setMsg(testStatus, "Testing stage complete. You can continue to Step 4.");
             }
         }, 1000);
     });
@@ -5825,6 +6377,8 @@ function initializeExerciseHubPage() {
                 const gloveData = JSON.parse(localStorage.getItem("theraflow_glove") || "{}");
                 gloveData.sessionReps   = sessionState.reps;
                 gloveData.sessionForce  = avgForce.toFixed(1);
+                gloveData.sessionMovementDeg = Number(movement.toFixed(1));
+                gloveData.lastMovementDeg = Number(movement.toFixed(1));
                 gloveData.sessionActive = true;
                 gloveData.targetRepetitions = sessionState.targetRepetitions;
                 gloveData.exerciseType = selectedExercise;
@@ -8562,7 +9116,7 @@ function initializeSettingsPage() {
             title: titleInput?.value.trim() || "",
             specialty: specialtyValue,
             hospital: hospitalInput?.value.trim() || "",
-            bio: bioInput?.value.trim() || "",
+            bio: bioInput ? (bioInput.value.trim() || "") : (draftProfile.bio || ""),
             email: emailInput?.value.trim() || "",
             username: draftProfile.username || "",
             contactNumber: doctorContactNumberInput?.value.trim() || "",

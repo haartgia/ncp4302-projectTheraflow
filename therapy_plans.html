@@ -73,6 +73,7 @@
                     <h1 id="therapyPlansTitle">Therapy Plans</h1>
                     <p class="subheader">Assign, adjust, and monitor therapy targets across all patients.</p>
                 </div>
+                <button type="button" class="sign-in-btn therapy-open-assign-btn" id="openAssignPlanModalBtn">Assign New Plan</button>
             </div>
 
             <article class="widget widget-blue therapy-template-section">
@@ -138,33 +139,39 @@
                         </button>
                     </div>
                 </article>
-
-                <article class="widget widget-green therapy-assign-new-card">
-                    <h2 class="widget-title">Assign New Plan</h2>
-                    <div class="field-grid">
-                        <label class="field-group required-field">
-                            <span>Select Patient</span>
-                            <select id="assignPatientSelect">
-                                <option value="" selected disabled>Search for a patient...</option>
-                            </select>
-                        </label>
-                        <label class="field-group required-field">
-                            <span>Select Preset Template</span>
-                            <select id="assignTemplateSelect">
-                                <option value="" selected disabled>Choose a difficulty level...</option>
-                                <option value="level1">Level 1: Beginner</option>
-                                <option value="level2">Level 2: Intermediate</option>
-                                <option value="level3">Level 3: Advanced</option>
-                            </select>
-                        </label>
-                        <button type="button" class="sign-in-btn" id="applyTemplateBtn">Apply Template</button>
-                        <p class="notes-save-feedback" id="assignTemplateFeedback" aria-live="polite"></p>
-                    </div>
-                </article>
             </div>
         </section>
     </main>
 
+</div>
+
+<div class="therapy-edit-popup" id="therapyAssignPopup" hidden role="dialog" aria-modal="true" aria-labelledby="therapyAssignTitle">
+    <div class="therapy-edit-popup-backdrop" id="therapyAssignBackdrop"></div>
+    <div class="therapy-edit-popup-card therapy-assign-new-card therapy-assign-modal-card">
+        <button type="button" class="patients-modal-close therapy-assign-modal-close" id="closeAssignPlanModal" aria-label="Close assign new plan modal">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+        <h2 class="widget-title" id="therapyAssignTitle">Assign New Plan</h2>
+        <div class="field-grid">
+            <label class="field-group required-field">
+                <span>Select Patient</span>
+                <select id="assignPatientSelect">
+                    <option value="" selected disabled>Search for a patient...</option>
+                </select>
+            </label>
+            <label class="field-group required-field">
+                <span>Select Preset Template</span>
+                <select id="assignTemplateSelect">
+                    <option value="" selected disabled>Choose a difficulty level...</option>
+                    <option value="level1">Level 1: Beginner</option>
+                    <option value="level2">Level 2: Intermediate</option>
+                    <option value="level3">Level 3: Advanced</option>
+                </select>
+            </label>
+            <button type="button" class="sign-in-btn" id="applyTemplateBtn">Apply Template</button>
+            <p class="notes-save-feedback" id="assignTemplateFeedback" aria-live="polite"></p>
+        </div>
+    </div>
 </div>
 
 <div class="therapy-edit-popup" id="therapyEditPopup" hidden role="dialog" aria-modal="true" aria-labelledby="therapyEditTitle">

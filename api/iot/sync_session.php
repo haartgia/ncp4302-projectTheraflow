@@ -38,6 +38,22 @@ function averageFromMixed($value): ?float
     return null;
 }
 
+function numericListFromMixed($value): array
+{
+    if (!is_array($value)) {
+        return [];
+    }
+
+    $nums = [];
+    foreach ($value as $item) {
+        if (is_numeric($item)) {
+            $nums[] = (float) $item;
+        }
+    }
+
+    return $nums;
+}
+
 function firstNonEmptyValue(array $payload, array $keys)
 {
     foreach ($keys as $key) {
@@ -66,6 +82,36 @@ function angleSummary(array $payload): ?float
     ]);
 
     return averageFromMixed($candidate);
+}
+
+function fingerAnglesFromPayload(array $payload): array
+{
+    $candidate = firstNonEmptyValue($payload, [
+        'finger_angles',
+        'fingerAngles',
+        'flexion_readings',
+        'flexionReadings',
+        'smoothedAngles',
+        'angles'
+    ]);
+
+    return numericListFromMixed($candidate);
+}
+
+function fingerAngleMap(array $angles): array
+{
+    if (count($angles) === 0) {
+        return [];
+    }
+
+    $labels = ['thumb', 'index', 'middle', 'ring', 'pinky'];
+    $mapped = [];
+    foreach ($angles as $i => $angle) {
+        $key = $labels[$i] ?? ('finger_' . ($i + 1));
+        $mapped[$key] = round((float) $angle, 2);
+    }
+
+    return $mapped;
 }
 
 $expectedToken = trim((string) getenv('THERAFLOW_IOT_TOKEN'));
@@ -129,8 +175,15 @@ if ($gripStrength === null) {
     ])) ?? 0.0;
 }
 
-$flexionAngle = angleSummary($payload);
-if ($flexionAngle === null) {
+$fingerAngles = fingerAnglesFromPayload($payload);
+$fingerAnglePayload = fingerAngleMap($fingerAngles);
+$flexionBasis = 'single_value';
+
+if (count($fingerAngles) > 0) {
+    // Aggregate as average finger movement for web dashboards while preserving per-finger values.
+    $flexionAngle = array_sum($fingerAngles) / count($fingerAngles);
+    $flexionBasis = 'avg_finger_angles';
+} else {
     $flexionAngle = averageFromMixed(firstNonEmptyValue($payload, [
         'flexion_angle',
         'flexionAngle',
@@ -150,6 +203,13 @@ if ($note === '') {
     $note = 'Rehabilitation glove session';
 }
 
+if (count($fingerAnglePayload) > 0) {
+    $encodedAngles = json_encode($fingerAnglePayload, JSON_UNESCAPED_SLASHES);
+    if (is_string($encodedAngles) && $encodedAngles !== '') {
+        $note = substr($note . ' | finger_angles=' . $encodedAngles, 0, 255);
+    }
+}
+
 $insertSession = $pdo->prepare(
     'INSERT INTO sessions (patient_id, grip_strength, flexion_angle, repetitions, source, status, note, recorded_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, NOW())'
@@ -161,6 +221,8 @@ echo json_encode([
     'patient_id' => $patientId,
     'grip_strength' => round($gripStrength, 2),
     'flexion_angle' => round($flexionAngle, 2),
+    'flexion_basis' => $flexionBasis,
+    'finger_angles' => $fingerAnglePayload,
     'repetitions' => $repetitions,
     'savedAt' => date('Y-m-d H:i:s')
 ]);

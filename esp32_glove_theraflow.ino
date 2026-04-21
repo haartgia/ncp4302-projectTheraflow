@@ -2,15 +2,15 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 
-const char* WIFI_SSID = "WIFI_NA_MABILIS";
-const char* WIFI_PASSWORD = "ivanpogi";
-const char* THERAFLOW_URL = "http://192.168.254.119/ncp4302-projectTheraflow/api/iot/sync_session.php";
+const char* WIFI_SSID = "Katabi mo";
+const char* WIFI_PASSWORD = "ivanpogi123";
+const char* THERAFLOW_URL = "http://172.20.10.5/ncp4302-projectTheraflow/api/iot/sync_session.php";
 const char* THERAFLOW_TOKEN = "";
 
-const int FLEX_COUNT = 4;
-const int flexPins[FLEX_COUNT] = {39, 34, 35, 32};
+const int FLEX_COUNT = 5;
+const int flexPins[FLEX_COUNT] = {36, 39, 34, 35, 32};
 const int gripPin = 33;
-const char* fingerNames[FLEX_COUNT] = {"Index", "Middle", "Ring", "Pinky"};
+const char* fingerNames[FLEX_COUNT] = {"Thumb", "Index", "Middle", "Ring", "Pinky"};
 
 const int suctionPump = 19;
 const int inflatePump = 23;
@@ -20,13 +20,22 @@ const bool INVERT_VALVE_LOGIC = true;
 const int CALIBRATE_SUCTION_SECONDS = 5;
 const int CALIBRATE_PUMP_SECONDS = 5;
 const int CALIBRATE_DEFLATE_SECONDS = 5;
+const int CALIBRATION_SAMPLES = 50;
+const int LIVE_READ_SAMPLES = 10;
+const int PER_FINGER_SETTLE_MS = 3000;
+const unsigned long PRINT_INTERVAL_MS = 200;
+const unsigned long SYNC_INTERVAL_MS = 400;
+const int FLEX_RAW_JUMP_THRESHOLD = 220;
 
-float smoothedAngles[FLEX_COUNT] = {0, 0, 0, 0};
+float smoothedAngles[FLEX_COUNT] = {0, 0, 0, 0, 0};
 float smoothedGrip = 0;
-float smoothingFactor = 0.1;
+float smoothedGripPercent = 0;
+float smoothingFactor = 0.25;
 
-int straightValues[FLEX_COUNT] = {0, 0, 0, 0};
-int bendValues[FLEX_COUNT] = {0, 0, 0, 0};
+int straightValues[FLEX_COUNT] = {0, 0, 0, 0, 0};
+int bendValues[FLEX_COUNT] = {0, 0, 0, 0, 0};
+int lastFlexRaw[FLEX_COUNT] = {0, 0, 0, 0, 0};
+bool hasLastFlexRaw[FLEX_COUNT] = {false, false, false, false, false};
 int gripMin = 0;
 int gripMax = 0;
 
@@ -42,6 +51,19 @@ bool calibrationInProgress = false;
 bool sessionActive = false;
 int activeCalibrationCommandId = 0;
 int activeSessionCommandId = 0;
+
+void resetSessionMetrics() {
+  repetitions = 0;
+  peakForce = 0.0;
+  maxFlexion = 0.0;
+}
+
+void resetLiveRawState() {
+  for (int i = 0; i < FLEX_COUNT; i++) {
+    hasLastFlexRaw[i] = false;
+    lastFlexRaw[i] = 0;
+  }
+}
 
 void configureHttpClient(HTTPClient& http, const String& url) {
   http.setConnectTimeout(5000);
@@ -140,6 +162,66 @@ int readAverageFlex(int pin, int samples) {
   return sum / samples;
 }
 
+void captureAllFingersCalibration(int values[], const char* actionLabel) {
+  Serial.print(actionLabel);
+  Serial.println(" all fingers...");
+  delay(PER_FINGER_SETTLE_MS);
+
+  long sums[FLEX_COUNT] = {0, 0, 0, 0, 0};
+  for (int sample = 0; sample < CALIBRATION_SAMPLES; sample++) {
+    for (int i = 0; i < FLEX_COUNT; i++) {
+      sums[i] += analogRead(flexPins[i]);
+    }
+    delay(2);
+  }
+
+  for (int i = 0; i < FLEX_COUNT; i++) {
+    values[i] = (int)(sums[i] / CALIBRATION_SAMPLES);
+    Serial.print(fingerNames[i]);
+    Serial.print(" Value: ");
+    Serial.println(values[i]);
+  }
+}
+
+float mapFlexToAngle(int flexValue, int straightValue, int bendValue) {
+  float angle = 0.0f;
+  if (bendValue != straightValue) {
+    angle = ((float)(flexValue - straightValue) / (float)(bendValue - straightValue)) * 90.0f;
+    angle = constrain(angle, 0.0f, 90.0f);
+  }
+  return angle;
+}
+
+void updateLiveSensorState() {
+  for (int i = 0; i < FLEX_COUNT; i++) {
+    int flexValue = readAverageFlex(flexPins[i], LIVE_READ_SAMPLES);
+    if (hasLastFlexRaw[i] && abs(flexValue - lastFlexRaw[i]) > FLEX_RAW_JUMP_THRESHOLD) {
+      // Ignore single-sample spikes that can incorrectly map to near-closed angles.
+      flexValue = lastFlexRaw[i];
+    } else {
+      lastFlexRaw[i] = flexValue;
+      hasLastFlexRaw[i] = true;
+    }
+
+    float angle = mapFlexToAngle(flexValue, straightValues[i], bendValues[i]);
+    smoothedAngles[i] = smoothedAngles[i] + (angle - smoothedAngles[i]) * smoothingFactor;
+    maxFlexion = max(maxFlexion, smoothedAngles[i]);
+  }
+
+  int gripValue = readAverageFlex(gripPin, LIVE_READ_SAMPLES);
+  float gripPercent = 0;
+
+  if (gripMax != gripMin) {
+    gripPercent = ((float)(gripValue - gripMin) / (gripMax - gripMin)) * 100.0;
+    gripPercent = constrain(gripPercent, 0, 100);
+  }
+
+  // Primary force signal now uses the real sensor reading (raw ADC units).
+  smoothedGrip = smoothedGrip + (((float)gripValue) - smoothedGrip) * smoothingFactor;
+  smoothedGripPercent = smoothedGripPercent + (gripPercent - smoothedGripPercent) * smoothingFactor;
+  peakForce = max(peakForce, smoothedGrip);
+}
+
 void printFingerCalibrationData(const char* label, const int values[]) {
   Serial.print("=== ");
   Serial.print(label);
@@ -182,7 +264,7 @@ void ensureWiFiConnected() {
 }
 
 void calibrateSensors() {
-  Serial.println("=== FLEX SENSOR 4-FINGER CALIBRATION ===");
+  Serial.println("=== FLEX SENSOR 5-FINGER CALIBRATION ===");
 
   Serial.println("Phase 1: Fully extend hand for 5 seconds...");
   for (int sec = 5; sec >= 1; sec--) {
@@ -248,7 +330,53 @@ void sendCalibrationProgress(int commandId, const char* phase, int secondsRemain
   http.end();
 }
 
-void syncReading(float gripPercent) {
+void printFingerAnglesFromResponse(const String& response) {
+  StaticJsonDocument<768> doc;
+  DeserializationError error = deserializeJson(doc, response);
+  if (error) {
+    return;
+  }
+
+  JsonVariant anglesVariant = doc["finger_angles"];
+  if (anglesVariant.isNull()) {
+    return;
+  }
+
+  if (anglesVariant.is<JsonObject>()) {
+    JsonObject angles = anglesVariant.as<JsonObject>();
+    Serial.print("Server finger angles: ");
+    bool first = true;
+    for (JsonPair kv : angles) {
+      if (!first) {
+        Serial.print(" | ");
+      }
+      first = false;
+      Serial.print(kv.key().c_str());
+      Serial.print("=");
+      Serial.print(kv.value().as<float>(), 2);
+      Serial.print(" deg");
+    }
+    Serial.println();
+    return;
+  }
+
+  if (anglesVariant.is<JsonArray>()) {
+    JsonArray angles = anglesVariant.as<JsonArray>();
+    Serial.print("Server finger angles: ");
+    for (int i = 0; i < FLEX_COUNT && i < (int)angles.size(); i++) {
+      if (i > 0) {
+        Serial.print(" | ");
+      }
+      Serial.print(fingerNames[i]);
+      Serial.print("=");
+      Serial.print(angles[i].as<float>(), 2);
+      Serial.print(" deg");
+    }
+    Serial.println();
+  }
+}
+
+void syncReading(float gripForceRaw) {
   if (WiFi.status() != WL_CONNECTED) {
     return;
   }
@@ -257,8 +385,8 @@ void syncReading(float gripPercent) {
   doc["patient_id"] = patientId;
   doc["source"] = "esp32_glove";
   doc["status"] = "streaming";
-  doc["grip_strength"] = gripPercent;
-  doc["grip_percent"] = gripPercent;
+  doc["grip_strength"] = gripForceRaw;
+  doc["grip_percent"] = smoothedGripPercent;
   doc["repetitions"] = repetitions;
   doc["peakForce"] = peakForce;
   doc["maxFlexion"] = maxFlexion;
@@ -291,6 +419,7 @@ void syncReading(float gripPercent) {
     Serial.println("Unauthorized. Set THERAFLOW_TOKEN to match server THERAFLOW_IOT_TOKEN.");
   }
   Serial.println(response);
+  printFingerAnglesFromResponse(response);
 }
 
 void syncHeartbeat(const char* status, const char* note) {
@@ -303,7 +432,7 @@ void syncHeartbeat(const char* status, const char* note) {
   doc["source"] = "esp32_glove";
   doc["status"] = status;
   doc["grip_strength"] = smoothedGrip;
-  doc["grip_percent"] = smoothedGrip;
+  doc["grip_percent"] = smoothedGripPercent;
   doc["repetitions"] = repetitions;
   doc["peakForce"] = peakForce;
   doc["maxFlexion"] = maxFlexion;
@@ -336,6 +465,7 @@ void syncHeartbeat(const char* status, const char* note) {
     Serial.println("Unauthorized. Set THERAFLOW_TOKEN to match server THERAFLOW_IOT_TOKEN.");
   }
   Serial.println(response);
+  printFingerAnglesFromResponse(response);
 }
 
 bool requestCalibrationCommand() {
@@ -382,6 +512,7 @@ bool requestCalibrationCommand() {
     activeSessionCommandId = command["id"] | 0;
     if (commandName == "start_session") {
       sessionActive = true;
+      resetSessionMetrics();
       Serial.println("Web requested session start.");
     } else {
       sessionActive = false;
@@ -402,12 +533,25 @@ void acknowledgeCalibrationComplete(int commandId) {
   String commandUrl = String(THERAFLOW_URL);
   commandUrl.replace("sync_session.php", "calibration_command.php");
 
-  StaticJsonDocument<256> doc;
+  StaticJsonDocument<1024> doc;
   doc["action"] = "complete";
   doc["patient_id"] = patientId;
   doc["command_id"] = commandId;
   doc["status"] = "completed";
   doc["command"] = "calibrate";
+
+  JsonObject calibration = doc.createNestedObject("calibration");
+  JsonArray straight = calibration.createNestedArray("straight_values");
+  JsonArray bend = calibration.createNestedArray("bend_values");
+  JsonArray names = calibration.createNestedArray("finger_names");
+  for (int i = 0; i < FLEX_COUNT; i++) {
+    straight.add(straightValues[i]);
+    bend.add(bendValues[i]);
+    names.add(fingerNames[i]);
+  }
+  calibration["grip_min"] = gripMin;
+  calibration["grip_max"] = gripMax;
+  calibration["captured_at"] = millis();
 
   String body;
   serializeJson(doc, body);
@@ -427,49 +571,58 @@ void acknowledgeCalibrationComplete(int commandId) {
 
 void performCalibrationFromWeb() {
   calibrationInProgress = true;
+  bool openCaptured = false;
+  bool closeCaptured = false;
   Serial.println("Calibration requested from web. Starting calibration now...");
 
   Serial.println("SUCTION (OPEN HANDS)");
   setSuctionMode();
   for (int sec = CALIBRATE_SUCTION_SECONDS; sec >= 0; sec--) {
     sendCalibrationProgress(activeCalibrationCommandId, "suction", sec);
+    if (sec == 1 && !openCaptured) {
+      Serial.println("=== OPEN-HAND ALL-FINGER CALIBRATION (LAST SECOND) ===");
+      captureAllFingersCalibration(straightValues, "Keep straight");
+      gripMin = readAverageFlex(gripPin, CALIBRATION_SAMPLES);
+      printFingerCalibrationData("OPEN-HAND FLEX DATA", straightValues);
+      Serial.print("Grip OPEN data: ");
+      Serial.println(gripMin);
+      openCaptured = true;
+    }
     if (sec > 0) {
       delay(1000);
     }
   }
 
-  for (int i = 0; i < FLEX_COUNT; i++) {
-    straightValues[i] = readAverageFlex(flexPins[i], 50);
-  }
-  gripMin = readAverageFlex(gripPin, 50);
-  printFingerCalibrationData("OPEN-HAND FLEX DATA", straightValues);
-  Serial.print("Grip OPEN data: ");
-  Serial.println(gripMin);
-
   Serial.println("PUMP (CLOSE HANDS)");
   setInflateMode();
   for (int sec = CALIBRATE_PUMP_SECONDS; sec >= 0; sec--) {
     sendCalibrationProgress(activeCalibrationCommandId, "pump", sec);
+    if (sec == 1 && !closeCaptured) {
+      Serial.println("=== CLOSED-HAND ALL-FINGER CALIBRATION (LAST SECOND) ===");
+      captureAllFingersCalibration(bendValues, "Fully bend");
+      gripMax = readAverageFlex(gripPin, CALIBRATION_SAMPLES);
+      printFingerCalibrationData("CLOSED-HAND FLEX DATA", bendValues);
+      Serial.print("Grip CLOSED data: ");
+      Serial.println(gripMax);
+      closeCaptured = true;
+    }
     if (sec > 0) {
       runPumpSecondHighIntensity();
     }
   }
 
-  for (int i = 0; i < FLEX_COUNT; i++) {
-    bendValues[i] = readAverageFlex(flexPins[i], 50);
-  }
-  gripMax = readAverageFlex(gripPin, 50);
-  printFingerCalibrationData("CLOSED-HAND FLEX DATA", bendValues);
-  Serial.print("Grip CLOSED data: ");
-  Serial.println(gripMax);
-
   Serial.println("=== FINGER CALIBRATION RANGE ===");
   for (int i = 0; i < FLEX_COUNT; i++) {
+    int span = abs(bendValues[i] - straightValues[i]);
+
     Serial.print(fingerNames[i]);
     Serial.print(": open=");
     Serial.print(straightValues[i]);
     Serial.print(", closed=");
-    Serial.println(bendValues[i]);
+    Serial.print(bendValues[i]);
+    Serial.print(", span=");
+    Serial.println(span);
+    Serial.println();
   }
 
   Serial.println("DEFLATE");
@@ -487,6 +640,8 @@ void performCalibrationFromWeb() {
   Serial.println("-----------------------------------");
   calibrationComplete = true;
   calibrationInProgress = false;
+  resetLiveRawState();
+  resetSessionMetrics();
   acknowledgeCalibrationComplete(activeCalibrationCommandId);
   activeCalibrationCommandId = 0;
 }
@@ -570,6 +725,8 @@ void loop() {
     return;
   }
 
+  updateLiveSensorState();
+
   if (!sessionActive) {
     if (millis() - lastHeartbeatAt >= 3000) {
       syncHeartbeat("ready", "ESP32 calibrated and ready for session start");
@@ -584,32 +741,8 @@ void loop() {
     return;
   }
 
-  for (int i = 0; i < FLEX_COUNT; i++) {
-    int flexValue = readAverageFlex(flexPins[i], 10);
-    float angle = 0;
-
-    if (bendValues[i] != straightValues[i]) {
-      angle = ((float)(flexValue - straightValues[i]) / (bendValues[i] - straightValues[i])) * 90.0;
-      angle = constrain(angle, 0, 90);
-    }
-
-    smoothedAngles[i] = smoothedAngles[i] + (angle - smoothedAngles[i]) * smoothingFactor;
-    maxFlexion = max(maxFlexion, smoothedAngles[i]);
-  }
-
-  int gripValue = readAverageFlex(gripPin, 10);
-  float gripPercent = 0;
-
-  if (gripMax != gripMin) {
-    gripPercent = ((float)(gripValue - gripMin) / (gripMax - gripMin)) * 100.0;
-    gripPercent = constrain(gripPercent, 0, 100);
-  }
-
-  smoothedGrip = smoothedGrip + (gripPercent - smoothedGrip) * smoothingFactor;
-  peakForce = max(peakForce, smoothedGrip);
-
   static unsigned long lastPrint = 0;
-  if (millis() - lastPrint > 200) {
+  if (millis() - lastPrint > PRINT_INTERVAL_MS) {
     for (int f = 0; f < FLEX_COUNT; f++) {
       Serial.print(fingerNames[f]);
       Serial.print(": ");
@@ -619,11 +752,13 @@ void loop() {
 
     Serial.print("Grip: ");
     Serial.print(smoothedGrip, 1);
-    Serial.println("%");
+    Serial.print(" raw (percent ");
+    Serial.print(smoothedGripPercent, 1);
+    Serial.println("%)");
     lastPrint = millis();
   }
 
-  if (millis() - lastSyncAt >= 1500) {
+  if (millis() - lastSyncAt >= SYNC_INTERVAL_MS) {
     syncReading(smoothedGrip);
     lastSyncAt = millis();
   }

@@ -65,7 +65,7 @@ if (!isset($_SESSION['role']) || strtolower((string) $_SESSION['role']) !== 'pat
                     <span class="hub-step-number">Step 2</span>
                     <span class="hub-step-label">Mandatory Calibration</span>
                 </h2>
-                <p class="widget-label" id="calibrationPrompt">Rest your hand flat and relaxed. The system will capture the 0&deg; baseline for all 4 fingers.</p>
+                <p class="widget-label" id="calibrationPrompt">Rest your hand flat and relaxed. The system will capture the 0&deg; baseline for all 5 fingers.</p>
                 <button type="button" class="sign-in-btn" id="hubCalibrateBtn">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Begin Calibration
                 </button>
@@ -92,31 +92,54 @@ if (!isset($_SESSION['role']) || strtolower((string) $_SESSION['role']) !== 'pat
                         <div class="session-meta-item">Source: <strong>Live Glove Data</strong></div>
                     </div>
 
-                    <div class="session-main-grid">
-                        <div class="session-main-focus" id="hubTestRepTile">
-                            <div class="session-tile-label">Current Repetition Count</div>
-                            <div class="rep-progress-ring" aria-hidden="true">
-                                <svg viewBox="0 0 120 120" class="rep-progress-svg">
-                                    <circle class="rep-ring-track" cx="60" cy="60" r="46"></circle>
-                                    <circle class="rep-ring-progress" id="hubTestRingProgress" cx="60" cy="60" r="46"></circle>
-                                </svg>
-                                <div class="session-main-reps" id="hubTestReps">0</div>
-                            </div>
-                        </div>
+                    <div class="session-main-grid test-layout-horizontal">
+                        <div class="session-main-focus test-horizontal-panel" id="hubTestFingerTile">
+                            <div class="test-horizontal-row">
+                                <div class="test-timer-panel" id="hubTestTimerTile">
+                                    <div class="test-inline-label">Timer</div>
+                                    <div class="test-inline-value" id="hubTestTime">30 Secs</div>
+                                </div>
 
-                        <div class="session-side-stack">
-                            <div class="session-side-tile" id="hubTestTimerTile">
-                                <div class="session-tile-label">Timer</div>
-                                <div class="session-tile-value" id="hubTestTime">0:00</div>
+                                <div class="test-finger-gauge-row" id="hubTestFingerGauges" aria-live="polite">
+                                    <div class="test-gauge-cell" data-finger="thumb">
+                                        <span class="test-gauge-value">40.0&deg;</span>
+                                        <div class="test-gauge-track"><div class="test-gauge-fill" style="height:44.4%"></div></div>
+                                        <span class="test-gauge-name">Thumb</span>
+                                    </div>
+                                    <div class="test-gauge-cell" data-finger="index">
+                                        <span class="test-gauge-value">80.0&deg;</span>
+                                        <div class="test-gauge-track"><div class="test-gauge-fill" style="height:88.9%"></div></div>
+                                        <span class="test-gauge-name">Index</span>
+                                    </div>
+                                    <div class="test-gauge-cell" data-finger="middle">
+                                        <span class="test-gauge-value">20.0&deg;</span>
+                                        <div class="test-gauge-track"><div class="test-gauge-fill" style="height:22.2%"></div></div>
+                                        <span class="test-gauge-name">Middle</span>
+                                    </div>
+                                    <div class="test-gauge-cell" data-finger="ring">
+                                        <span class="test-gauge-value">35.0&deg;</span>
+                                        <div class="test-gauge-track"><div class="test-gauge-fill" style="height:38.9%"></div></div>
+                                        <span class="test-gauge-name">Ring</span>
+                                    </div>
+                                    <div class="test-gauge-cell" data-finger="pinky">
+                                        <span class="test-gauge-value">45.0&deg;</span>
+                                        <div class="test-gauge-track"><div class="test-gauge-fill" style="height:50%"></div></div>
+                                        <span class="test-gauge-name">Pinky</span>
+                                    </div>
+                                </div>
+
+                                <div class="test-force-panel">
+                                    <div class="test-analog-dial" id="hubTestForceDial" style="--dial-angle:-120deg;" aria-hidden="true">
+                                        <div class="test-analog-arc"></div>
+                                        <div class="test-analog-needle"></div>
+                                        <div class="test-analog-center"></div>
+                                        <div class="test-analog-value" id="hubTestForce">25.9 N</div>
+                                    </div>
+                                    <div class="test-force-label">Force</div>
+                                </div>
                             </div>
-                            <div class="session-side-tile">
-                                <div class="session-tile-label">Avg Force</div>
-                                <div class="session-tile-value" id="hubTestForce">0.0 N</div>
-                            </div>
-                            <div class="session-side-tile">
-                                <div class="session-tile-label">Finger Movement</div>
-                                <div class="session-tile-value" id="hubTestMovement">0.0&deg;</div>
-                            </div>
+
+                            <div class="test-movement-summary">Finger Movement <strong id="hubTestMovement">OPEN 0.0&deg;</strong></div>
                         </div>
                     </div>
 
