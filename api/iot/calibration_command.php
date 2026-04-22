@@ -99,7 +99,7 @@ if ($method === 'POST') {
         exit;
     }
 
-    if (!in_array($command, ['calibrate', 'start_session', 'stop_session'], true)) {
+    if (!in_array($command, ['calibrate', 'start_session', 'stop_session', 'ping'], true)) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'Unsupported command']);
         exit;
@@ -142,39 +142,71 @@ if ($method !== 'GET') {
 }
 
 $patientId = (int) ($_GET['patient_id'] ?? 0);
-if ($patientId <= 0) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'patient_id is required']);
-    exit;
+$claim = (string) ($_GET['claim'] ?? '') === '1';
+$commandRow = null;
+
+if ($claim) {
+    if ($patientId > 0) {
+        $claimStmt = $pdo->prepare(
+            'SELECT id, patient_id, command, status, payload, requested_at, dispatched_at, completed_at
+             FROM iot_glove_commands
+             WHERE patient_id = ? AND status = "pending"
+             ORDER BY requested_at ASC, id ASC
+             LIMIT 1'
+        );
+        $claimStmt->execute([$patientId]);
+    } else {
+        $claimStmt = $pdo->prepare(
+            'SELECT id, patient_id, command, status, payload, requested_at, dispatched_at, completed_at
+             FROM iot_glove_commands
+             WHERE status = "pending"
+             ORDER BY requested_at ASC, id ASC
+             LIMIT 1'
+        );
+        $claimStmt->execute();
+    }
+
+    $commandRow = $claimStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+    if ($commandRow) {
+        $dispatchStmt = $pdo->prepare(
+            'UPDATE iot_glove_commands
+             SET status = "dispatched", dispatched_at = NOW()
+             WHERE id = ? AND status = "pending"'
+        );
+        $dispatchStmt->execute([(int) $commandRow['id']]);
+        $commandRow['status'] = 'dispatched';
+        $commandRow['dispatched_at'] = date('Y-m-d H:i:s');
+    }
 }
 
-$claim = (string) ($_GET['claim'] ?? '') === '1';
-
-$commandStmt = $pdo->prepare(
-    'SELECT id, command, status, payload, requested_at, dispatched_at, completed_at
-     FROM iot_glove_commands
-     WHERE patient_id = ?
-     ORDER BY requested_at DESC, id DESC
-     LIMIT 1'
-);
-$commandStmt->execute([$patientId]);
-$commandRow = $commandStmt->fetch(PDO::FETCH_ASSOC) ?: null;
-
-if ($commandRow && $claim && ($commandRow['status'] ?? '') === 'pending') {
-    $dispatchStmt = $pdo->prepare(
-        'UPDATE iot_glove_commands
-         SET status = "dispatched", dispatched_at = NOW()
-         WHERE id = ? AND status = "pending"'
-    );
-    $dispatchStmt->execute([(int) $commandRow['id']]);
-    $commandRow['status'] = 'dispatched';
-    $commandRow['dispatched_at'] = date('Y-m-d H:i:s');
+if (!$commandRow) {
+    if ($patientId > 0) {
+        $commandStmt = $pdo->prepare(
+            'SELECT id, patient_id, command, status, payload, requested_at, dispatched_at, completed_at
+             FROM iot_glove_commands
+             WHERE patient_id = ?
+             ORDER BY requested_at DESC, id DESC
+             LIMIT 1'
+        );
+        $commandStmt->execute([$patientId]);
+    } else {
+        $commandStmt = $pdo->prepare(
+            'SELECT id, patient_id, command, status, payload, requested_at, dispatched_at, completed_at
+             FROM iot_glove_commands
+             ORDER BY requested_at DESC, id DESC
+             LIMIT 1'
+        );
+        $commandStmt->execute();
+    }
+    $commandRow = $commandStmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 
 echo json_encode([
     'ok' => true,
     'command' => $commandRow ? [
         'id' => (int) $commandRow['id'],
+        'patient_id' => (int) $commandRow['patient_id'],
         'command' => (string) $commandRow['command'],
         'status' => (string) $commandRow['status'],
         'payload' => json_decode((string) ($commandRow['payload'] ?? '{}'), true),

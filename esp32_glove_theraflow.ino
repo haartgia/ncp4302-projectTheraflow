@@ -43,7 +43,7 @@ bool hasLastFlexRaw[FLEX_COUNT] = {false, false, false, false, false};
 int gripMin = 0;
 int gripMax = 0;
 
-int patientId = 1;
+int activePatientId = 0;
 int repetitions = 0;
 float peakForce = 0.0;
 float maxFlexion = 0.0;
@@ -55,6 +55,27 @@ bool calibrationInProgress = false;
 bool sessionActive = false;
 int activeCalibrationCommandId = 0;
 int activeSessionCommandId = 0;
+int activePingCommandId = 0;
+
+int currentPatientId() {
+  return activePatientId;
+}
+
+bool hasPatientContext() {
+  return currentPatientId() > 0;
+}
+
+void releasePatientContext(const char* reason) {
+  activePatientId = 0;
+  sessionActive = false;
+  activeCalibrationCommandId = 0;
+  activeSessionCommandId = 0;
+  activePingCommandId = 0;
+  resetSessionMetrics();
+
+  Serial.print("Patient context released: ");
+  Serial.println(reason);
+}
 
 void resetSessionMetrics() {
   repetitions = 0;
@@ -321,7 +342,7 @@ void calibrateSensors() {
 }
 
 void sendCalibrationProgress(int commandId, const char* phase, int secondsRemaining) {
-  if (WiFi.status() != WL_CONNECTED || commandId <= 0) {
+  if (WiFi.status() != WL_CONNECTED || commandId <= 0 || !hasPatientContext()) {
     return;
   }
 
@@ -330,7 +351,7 @@ void sendCalibrationProgress(int commandId, const char* phase, int secondsRemain
 
   StaticJsonDocument<256> doc;
   doc["action"] = "update";
-  doc["patient_id"] = patientId;
+  doc["patient_id"] = currentPatientId();
   doc["command_id"] = commandId;
   doc["payload"]["phase"] = phase;
   doc["payload"]["seconds_remaining"] = secondsRemaining;
@@ -393,12 +414,12 @@ void printFingerAnglesFromResponse(const String& response) {
 }
 
 void syncReading(float gripForceRaw) {
-  if (WiFi.status() != WL_CONNECTED) {
+  if (WiFi.status() != WL_CONNECTED || !hasPatientContext()) {
     return;
   }
 
   StaticJsonDocument<512> doc;
-  doc["patient_id"] = patientId;
+  doc["patient_id"] = currentPatientId();
   doc["source"] = "esp32_glove";
   doc["status"] = "streaming";
   doc["grip_strength"] = gripForceRaw;
@@ -439,12 +460,12 @@ void syncReading(float gripForceRaw) {
 }
 
 void syncHeartbeat(const char* status, const char* note) {
-  if (WiFi.status() != WL_CONNECTED) {
+  if (WiFi.status() != WL_CONNECTED || !hasPatientContext()) {
     return;
   }
 
   StaticJsonDocument<512> doc;
-  doc["patient_id"] = patientId;
+  doc["patient_id"] = currentPatientId();
   doc["source"] = "esp32_glove";
   doc["status"] = status;
   doc["grip_strength"] = smoothedGripForceN;
@@ -491,7 +512,11 @@ bool requestCalibrationCommand() {
 
   String commandUrl = String(THERAFLOW_URL);
   commandUrl.replace("sync_session.php", "calibration_command.php");
-  commandUrl += "?patient_id=" + String(patientId) + "&claim=1";
+  if (sessionActive && hasPatientContext()) {
+    commandUrl += "?patient_id=" + String(currentPatientId()) + "&claim=1";
+  } else {
+    commandUrl += "?claim=1";
+  }
 
   HTTPClient http;
   configureHttpClient(http, commandUrl);
@@ -519,6 +544,17 @@ bool requestCalibrationCommand() {
 
   String commandName = command["command"] | "";
   String commandStatus = command["status"] | "";
+  int commandPatientId = (int) (command["patient_id"] | 0);
+  if (commandPatientId <= 0) {
+    return false;
+  }
+
+  if (activePatientId != commandPatientId) {
+    activePatientId = commandPatientId;
+    Serial.print("Active patient context set to patient_id=");
+    Serial.println(activePatientId);
+  }
+
   if (commandName == "calibrate" && commandStatus == "dispatched") {
     activeCalibrationCommandId = command["id"] | 0;
     return true;
@@ -538,11 +574,17 @@ bool requestCalibrationCommand() {
     return true;
   }
 
+  if (commandName == "ping" && commandStatus == "dispatched") {
+    activePingCommandId = command["id"] | 0;
+    Serial.println("Web requested ping handshake.");
+    return true;
+  }
+
   return false;
 }
 
 void acknowledgeCalibrationComplete(int commandId) {
-  if (WiFi.status() != WL_CONNECTED || commandId <= 0) {
+  if (WiFi.status() != WL_CONNECTED || commandId <= 0 || !hasPatientContext()) {
     return;
   }
 
@@ -551,7 +593,7 @@ void acknowledgeCalibrationComplete(int commandId) {
 
   StaticJsonDocument<1024> doc;
   doc["action"] = "complete";
-  doc["patient_id"] = patientId;
+  doc["patient_id"] = currentPatientId();
   doc["command_id"] = commandId;
   doc["status"] = "completed";
   doc["command"] = "calibrate";
@@ -663,7 +705,7 @@ void performCalibrationFromWeb() {
 }
 
 void acknowledgeSessionCommandComplete(int commandId) {
-  if (WiFi.status() != WL_CONNECTED || commandId <= 0) {
+  if (WiFi.status() != WL_CONNECTED || commandId <= 0 || !hasPatientContext()) {
     return;
   }
 
@@ -672,7 +714,7 @@ void acknowledgeSessionCommandComplete(int commandId) {
 
   StaticJsonDocument<256> doc;
   doc["action"] = "complete";
-  doc["patient_id"] = patientId;
+  doc["patient_id"] = currentPatientId();
   doc["command_id"] = commandId;
   doc["status"] = "completed";
   doc["command"] = sessionActive ? "start_session" : "stop_session";
@@ -693,6 +735,37 @@ void acknowledgeSessionCommandComplete(int commandId) {
   Serial.println(response);
 }
 
+void acknowledgePingCommandComplete(int commandId) {
+  if (WiFi.status() != WL_CONNECTED || commandId <= 0 || !hasPatientContext()) {
+    return;
+  }
+
+  String commandUrl = String(THERAFLOW_URL);
+  commandUrl.replace("sync_session.php", "calibration_command.php");
+
+  StaticJsonDocument<256> doc;
+  doc["action"] = "complete";
+  doc["patient_id"] = currentPatientId();
+  doc["command_id"] = commandId;
+  doc["status"] = "completed";
+  doc["command"] = "ping";
+
+  String body;
+  serializeJson(doc, body);
+
+  HTTPClient http;
+  configureHttpClient(http, commandUrl);
+  http.addHeader("Content-Type", "application/json");
+  int statusCode = http.POST(body);
+  logHttpFailure("Ping command ack", statusCode, commandUrl);
+  String response = http.getString();
+  http.end();
+
+  Serial.print("Ping ack status: ");
+  Serial.println(statusCode);
+  Serial.println(response);
+}
+
 void setup() {
   Serial.begin(115200);
   delay(2000);
@@ -707,8 +780,7 @@ void setup() {
   Serial.println(THERAFLOW_URL);
   probeTheraflowServer();
   Serial.println("Waiting for calibration request from the web...");
-  Serial.print("Polling commands for patient_id=");
-  Serial.println(patientId);
+  Serial.println("Polling commands for any patient (auto-binding on claim).");
 }
 
 void loop() {
@@ -719,8 +791,15 @@ void loop() {
       if (activeCalibrationCommandId > 0) {
         performCalibrationFromWeb();
       } else if (activeSessionCommandId > 0) {
+        bool stoppingSession = !sessionActive;
         acknowledgeSessionCommandComplete(activeSessionCommandId);
         activeSessionCommandId = 0;
+        if (stoppingSession) {
+          releasePatientContext("stop_session acknowledged");
+        }
+      } else if (activePingCommandId > 0) {
+        acknowledgePingCommandComplete(activePingCommandId);
+        activePingCommandId = 0;
       }
     }
     lastCommandPollAt = millis();
@@ -734,8 +813,7 @@ void loop() {
 
     static unsigned long lastPreCalibPrint = 0;
     if (millis() - lastPreCalibPrint > 5000) {
-      Serial.print("Awaiting web calibration command for patient_id=");
-      Serial.println(patientId);
+      Serial.println("Awaiting web calibration command for any patient...");
       lastPreCalibPrint = millis();
     }
     return;

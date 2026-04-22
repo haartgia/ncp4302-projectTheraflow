@@ -5868,7 +5868,20 @@ function initializeExerciseHubPage() {
         if (searchingAnim) searchingAnim.classList.add("is-searching");
         if (searchingAnim) searchingAnim.classList.remove("is-connected");
 
-        await refreshGloveConnectionState({ showStatus: true });
+        try {
+            await loadPatientContext();
+            if (currentPatientId) {
+                await requestGloveCommand("ping");
+            }
+        } catch {
+            // Keep refresh resilient even when command request fails.
+        }
+
+        let connected = await refreshGloveConnectionState({ showStatus: true });
+        if (!connected) {
+            await new Promise(resolve => setTimeout(resolve, 1800));
+            connected = await refreshGloveConnectionState({ showStatus: true });
+        }
 
         pairButton.disabled = false;
     });
