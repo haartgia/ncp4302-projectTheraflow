@@ -161,7 +161,7 @@ if (!isset($_SESSION['role']) || strtolower((string) $_SESSION['role']) !== 'pat
                 <div class="exercise-choice-grid" id="exerciseChoiceGrid" role="radiogroup" aria-label="Exercise type">
                     <button type="button" class="exercise-choice-card" data-exercise-type="open_close_hand">Open&ndash;Close Hand</button>
                     <button type="button" class="exercise-choice-card" data-exercise-type="full_grip_hold">Full Grip (Hold)</button>
-                    <button type="button" class="exercise-choice-card" data-exercise-type="full_extension_hold">Full Extension (Hold)</button>
+                    <button type="button" class="exercise-choice-card" data-exercise-type="full_extension_hold"><i class="fa-regular fa-hand" aria-hidden="true"></i> Full Extension (Hold)</button>
                 </div>
 
                 <div class="exercise-options-wrap" id="exerciseOptionsWrap">

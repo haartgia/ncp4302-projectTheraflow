@@ -18,6 +18,7 @@ $pdo->exec(
     'CREATE TABLE IF NOT EXISTS diagnostic_logs (
         id            INT AUTO_INCREMENT PRIMARY KEY,
         patient_id    INT          NOT NULL,
+        stage_name    VARCHAR(120) NULL,
         max_extension DECIMAL(6,2) DEFAULT 0,
         max_flexion   DECIMAL(6,2) DEFAULT 0,
         peak_force    DECIMAL(6,2) DEFAULT 0,
@@ -25,6 +26,12 @@ $pdo->exec(
         INDEX idx_dl_pid (patient_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
 );
+
+try {
+    $pdo->exec('ALTER TABLE diagnostic_logs ADD COLUMN stage_name VARCHAR(120) NULL AFTER patient_id');
+} catch (Throwable $e) {
+    // Column already exists.
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $raw = json_decode(file_get_contents('php://input'), true);
@@ -37,12 +44,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $maxExt    = (float) ($raw['maxExtension'] ?? 0);
     $maxFlex   = (float) ($raw['maxFlexion']   ?? 0);
     $peakForce = (float) ($raw['peakForce']    ?? 0);
+    $stageName = trim((string) ($raw['stageName'] ?? 'Initial Baseline'));
+    if ($stageName === '') {
+        $stageName = 'Initial Baseline';
+    }
 
     $stmt = $pdo->prepare(
-        'INSERT INTO diagnostic_logs (patient_id, max_extension, max_flexion, peak_force)
-         VALUES (?, ?, ?, ?)'
+        'INSERT INTO diagnostic_logs (patient_id, stage_name, max_extension, max_flexion, peak_force)
+         VALUES (?, ?, ?, ?, ?)'
     );
-    $stmt->execute([$patientId, $maxExt, $maxFlex, $peakForce]);
+    $stmt->execute([$patientId, $stageName, $maxExt, $maxFlex, $peakForce]);
 
     $plan = getPatientPlan($pdo, $patientId);
 
@@ -61,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 $stmt = $pdo->prepare(
-    'SELECT id, max_extension, max_flexion, peak_force, logged_at
+    'SELECT id, stage_name, max_extension, max_flexion, peak_force, logged_at
      FROM diagnostic_logs
      WHERE patient_id = ?
      ORDER BY logged_at DESC

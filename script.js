@@ -1300,10 +1300,20 @@ function initializeDoctorDashboard() {
     let selectedPatientKey = "all";
     let patientOptions = [];
     let refreshTimer = null;
+    const defaultAssessmentStageName = "Initial Baseline";
 
     function safeText(value, fallback = "-") {
         const normalized = value === null || value === undefined ? "" : String(value).trim();
         return normalized || fallback;
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/\"/g, "&quot;")
+            .replace(/'/g, "&#39;");
     }
 
     function toggleEmptyState(emptyNode, isVisible) {
@@ -1529,60 +1539,6 @@ function initializeDoctorDashboard() {
         }
     }
 
-    function formatExerciseType(rawType) {
-        const normalized = String(rawType || "")
-            .trim()
-            .toLowerCase()
-            .replace(/[_\s]+/g, "_");
-        if (!normalized) {
-            return "Exercise Session";
-        }
-
-        return normalized
-            .split("_")
-            .map(segment => segment ? segment[0].toUpperCase() + segment.slice(1) : "")
-            .join("-");
-    }
-
-    function parseActivityNote(note) {
-        const text = String(note || "").trim();
-        const parts = text.split("|").map(part => part.trim()).filter(Boolean);
-        const parsed = {
-            exerciseType: "",
-            maxExtension: "",
-            status: ""
-        };
-
-        parts.forEach(part => {
-            const eqIndex = part.indexOf("=");
-            if (eqIndex === -1) {
-                return;
-            }
-
-            const key = part.slice(0, eqIndex).trim().toLowerCase();
-            const value = part.slice(eqIndex + 1).trim();
-            if (!value) {
-                return;
-            }
-
-            if (key === "exercisetype" || key === "exercise_type") {
-                parsed.exerciseType = value;
-                return;
-            }
-
-            if (key === "maxextension" || key === "max_extension") {
-                parsed.maxExtension = value;
-                return;
-            }
-
-            if (key === "status") {
-                parsed.status = value;
-            }
-        });
-
-        return parsed;
-    }
-
     function formatActivityTimestamp(timestamp) {
         const raw = String(timestamp || "").trim();
         if (!raw) {
@@ -1594,6 +1550,20 @@ function initializeDoctorDashboard() {
             return raw;
         }
 
+        const now = Date.now();
+        const diffSec = Math.max(0, Math.floor((now - parsedDate.getTime()) / 1000));
+        if (diffSec < 60) {
+            return "just now";
+        }
+        if (diffSec < 3600) {
+            const mins = Math.floor(diffSec / 60);
+            return `${mins} ${mins === 1 ? "min" : "mins"} ago`;
+        }
+        if (diffSec < 86400) {
+            const hours = Math.floor(diffSec / 3600);
+            return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
+        }
+
         return parsedDate.toLocaleString("en-US", {
             month: "short",
             day: "numeric",
@@ -1601,17 +1571,6 @@ function initializeDoctorDashboard() {
             minute: "2-digit",
             hour12: true
         });
-    }
-
-    function getActivityStatusClass(status) {
-        const normalized = String(status || "").trim().toLowerCase();
-        if (normalized === "success") {
-            return "is-success";
-        }
-        if (normalized === "failed" || normalized === "error") {
-            return "is-failed";
-        }
-        return "is-neutral";
     }
 
     function renderDashboard(payload) {
@@ -1627,20 +1586,26 @@ function initializeDoctorDashboard() {
             const rows = Array.isArray(payload.recentActivity) ? payload.recentActivity : [];
             if (rows.length) {
                 recentActivityBody.innerHTML = rows.map(row => {
-                    const parsed = parseActivityNote(row.note);
-                    const exerciseTitle = formatExerciseType(parsed.exerciseType);
-                    const maxExtensionText = safeText(parsed.maxExtension || "0.0");
-                    const statusText = safeText(parsed.status || "Pending");
-                    const statusClass = getActivityStatusClass(parsed.status);
+                    const patientName = escapeHtml(safeText(row.patient_name));
+                    const activityLabel = escapeHtml(safeText(row.activity_label, `Assessment: ${defaultAssessmentStageName}`));
+                    const metricsPrimary = escapeHtml(safeText(row.metrics_primary, "--"));
+                    const metricsSecondary = escapeHtml(safeText(row.metrics_secondary, "--"));
+                    const badgeLabel = escapeHtml(safeText(row.badge_label, "Assessment"));
+                    const badgeVariant = String(row.badge_variant || "assessment").toLowerCase() === "exercise"
+                        ? "exercise"
+                        : "assessment";
+                    const activityTime = escapeHtml(formatActivityTimestamp(row.recorded_at));
+
                     return `
                         <tr>
-                            <td class="activity-patient-cell">${safeText(row.patient_name)}</td>
                             <td class="activity-summary-cell">
-                                <div class="activity-primary">${exerciseTitle}</div>
-                                <div class="activity-secondary">Max Extension: ${maxExtensionText}</div>
-                                <span class="activity-status-pill ${statusClass}">${statusText}</span>
+                                <div class="activity-primary-row">
+                                    <span class="activity-primary">${patientName} - ${activityLabel}</span>
+                                    <span class="activity-type-chip is-${badgeVariant}">${badgeLabel}</span>
+                                </div>
+                                <div class="activity-secondary">${metricsPrimary} | ${metricsSecondary}</div>
                             </td>
-                            <td class="activity-time-cell">${formatActivityTimestamp(row.recorded_at)}</td>
+                            <td class="activity-time-cell">${activityTime}</td>
                         </tr>
                     `;
                 }).join("");
@@ -2164,7 +2129,7 @@ function initializePatientsPage() {
 
     function exerciseTypeIcon(type) {
         if (type === "full_extension") {
-            return "fa-solid fa-hand-middle-finger";
+            return "fa-regular fa-hand";
         }
         if (type === "full_close") {
             return "fa-solid fa-hand-fist";
@@ -5221,6 +5186,7 @@ function initializeExerciseHubPage() {
     const fingerNames = ["Thumb", "Index", "Middle", "Ring", "Pinky"];
     const calibrationState = fingerNames.map(name => ({ name, zero: null, max: null, current: 0 }));
     const diagResults = { maxExtension: 0, maxFlexion: 0, peakForce: 0 };
+    const defaultAssessmentStageName = "Initial Baseline";
     let planTargetReps = 120;
     let planDurationMin = 15;
     let calibrationPhase = "zero";
@@ -5241,6 +5207,8 @@ function initializeExerciseHubPage() {
         reps: 0,
         totalForce: 0,
         sampleCount: 0,
+        bestFlexion: 0,
+        peakForce: 0,
         startTime: null,
         intervalId: null,
         motionPhase: "",
@@ -6053,6 +6021,8 @@ function initializeExerciseHubPage() {
         testState.reps = 0;
         testState.totalForce = 0;
         testState.sampleCount = 0;
+        testState.bestFlexion = 0;
+        testState.peakForce = 0;
         testState.startTime = Date.now();
         testState.motionPhase = "";
         testState.lastReadingId = 0;
@@ -6120,6 +6090,8 @@ function initializeExerciseHubPage() {
 
             testState.totalForce += force;
             testState.sampleCount += 1;
+            testState.bestFlexion = Math.max(testState.bestFlexion, displayedMovement);
+            testState.peakForce = Math.max(testState.peakForce, force);
 
             const avgForce = testState.totalForce / testState.sampleCount;
             const elapsed = testState.startTime ? Math.floor((Date.now() - testState.startTime) / 1000) : 0;
@@ -6194,7 +6166,28 @@ function initializeExerciseHubPage() {
         }
 
         if (testCompleted) {
-            setMsg(testStatus, "Testing stopped. Continue to Step 4.");
+            const avgForce = testState.sampleCount > 0 ? testState.totalForce / testState.sampleCount : 0;
+            const bestPeakForce = Math.max(avgForce, testState.peakForce);
+
+            try {
+                const response = await fetch("api/patient/diagnostic_logs.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        stageName: defaultAssessmentStageName,
+                        maxExtension: 0,
+                        maxFlexion: testState.bestFlexion,
+                        peakForce: bestPeakForce
+                    })
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || !payload?.ok) {
+                    throw new Error(payload?.error || "Unable to save testing metrics.");
+                }
+                setMsg(testStatus, "Testing saved as assessment. Continue to Step 4.");
+            } catch (error) {
+                setMsg(testStatus, error instanceof Error ? error.message : "Testing completed, but saving failed.");
+            }
         } else {
             setMsg(testStatus, "No valid sample captured yet. Start test again.");
         }
@@ -6539,6 +6532,7 @@ function initializeExerciseHubPage() {
                     maxFlexion: diagResults.maxFlexion,
                     maxExtension: diagResults.maxExtension,
                     repetitions: sessionState.reps,
+                    durationSec: durationSeconds,
                     status: sessionResult,
                     exerciseType: selectedExercise,
                     speed: isHoldExercise(selectedExercise) ? null : selectedSpeed,

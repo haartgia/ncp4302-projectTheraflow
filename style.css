@@ -3434,6 +3434,16 @@ body.auth-gated-home .calendar-dates {
   padding-bottom: 8px;
 }
 
+.doctor-activity-table th:first-child,
+.doctor-activity-table td:first-child {
+  width: 76%;
+}
+
+.doctor-activity-table th:last-child,
+.doctor-activity-table td:last-child {
+  width: 24%;
+}
+
 .doctor-activity-table tbody tr {
   transition: background-color 0.2s ease;
 }
@@ -3442,62 +3452,75 @@ body.auth-gated-home .calendar-dates {
   background: rgba(13, 95, 115, 0.06);
 }
 
-.doctor-activity-table .activity-patient-cell {
-  font-weight: 500;
-  line-height: 1.2;
-}
-
 .doctor-activity-table .activity-summary-cell {
   line-height: 1.2;
 }
 
+.doctor-activity-table .activity-primary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .doctor-activity-table .activity-primary {
-  font-size: 0.98rem;
+  font-size: 0.93rem;
   font-weight: 700;
   color: var(--text-color);
+  line-height: 1.35;
 }
 
 .doctor-activity-table .activity-secondary {
-  margin-top: 2px;
-  font-size: 0.82rem;
+  margin-top: 4px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   color: var(--text-muted);
 }
 
-.doctor-activity-table .activity-status-pill {
+.doctor-activity-table .activity-type-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-top: 6px;
-  padding: 2px 9px;
+  flex-shrink: 0;
+  padding: 3px 9px;
   border-radius: 999px;
-  font-size: 0.74rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   border: 1px solid transparent;
 }
 
-.doctor-activity-table .activity-status-pill.is-success {
-  color: #1f6f3d;
-  background: rgba(84, 184, 126, 0.16);
-  border-color: rgba(84, 184, 126, 0.34);
+.doctor-activity-table .activity-type-chip.is-exercise {
+  color: #0f6070;
+  background: rgba(65, 165, 186, 0.2);
+  border-color: rgba(28, 132, 151, 0.35);
 }
 
-.doctor-activity-table .activity-status-pill.is-failed {
-  color: #9a2f2f;
-  background: rgba(217, 100, 100, 0.16);
-  border-color: rgba(217, 100, 100, 0.32);
-}
-
-.doctor-activity-table .activity-status-pill.is-neutral {
-  color: #355d6a;
-  background: rgba(53, 93, 106, 0.11);
-  border-color: rgba(53, 93, 106, 0.24);
+.doctor-activity-table .activity-type-chip.is-assessment {
+  color: #6a4587;
+  background: rgba(214, 180, 95, 0.2);
+  border-color: rgba(177, 121, 208, 0.34);
 }
 
 .doctor-activity-table .activity-time-cell {
-  font-size: 0.88rem;
+  font-size: 0.82rem;
+  font-weight: 600;
   color: #284956;
   white-space: nowrap;
+}
+
+body.dark-mode .doctor-activity-table .activity-type-chip.is-exercise {
+  color: #9be2f2;
+  background: rgba(65, 165, 186, 0.22);
+  border-color: rgba(120, 217, 235, 0.42);
+}
+
+body.dark-mode .doctor-activity-table .activity-type-chip.is-assessment {
+  color: #f0dcb2;
+  background: rgba(135, 92, 165, 0.28);
+  border-color: rgba(228, 191, 112, 0.48);
 }
 
 .doctor-table th {
@@ -7878,6 +7901,10 @@ body.dark-mode .diag-prompt-text {
   border-color: #4d869c;
   background: rgba(77, 134, 156, 0.16);
   color: #245a6d;
+}
+
+.exercise-choice-card i {
+  margin-right: 8px;
 }
 
 .exercise-options-wrap {
