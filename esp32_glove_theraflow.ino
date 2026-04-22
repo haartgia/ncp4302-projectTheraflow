@@ -26,10 +26,14 @@ const int PER_FINGER_SETTLE_MS = 3000;
 const unsigned long PRINT_INTERVAL_MS = 200;
 const unsigned long SYNC_INTERVAL_MS = 400;
 const int FLEX_RAW_JUMP_THRESHOLD = 220;
+const float FORCE_DEADZONE_PERCENT = 3.0f;
+const float FORCE_MAX_NEWTON = 420.0f;
+const float FORCE_CURVE_GAMMA = 1.35f;
 
 float smoothedAngles[FLEX_COUNT] = {0, 0, 0, 0, 0};
 float smoothedGrip = 0;
 float smoothedGripPercent = 0;
+float smoothedGripForceN = 0;
 float smoothingFactor = 0.25;
 
 int straightValues[FLEX_COUNT] = {0, 0, 0, 0, 0};
@@ -192,6 +196,15 @@ float mapFlexToAngle(int flexValue, int straightValue, int bendValue) {
   return angle;
 }
 
+float mapGripPercentToForce(float gripPercent) {
+  // Convert calibrated grip percentage to a realistic force profile (0..~420 N).
+  float clampedPercent = constrain(gripPercent, 0.0f, 100.0f);
+  float normalized = (clampedPercent - FORCE_DEADZONE_PERCENT) / (100.0f - FORCE_DEADZONE_PERCENT);
+  normalized = constrain(normalized, 0.0f, 1.0f);
+  float curved = pow(normalized, FORCE_CURVE_GAMMA);
+  return curved * FORCE_MAX_NEWTON;
+}
+
 void updateLiveSensorState() {
   for (int i = 0; i < FLEX_COUNT; i++) {
     int flexValue = readAverageFlex(flexPins[i], LIVE_READ_SAMPLES);
@@ -219,7 +232,10 @@ void updateLiveSensorState() {
   // Primary force signal now uses the real sensor reading (raw ADC units).
   smoothedGrip = smoothedGrip + (((float)gripValue) - smoothedGrip) * smoothingFactor;
   smoothedGripPercent = smoothedGripPercent + (gripPercent - smoothedGripPercent) * smoothingFactor;
-  peakForce = max(peakForce, smoothedGrip);
+
+  float estimatedForceN = mapGripPercentToForce(smoothedGripPercent);
+  smoothedGripForceN = smoothedGripForceN + (estimatedForceN - smoothedGripForceN) * smoothingFactor;
+  peakForce = max(peakForce, smoothedGripForceN);
 }
 
 void printFingerCalibrationData(const char* label, const int values[]) {
@@ -431,7 +447,7 @@ void syncHeartbeat(const char* status, const char* note) {
   doc["patient_id"] = patientId;
   doc["source"] = "esp32_glove";
   doc["status"] = status;
-  doc["grip_strength"] = smoothedGrip;
+  doc["grip_strength"] = smoothedGripForceN;
   doc["grip_percent"] = smoothedGripPercent;
   doc["repetitions"] = repetitions;
   doc["peakForce"] = peakForce;
@@ -751,15 +767,17 @@ void loop() {
     }
 
     Serial.print("Grip: ");
+    Serial.print(smoothedGripForceN, 1);
+    Serial.print(" N (raw ");
     Serial.print(smoothedGrip, 1);
-    Serial.print(" raw (percent ");
+    Serial.print(", percent ");
     Serial.print(smoothedGripPercent, 1);
     Serial.println("%)");
     lastPrint = millis();
   }
 
   if (millis() - lastSyncAt >= SYNC_INTERVAL_MS) {
-    syncReading(smoothedGrip);
+    syncReading(smoothedGripForceN);
     lastSyncAt = millis();
   }
 }

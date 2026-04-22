@@ -5264,6 +5264,8 @@ function initializeExerciseHubPage() {
         lastReadingTs: 0
     };
 
+    const TEST_SHOTCLOCK_SECONDS = 30;
+
     const exerciseLabelMap = {
         open_close_hand: "Open-Close Hand",
         full_grip_hold: "Full Grip (Hold)",
@@ -5284,6 +5286,11 @@ function initializeExerciseHubPage() {
         const mm = Math.floor(safeSeconds / 60);
         const ss = String(safeSeconds % 60).padStart(2, "0");
         return `${mm}:${ss}`;
+    }
+
+    function formatShotClock(totalSeconds) {
+        const safeSeconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+        return String(safeSeconds).padStart(2, "0");
     }
 
     function openSessionSummaryModal(summary) {
@@ -5990,7 +5997,7 @@ function initializeExerciseHubPage() {
         if (testRepsEl) testRepsEl.textContent = "0";
         if (testMovementEl) testMovementEl.textContent = "0.0°";
         if (testForceEl) testForceEl.textContent = "0.0 N";
-        if (testTimeEl) testTimeEl.textContent = "0:00";
+        if (testTimeEl) testTimeEl.textContent = formatShotClock(TEST_SHOTCLOCK_SECONDS);
         if (testForceDialEl) {
             testForceDialEl.style.setProperty("--dial-angle", "-120deg");
         }
@@ -6055,7 +6062,7 @@ function initializeExerciseHubPage() {
         if (testRepsEl) testRepsEl.textContent = "0";
         if (testMovementEl) testMovementEl.textContent = "0.0°";
         if (testForceEl) testForceEl.textContent = "0.0 N";
-        if (testTimeEl) testTimeEl.textContent = "0:00";
+        if (testTimeEl) testTimeEl.textContent = formatShotClock(TEST_SHOTCLOCK_SECONDS);
         updateTestProgressRing(0);
 
         startTestBtn.disabled = true;
@@ -6116,8 +6123,7 @@ function initializeExerciseHubPage() {
 
             const avgForce = testState.totalForce / testState.sampleCount;
             const elapsed = testState.startTime ? Math.floor((Date.now() - testState.startTime) / 1000) : 0;
-            const mm = Math.floor(elapsed / 60);
-            const ss = String(elapsed % 60).padStart(2, "0");
+            const remaining = Math.max(0, TEST_SHOTCLOCK_SECONDS - elapsed);
             const movementLabel = movementState.phase === "open" ? "OPEN" : movementState.phase === "close" ? "CLOSED" : "MID";
             const displayedMovement = movementState.phase === "middle" ? movement : movementState.normalizedDeg;
             updateTestFingerGauges(reading.fingerAngles, displayedMovement);
@@ -6125,7 +6131,7 @@ function initializeExerciseHubPage() {
             if (testRepsEl) testRepsEl.textContent = String(testState.reps);
             if (testMovementEl) testMovementEl.textContent = `${movementLabel} ${displayedMovement.toFixed(1)}°`;
             if (testForceEl) testForceEl.textContent = `${avgForce.toFixed(1)} N`;
-            if (testTimeEl) testTimeEl.textContent = `${mm}:${ss}`;
+            if (testTimeEl) testTimeEl.textContent = formatShotClock(remaining);
             if (testForceDialEl) {
                 const cappedForce = Math.max(0, Math.min(60, Number(avgForce) || 0));
                 const dialAngle = -120 + ((cappedForce / 60) * 240);
@@ -6146,6 +6152,28 @@ function initializeExerciseHubPage() {
             if (!testCompleted && testState.sampleCount > 0) {
                 testCompleted = true;
                 updateStepNavigationState();
+            }
+
+            if (remaining <= 0) {
+                if (testState.intervalId) {
+                    clearInterval(testState.intervalId);
+                    testState.intervalId = null;
+                }
+                testState.isRunning = false;
+                if (startTestBtn) startTestBtn.disabled = false;
+                if (stopTestBtn) stopTestBtn.disabled = true;
+
+                try {
+                    await requestGloveCommand("stop_session");
+                } catch {
+                    // Keep UI responsive even if glove acknowledgment is delayed.
+                }
+
+                if (testCompleted) {
+                    setMsg(testStatus, "30-second test complete. Continue to Step 4.");
+                } else {
+                    setMsg(testStatus, "30-second test complete, but no valid sample was captured. Start test again.");
+                }
             }
         }, 1000);
     });

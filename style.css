@@ -8100,7 +8100,7 @@ body.exercise-hub-page #stepTest .session-main-focus.session-main-focus-bars {
 body.exercise-hub-page #stepTest .test-horizontal-panel {
   padding: 18px;
   align-items: stretch;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 14px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid #c9dbe2;
@@ -8108,20 +8108,26 @@ body.exercise-hub-page #stepTest .test-horizontal-panel {
 
 body.exercise-hub-page #stepTest .test-horizontal-row {
   display: grid;
-  grid-template-columns: 160px 1fr 220px;
-  gap: 18px;
-  align-items: stretch;
+  grid-template-columns: minmax(124px, 140px) minmax(0, 1fr) minmax(190px, 210px);
+  column-gap: 14px;
+  align-items: center;
 }
 
 body.exercise-hub-page #stepTest .test-timer-panel {
   border: 1px solid #c3d7df;
   border-radius: 14px;
   background: #f3f8fa;
-  padding: 12px 14px;
+  width: 100%;
+  max-width: 138px;
+  min-height: 92px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  align-self: start;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+  align-self: center;
 }
 
 body.exercise-hub-page #stepTest .test-inline-label {
@@ -8130,21 +8136,22 @@ body.exercise-hub-page #stepTest .test-inline-label {
   font-weight: 700;
   text-transform: uppercase;
   color: #6a8592;
+  line-height: 1;
 }
 
 body.exercise-hub-page #stepTest .test-inline-value {
-  font-size: 1.65rem;
-  line-height: 1.1;
+  font-size: 2rem;
+  line-height: 1;
   font-weight: 800;
   color: #1f5668;
-  margin-top: 4px;
+  margin-top: 0;
 }
 
 body.exercise-hub-page #stepTest .test-finger-gauge-row {
   display: grid;
   grid-template-columns: repeat(5, minmax(64px, 1fr));
-  gap: 12px;
-  align-items: end;
+  gap: 14px;
+  align-items: center;
 }
 
 body.exercise-hub-page #stepTest .test-gauge-cell {
@@ -8186,10 +8193,10 @@ body.exercise-hub-page #stepTest .test-gauge-name {
 }
 
 body.exercise-hub-page #stepTest .test-force-panel {
-  border: 1px solid #c3d7df;
-  border-radius: 14px;
-  background: #f3f8fa;
-  padding: 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -8256,19 +8263,6 @@ body.exercise-hub-page #stepTest .test-force-label {
   color: #2e5f70;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-}
-
-body.exercise-hub-page #stepTest .test-movement-summary {
-  margin-top: 2px;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #3f6675;
-}
-
-body.exercise-hub-page #stepTest .test-movement-summary strong {
-  color: #1f5668;
-  font-weight: 800;
-  margin-left: 6px;
 }
 
 body.exercise-hub-page #stepTest .finger-bar-grid {

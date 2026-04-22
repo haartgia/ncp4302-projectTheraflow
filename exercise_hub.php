@@ -97,7 +97,7 @@ if (!isset($_SESSION['role']) || strtolower((string) $_SESSION['role']) !== 'pat
                             <div class="test-horizontal-row">
                                 <div class="test-timer-panel" id="hubTestTimerTile">
                                     <div class="test-inline-label">Timer</div>
-                                    <div class="test-inline-value" id="hubTestTime">30 Secs</div>
+                                    <div class="test-inline-value" id="hubTestTime">30</div>
                                 </div>
 
                                 <div class="test-finger-gauge-row" id="hubTestFingerGauges" aria-live="polite">
@@ -138,8 +138,6 @@ if (!isset($_SESSION['role']) || strtolower((string) $_SESSION['role']) !== 'pat
                                     <div class="test-force-label">Force</div>
                                 </div>
                             </div>
-
-                            <div class="test-movement-summary">Finger Movement <strong id="hubTestMovement">OPEN 0.0&deg;</strong></div>
                         </div>
                     </div>
 
